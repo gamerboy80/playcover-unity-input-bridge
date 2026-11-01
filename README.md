@@ -46,8 +46,9 @@ two installer commands at once. Restore any earlier experimental patch first.
   carries into the next event. Each emitted step is also converted into a normal,
   non-precise AppKit line-wheel event, preserving its location and targeting the
   active game window. It is freshly created, without copied gesture metadata.
-  The original gesture is consumed and the wheel event is queued inside the app
-  to re-enter the ordinary wheel handler once.
+  The original gesture is consumed. A main-queue callback processes the ordinary
+  wheel event once and delivers it to the native view under the cursor, with
+  an explicit game-window binding.
   A new gesture or focus loss clears the remainder.
   Physical notched wheels remain immediate. The game's original mouse component
   processes scrolling against the current bridge Mouse, including login settings.
@@ -80,7 +81,8 @@ full-size Mouse state padding, and actual AppKit event conversion. The native
 event test checks that a precise gesture becomes a non-precise wheel with the
 expected notch counts while preserving its location, then survives an AppKit
 queue/dequeue cycle without becoming precise again. With WindowServer access,
-it also checks destination-window binding after dequeueing. That check is skipped
+it also checks destination-window binding, hit testing, and delivery to the
+native view's `scrollWheel` handler. Window checks are skipped
 in a headless sandbox. Builds enable warnings as errors
 and assert Unity event layouts. Keyboard, WASD release, F1/F2, mouse look, and
 capture/release were confirmed in a physical gameplay test before the scroll update.

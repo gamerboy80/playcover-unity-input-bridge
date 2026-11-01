@@ -7,13 +7,31 @@
 
 @interface NSObject (ZZZWheelWindowBinding)
 - (id)_eventRelativeToWindow:(id)window;
+- (id)window;
+- (id)contentView;
+- (id)superview;
+- (CGPoint)locationInWindow;
+- (CGPoint)convertPoint:(CGPoint)point fromView:(id)view;
+- (id)hitTest:(CGPoint)point;
+- (void)scrollWheel:(id)event;
 @end
 
 static inline id bindNativeWheelToWindow(id event, id window) {
+    if (window && [event window]==window) return event;
     if (window && [event respondsToSelector:@selector(_eventRelativeToWindow:)]) {
         return [event _eventRelativeToWindow:window];
     }
     return event;
+}
+
+static inline void dispatchNativeWheelToWindow(id event, id window) {
+    event=bindNativeWheelToWindow(event, window);
+    id content=[window contentView];
+    id parent=[content superview];
+    CGPoint point=[event locationInWindow];
+    if (parent) point=[parent convertPoint:point fromView:nil];
+    id target=[content hitTest:point] ?: content;
+    [target scrollWheel:event];
 }
 
 typedef void *(*CreateWheel)(void *, uint32_t, uint32_t, int32_t, ...);

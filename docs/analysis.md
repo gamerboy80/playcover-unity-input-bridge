@@ -75,9 +75,10 @@ processing is preserved rather than bypassed with a game-action patch.
 Both axes accumulate precise trackpad deltas until 16 points produce a standard
 120-unit wheel event. A fresh native line-scroll CGEvent becomes a non-continuous
 AppKit wheel event, preserving the source location and targeting the game window.
-Trackpad gesture metadata is not copied. It is queued within the app
-to re-enter the normal wheel handler; the original precise event is consumed,
-avoiding recursive conversion or duplicate Unity delivery. Fractions carry forward; gesture start/cancel and focus loss
+Trackpad gesture metadata is not copied. It is scheduled on the main queue
+after the gesture callback, processed once through the ordinary wheel handler,
+and delivered to the hit-tested native view's scrollWheel handler; the original
+precise event is consumed, avoiding recursive conversion or duplicate delivery. Fractions carry forward; gesture start/cancel and focus loss
 clear the remainders. A scroll event without a window can use the active
 application's key window. The original mouse component is enabled after the
 bridge validates its Mouse, rather than waiting for game-asset loading, so the
@@ -97,3 +98,10 @@ discard that binding. The ordinary wheel handler therefore reapplies the binding
 after dequeueing, before returning the event for UI dispatch. A WindowServer-backed
 test verifies this routing sequence with an invisible test window. The private
 selector is checked at runtime; its availability is an OS compatibility constraint.
+
+Production dispatch retains the bound NSEvent in a main-queue callback rather
+than relying on implicit monitor re-entry through NSApplication.postEvent. The
+callback processes its coarse event once, binds it to the game window, hit-tests
+the window's content view and invokes the native target's scrollWheel handler.
+The WindowServer-backed regression test verifies that the real target NSView
+receives the correct coarse deltas through this same helper.

@@ -36,7 +36,6 @@
 @property(readonly) id keyWindow;
 @property(readonly) BOOL isActive;
 + (id)sharedApplication;
-- (void)postEvent:(id)event atStart:(BOOL)atStart;
 + (void)hide;
 + (void)unhide;
 @end
@@ -213,8 +212,10 @@ static id handleEvent(ZZZHostEvent *event) {
         if (mouseState.sx==0 && mouseState.sy==0) return nil;
         wheelEvent=nativeWheelEvent(event, window, mouseState.sx, mouseState.sy);
         if (precise && wheelEvent && ![wheelEvent hasPreciseScrollingDeltas]) {
-            id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-            [app postEvent:wheelEvent atStart:NO];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                id forwarded=handleEvent(wheelEvent);
+                if (forwarded) dispatchNativeWheelToWindow(forwarded, window);
+            });
             mouseState.sx=mouseState.sy=0;
             return nil;
         }

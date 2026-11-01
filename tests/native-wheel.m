@@ -2,6 +2,17 @@
 #include "../src/NativeWheel.h"
 #include <assert.h>
 
+@interface WheelTestView : NSView
+@property NSInteger received;
+@end
+@implementation WheelTestView
+- (void)scrollWheel:(NSEvent *)event {
+    assert(!event.hasPreciseScrollingDeltas);
+    assert(event.scrollingDeltaY==2 && event.scrollingDeltaX==-1);
+    self.received++;
+}
+@end
+
 int main(void) {
     @autoreleasepool {
         CGEventRef original=CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 2, 32, -16);
@@ -21,10 +32,18 @@ int main(void) {
         NSWindow *window=[[NSWindow alloc] initWithContentRect:NSMakeRect(100,100,300,200)
             styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
         if (window.windowNumber>0) {
+            WheelTestView *view=[[WheelTestView alloc] initWithFrame:NSMakeRect(0,0,300,200)];
+            window.contentView=view;
+            CGPoint point=[window convertPointToScreen:CGPointMake(50,50)];
+            point.y=NSScreen.screens.firstObject.frame.size.height-point.y;
+            CGEventSetLocation(copy,point);
+            wheel=[NSEvent eventWithCGEvent:copy];
             assert(wheel.windowNumber==0);
             wheel=bindNativeWheelToWindow(wheel, window);
             assert(wheel.window==window && wheel.windowNumber==window.windowNumber);
             assert(!wheel.hasPreciseScrollingDeltas);
+            dispatchNativeWheelToWindow(wheel,window);
+            assert(view.received==1);
         } else {
             fprintf(stderr,"SKIP: Window binding needs WindowServer access\n");
         }
