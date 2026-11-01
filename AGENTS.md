@@ -15,6 +15,8 @@ exact-build patcher. Read `README.md`, `docs/porting.md`, the selected profile, 
 - `src/NativeInputBridge.m`: shared AppKit event monitoring, Unity device setup,
   keyboard/mouse state queueing and capture. It consumes named generated constants.
   `InputState.h`, `Scroll.h`, `NativeWheel.h`, and `MousePresence.h` hold shared handling.
+- `src/LegacyBackend.h`: legacy Unity/InControl input for `hsr`, selected at build
+  time by the profile while retaining the shared AppKit host.
 - `patch.py`: identity/hash guards, byte edits, Mach-O library linking, originals,
   signing, rollback, status and restore. `build.sh` builds a profile-specific dylib.
 - `patches/`: optional PlayTools source changes, separate from game byte patches.
@@ -59,7 +61,10 @@ synthetic event tests. Do not infer hardware success from nonzero Unity state.
 
 ## Current known state
 
-Only ZZZ 3.3.0's listed arm64 binary has been analyzed. Keyboard, WASD release,
+ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`hsr`) uses legacy input
+and two PC-layout predicates; initialization is observed but physical gameplay
+is unconfirmed. Read `docs/hsr.md` for its ABI and provisional camera scale.
+For ZZZ, keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.
 

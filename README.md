@@ -1,4 +1,4 @@
-# ZZZ PC controls on Apple Silicon
+# Native Unity PC controls on Apple Silicon
 
 Enables the existing PC control path in Zenless Zone Zero's iOS build running
 under PlayCover, then bridges macOS keyboard and mouse events into Unity's
@@ -12,7 +12,8 @@ refuses other binaries. An update to the game requires new analysis.
 
 See [porting instructions](docs/porting.md) to add a version or another compatible
 Unity game, and [AGENTS.md](AGENTS.md) for repository architecture and development
-rules. Only the listed ZZZ build has been examined; other games are not yet supported.
+rules. HSR 4.6.0 also has an experimental [`hsr` profile](profiles/hsr.json)
+using the legacy Unity/InControl backend; see [HSR status and analysis](docs/hsr.md).
 
 ## Build and install
 
@@ -32,10 +33,13 @@ List profiles or select one explicitly:
 python3 patch.py profiles
 python3 patch.py build --profile zzz-3.3.0
 python3 patch.py install --profile zzz-3.3.0
+python3 patch.py install --profile hsr
 ```
 
 `zzz-3.3.0` remains the default. Builds generate `build/<profile-id>/Profile.h`
 from JSON and compile a matching `NativeInputBridge.dylib` in that directory.
+The profiles share macOS input/capture handling and select different game-facing
+backends. HSR builds and backups are independent of ZZZ.
 
 The default app location is
 `~/Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app`.

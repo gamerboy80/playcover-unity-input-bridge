@@ -15,6 +15,10 @@ FIELD_NAMES = {
     'StaticInputManager', 'StaticKeyboard', 'StaticMouse', 'DeviceID',
     'StateBlock', 'MousePosition', 'MouseDelta', 'MouseScroll',
 }
+LEGACY_ADDRESSES = {'ScreenWidth','ScreenHeight','CursorLock','CursorVisible','FrameCount',
+    'SetKey','MousePositionSlot','MouseScrollSlot','MouseButtonSlot',
+    'MouseButtonDownSlot','MouseButtonUpSlot','AxisSlot','AxisRawSlot','LegacyMousePresentSlot'}
+
 OPTIONAL_ADDRESSES = {'GetMouseProcessing', 'MouseProcessingEnabled', 'ReadProcessedScroll',
                       'LegacyMousePresent', 'LegacyMousePresentSlot'}
 
@@ -66,11 +70,13 @@ def validate(data, profile_id):
     ranges.sort()
     require(all(a[1] <= b[0] for a, b in zip(ranges, ranges[1:])), 'Overlapping patches')
     bridge = data['bridge']
-    require(bridge['backend'] == 'unity-input-system-v1', 'Unsupported bridge backend')
+    require(bridge['backend'] in ('unity-input-system-v1','unity-legacy-v1'), 'Unsupported bridge backend')
+    legacy = bridge['backend'] == 'unity-legacy-v1'
     require(bridge['image_suffix'] == '/' + '/'.join(binary.parts[1:]), 'Image suffix mismatch')
     require(type(bridge['mouse_state_bytes']) is int and 30 <= bridge['mouse_state_bytes'] <= 64,
             'Mouse payload must fit the supported layout')
-    for group, expected_names in (('addresses', ADDRESS_NAMES), ('fields', FIELD_NAMES)):
+    for group, expected_names in (('addresses', LEGACY_ADDRESSES if legacy else ADDRESS_NAMES),
+                                  ('fields', set() if legacy else FIELD_NAMES)):
         names = set(bridge[group])
         allowed = expected_names | (OPTIONAL_ADDRESSES if group == 'addresses' else set())
         require(expected_names <= names <= allowed, f'Unexpected/missing bridge {group}')
@@ -79,7 +85,7 @@ def validate(data, profile_id):
             require(number > 0 or name == 'EnableMouseProcessing' or name in OPTIONAL_ADDRESSES, f'Zero {name}')
             if group == 'addresses':
                 require(number % 4 == 0, f'Unaligned address: {name}')
-                if name == 'LegacyMousePresentSlot':
+                if name.endswith('Slot'):
                     require(number % 8 == 0, 'Unaligned mouse presence callback slot')
     require(all(isinstance(data['validation'][key], str) and data['validation'][key]
                 for key in ('keyboard_mouse', 'trackpad', 'evidence')), 'Missing validation notes')
@@ -106,6 +112,7 @@ def generate_header(profile):
     for name, value in (('ProfileID', profile['id']), ('BundleID', profile['bundle_id']),
                         ('Version', profile['version']), ('ImageSuffix', bridge['image_suffix'])):
         lines.append(f'#define Game{name} {json.dumps(value)}')
+    lines.append(f'#define GameLegacyBackend {int(bridge["backend"] == "unity-legacy-v1")}')
     lines.append(f'#define GameMouseStateBytes {bridge["mouse_state_bytes"]}')
     for group, prefix in (('addresses', 'Game'), ('fields', 'GameField')):
         values = dict(bridge[group])

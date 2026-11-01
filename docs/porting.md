@@ -3,7 +3,10 @@
 The reusable part is macOS event handling and a specific Unity Input System ABI.
 The profile supplies game identity, binary edits, addresses and field offsets.
 A similar Unity or HoYoverse game is not automatically compatible. This repository
-currently contains one examined build: `profiles/zzz-3.3.0.json`.
+contains the ZZZ new Input System profile and an experimental HSR legacy/InControl
+profile. Both use one AppKit host; `bridge.backend` selects game-facing code.
+See [HSR's backend contract](hsr.md) for `unity-legacy-v1`. The tables below
+describe the ZZZ `unity-input-system-v1` contract.
 
 ## Select and build a profile
 

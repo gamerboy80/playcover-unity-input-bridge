@@ -12,8 +12,12 @@ class ProfileTests(unittest.TestCase):
                 profile = load_profile(path.stem)
                 header = generate_header(profile)
                 self.assertIn('#define GameProfileID "' + path.stem + '"', header)
-                self.assertIn('#define GameMouseMakeCurrent ', header)
-                self.assertIn('#define GameFieldMouseScroll ', header)
+                if profile['bridge']['backend']=='unity-input-system-v1':
+                    self.assertIn('#define GameMouseMakeCurrent ', header)
+                    self.assertIn('#define GameFieldMouseScroll ', header)
+                else:
+                    self.assertIn('#define GameSetKey ', header)
+                    self.assertIn('#define GameLegacyBackend 1', header)
                 self.assertEqual(header, generate_header(profile))
 
     def test_a_new_profile_changes_generated_runtime_values(self):

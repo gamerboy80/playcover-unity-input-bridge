@@ -47,7 +47,10 @@
 + (void)unhide;
 @end
 
-static uintptr_t slide, mouse, keyboard;
+static uintptr_t slide;
+#if !GameLegacyBackend
+static uintptr_t mouse, keyboard;
+#endif
 // The unity-input-system-v1 backend uses the 110-key, 14-byte Unity Key bitset.
 static uint8_t keys[14];
 static MouseState mouseState;
@@ -62,18 +65,25 @@ static unsigned int (*cursorVisible)(void);
 static BOOL wasActive;
 static bool discardFirstMotion;
 static double captureNotBefore, ignoreMotionUntil;
-static BOOL sawScroll, sawScrollState, sawPreciseScroll;
+static BOOL sawScroll, sawPreciseScroll;
+#if !GameLegacyBackend
+static BOOL sawScrollState;
+#endif
+#if !GameLegacyBackend
 static size_t mouseStateBytes;
+#endif
 static double scrollRemainderX, scrollRemainderY;
 static CreateWheel createCGWheel;
 static void (*setCGInteger)(void *, uint32_t, int64_t);
 static CGPoint (*getCGLocation)(void *);
 static void (*setCGLocation)(void *, CGPoint);
 static BOOL sawNativeWheel;
-static unsigned preciseEvents, wheelEvents, emittedSteps, queuedScrolls, traceLines;
-static unsigned controlSamples, processedSamples;
+static unsigned preciseEvents, wheelEvents, emittedSteps, queuedScrolls;
+#if !GameLegacyBackend
+static unsigned controlSamples, processedSamples, traceLines;
 static double lastTrace;
 static BOOL tracePending;
+#endif
 static MousePresentCallback originalMousePresent;
 static unsigned mousePresentCalls;
 
@@ -88,6 +98,7 @@ static bool bridgeMousePresent(void) {
     return ready || (originalMousePresent && originalMousePresent());
 }
 
+#if !GameLegacyBackend
 static void traceScroll(void) {
     if (!output || !tracePending || traceLines>=30) return;
     uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
@@ -116,6 +127,8 @@ static void traceScroll(void) {
         legacy,mousePresentCalls);
     fflush(output);
 }
+
+#endif
 
 static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     if (!event.hasPreciseScrollingDeltas) return bindNativeWheelToWindow(event, window);
@@ -157,6 +170,9 @@ static unsigned unityKey(unsigned code) {
     return code < sizeof(map) ? map[code] : 0;
 }
 
+#if GameLegacyBackend
+#include "LegacyBackend.h"
+#else
 static void queueState(uintptr_t device, uint32_t format, const void *state, size_t size) {
     if (!ready || !device) return;
     int deviceID = *(int *)(device + GameFieldDeviceID);
@@ -180,6 +196,8 @@ static void sendMouse(void) {
     }
     mouseState.dx = mouseState.dy = mouseState.sx = mouseState.sy = 0;
 }
+
+#endif
 
 static void setCapture(BOOL value) {
     Class cursorClass = NSClassFromString(@"NSCursor");
@@ -246,7 +264,9 @@ static id handleEvent(ZZZHostEvent *event) {
     id window=event.window;
     if (type==22) {
         if (event.hasPreciseScrollingDeltas) preciseEvents++; else wheelEvents++;
+#if !GameLegacyBackend
         tracePending=YES;
+#endif
         if (event.hasPreciseScrollingDeltas && !sawPreciseScroll) {
             sawPreciseScroll=YES; note("Precise trackpad scroll event received");
         }
@@ -334,9 +354,13 @@ static void initializeDevices(void) {
         }
     }
     if (!slide) return;
-    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
-    if (!statics || !*(uintptr_t *)(statics+GameFieldStaticInputManager) || !*(uintptr_t *)(statics+GameFieldStaticKeyboard)) return;
     if (!ready) {
+#if GameLegacyBackend
+        if (!initializeLegacy()) return;
+        Class eventClass=NSClassFromString(@"NSEvent");
+#else
+        uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
+        if (!statics || !*(uintptr_t *)(statics+GameFieldStaticInputManager) || !*(uintptr_t *)(statics+GameFieldStaticKeyboard)) return;
         Class eventClass=NSClassFromString(@"NSEvent");
         if (!eventClass) { note("AppKit event class unavailable"); [timer invalidate]; return; }
         void *(*newString)(const char *,int)=(void *)(slide+GameNewString);
@@ -351,6 +375,7 @@ static void initializeDevices(void) {
         if (mouseBlock[0]!=0x4d4f5553 || mouseStateBytes!=GameMouseStateBytes) {
             note("Unexpected Mouse state layout; bridge disabled"); [timer invalidate]; return;
         }
+#endif
         ready=YES;
         if (GameLegacyMousePresentSlot!=0) {
             MousePresentCallback *slot=(void *)(slide+GameLegacyMousePresentSlot);
@@ -363,22 +388,29 @@ static void initializeDevices(void) {
         for (unsigned i=0;i<sizeof(types)/sizeof(types[0]);i++) mask|=(NSUInteger)1<<types[i];
         monitor=[(id)eventClass addLocalMonitorForEventsMatchingMask:mask handler:^id(id e) { return handleEvent(e); }];
         if (!monitor) { ready=NO; note("Event monitor unavailable"); [timer invalidate]; return; }
+#if !GameLegacyBackend
         uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (output && scroll) {
             uint32_t *block=(uint32_t *)(scroll+GameFieldStateBlock);
             fprintf(output,"Scroll control format=%08x byteOffset=%u bitOffset=%u size=%u\n",block[0],block[1],block[2],block[3]);
             fflush(output);
         }
+#endif
         [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationDidResignActiveNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
         [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationWillTerminateNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
+#if !GameLegacyBackend
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
         if (GameEnableMouseProcessing) {
             ((void (*)(BOOL))(slide+GameEnableMouseProcessing))(YES);
             note("Game mouse processing initialized before login");
         }
+#endif
         note("Native devices initialized; local keyboard/mouse events enabled. Option+M toggles capture; Escape releases manual capture.");
+#if !GameLegacyBackend
         if (output) { fprintf(output,"mouseID=%d keyboardID=%d position=%p delta=%p\n",*(int *)(mouse+GameFieldDeviceID),*(int *)(keyboard+GameFieldDeviceID),(void *)*(uintptr_t *)(mouse+GameFieldMousePosition),(void *)*(uintptr_t *)(mouse+GameFieldMouseDelta)); fflush(output); }
+#endif
     }
+#if !GameLegacyBackend
     if (sawScroll && !sawScrollState) {
         uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (scroll) {
@@ -387,10 +419,12 @@ static void initializeDevices(void) {
         }
     }
     traceScroll();
+    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
     uintptr_t currentMouse=*(uintptr_t *)(statics+GameFieldStaticMouse);
     if (!currentMouse || !*(uintptr_t *)(currentMouse+GameFieldMousePosition) || !*(uintptr_t *)(currentMouse+GameFieldMouseDelta)) {
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
     }
+#endif
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     BOOL active=[app isActive];
     double now=NSProcessInfo.processInfo.systemUptime;
@@ -424,6 +458,8 @@ __attribute__((constructor)) static void start(void) {
             return;
         }
         NSString *path=[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/LogDir/NativeInputBridge.log"];
+        [[NSFileManager defaultManager] createDirectoryAtPath:path.stringByDeletingLastPathComponent
+            withIntermediateDirectories:YES attributes:nil error:nil];
         output=fopen(path.fileSystemRepresentation,"w");
         note(GameProfileID " native input experiment; no key logging");
         associateCursor=(int (*)(int))dlsym(RTLD_DEFAULT,"CGAssociateMouseAndMouseCursorPosition");

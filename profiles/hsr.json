@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "hsr",
+  "game": "Honkai: Star Rail",
+  "version": "4.6.0",
+  "bundle_id": "com.HoYoverse.hkrpgoversea",
+  "executable": "hkrpg",
+  "architecture": "arm64",
+  "framework_binary": "Frameworks/UnityFramework.framework/UnityFramework",
+  "original_sha256": "29c5e8960e90bdd1f877f2b3e040deb965506325c922e826c80fee5840115dcd",
+  "patches": [
+    {
+      "name": "pc-layout",
+      "reason": "AppUtils.IsPCLayout: select PC layout without changing platform/network identity.",
+      "file_offset": "0xf2bde8",
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "20008052c0035fd6"
+    },
+    {
+      "name": "pc-ui",
+      "reason": "UIUtils.IsPCMode: enable PC UI path without spoofing the operating system.",
+      "file_offset": "0x226c378",
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "20008052c0035fd6"
+    }
+  ],
+  "bridge": {
+    "backend": "unity-legacy-v1",
+    "image_suffix": "/UnityFramework.framework/UnityFramework",
+    "mouse_state_bytes": 30,
+    "fields": {},
+    "addresses": {
+      "ScreenWidth": "0xe869018",
+      "ScreenHeight": "0xe869028",
+      "CursorLock": "0xe827c48",
+      "CursorVisible": "0xe827c28",
+      "FrameCount": "0xe8732f4",
+      "SetKey": "0xe89c394",
+      "MousePositionSlot": "0x15a50128",
+      "MouseScrollSlot": "0x15a50130",
+      "MouseButtonSlot": "0x15a50010",
+      "MouseButtonDownSlot": "0x15a50018",
+      "MouseButtonUpSlot": "0x15a50020",
+      "AxisSlot": "0x15a4ffe8",
+      "AxisRawSlot": "0x15a4fff0",
+      "LegacyMousePresentSlot": "0x15a50090"
+    }
+  },
+  "validation": {
+    "keyboard_mouse": "Experimental: native legacy hooks initialized and the game reached its resource downloader. About 47 GB of resources must download before physical gameplay validation.",
+    "trackpad": "Not yet tested on HSR.",
+    "evidence": "docs/hsr.md"
+  }
+}
