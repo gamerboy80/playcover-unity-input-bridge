@@ -1,0 +1,26 @@
+#import <AppKit/AppKit.h>
+#include "../src/NativeWheel.h"
+#include <assert.h>
+
+static void setInteger(void *event, uint32_t field, int64_t value) {
+    CGEventSetIntegerValueField(event, (CGEventField)field, value);
+}
+
+int main(void) {
+    @autoreleasepool {
+        CGEventRef original=CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 2, 32, -16);
+        CGEventSetLocation(original, CGPointMake(100, 200));
+        NSEvent *precise=[NSEvent eventWithCGEvent:original];
+        assert(precise.hasPreciseScrollingDeltas);
+        CGEventRef copy=CGEventCreateCopy(original);
+        setNativeWheelFields(copy, setInteger, -120, 240);
+        NSEvent *wheel=[NSEvent eventWithCGEvent:copy];
+        assert(!wheel.hasPreciseScrollingDeltas);
+        assert(wheel.scrollingDeltaY==2 && wheel.scrollingDeltaX==-1);
+        assert(CGPointEqualToPoint(CGEventGetLocation(copy), CGEventGetLocation(original)));
+        assert(CGEventGetIntegerValueField(copy, kCGScrollWheelEventScrollPhase)==0);
+        assert(CGEventGetIntegerValueField(copy, kCGScrollWheelEventMomentumPhase)==0);
+        assert(CGEventGetIntegerValueField(original, kCGScrollWheelEventIsContinuous)==1);
+        CFRelease(copy); CFRelease(original);
+    }
+}

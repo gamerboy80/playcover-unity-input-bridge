@@ -1,0 +1,28 @@
+diff --git a/PlayTools/Controls/PTFakeTouch/NSObject+Swizzle.m b/PlayTools/Controls/PTFakeTouch/NSObject+Swizzle.m
+index e50200f..b7254ee 100644
+--- a/PlayTools/Controls/PTFakeTouch/NSObject+Swizzle.m
++++ b/PlayTools/Controls/PTFakeTouch/NSObject+Swizzle.m
+@@ -333,7 +333,9 @@ + (void)load {
+     }
+     
+     [objc_getClass("_UIMenuBuilder") swizzleInstanceMethod:sel_getUid("initWithRootMenu:") withMethod:@selector(initWithRootMenuHook:)];
+-    [objc_getClass("IOSViewController") swizzleInstanceMethod:@selector(prefersPointerLocked) withMethod:@selector(hook_prefersPointerLocked)];
++    if ([[PlaySettings shared] keymapping]) {
++        [objc_getClass("IOSViewController") swizzleInstanceMethod:@selector(prefersPointerLocked) withMethod:@selector(hook_prefersPointerLocked)];
++    }
+     // Set idiom to iPad
+     // [objc_getClass("UIDevice") swizzleInstanceMethod:@selector(userInterfaceIdiom) withMethod:@selector(hook_userInterfaceIdiom)];
+     // [objc_getClass("UITraitCollection") swizzleInstanceMethod:@selector(userInterfaceIdiom) withMethod:@selector(hook_userInterfaceIdiom)];
+diff --git a/PlayTools/PlaySettings.swift b/PlayTools/PlaySettings.swift
+index a5f945b..ece1302 100644
+--- a/PlayTools/PlaySettings.swift
++++ b/PlayTools/PlaySettings.swift
+@@ -25,7 +25,7 @@ let settings = PlaySettings.shared
+ 
+     lazy var discordActivity = settingsData.discordActivity
+ 
+-    lazy var keymapping = settingsData.keymapping
++    @objc lazy var keymapping = settingsData.keymapping
+ 
+     lazy var notch = settingsData.notch
+ 
