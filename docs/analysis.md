@@ -75,7 +75,9 @@ processing is preserved rather than bypassed with a game-action patch.
 Both axes accumulate precise trackpad deltas until 16 points produce a standard
 120-unit wheel event. The copied native CGEvent is converted to a non-continuous
 AppKit wheel event, including line/fixed-point/pixel deltas and cleared gesture
-phases; event location/window metadata is retained. Fractions carry forward; gesture start/cancel and focus loss
+phases; event location/window metadata is retained. It is queued within the app
+to re-enter the normal wheel handler; the original precise event is consumed,
+avoiding recursive conversion or duplicate Unity delivery. Fractions carry forward; gesture start/cancel and focus loss
 clear the remainders. A scroll event without a window can use the active
 application's key window. The original mouse component is enabled after the
 bridge validates its Mouse, rather than waiting for game-asset loading, so the

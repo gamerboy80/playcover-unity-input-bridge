@@ -35,6 +35,7 @@
 @property(readonly) id keyWindow;
 @property(readonly) BOOL isActive;
 + (id)sharedApplication;
+- (void)postEvent:(id)event atStart:(BOOL)atStart;
 + (void)hide;
 + (void)unhide;
 @end
@@ -202,6 +203,12 @@ static id handleEvent(ZZZHostEvent *event) {
         mouseState.sy=unityScroll(&scrollRemainderY, event.scrollingDeltaY, precise);
         if (mouseState.sx==0 && mouseState.sy==0) return nil;
         wheelEvent=nativeWheelEvent(event, mouseState.sx, mouseState.sy);
+        if (precise && wheelEvent && ![wheelEvent hasPreciseScrollingDeltas]) {
+            id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
+            [app postEvent:wheelEvent atStart:NO];
+            mouseState.sx=mouseState.sy=0;
+            return nil;
+        }
         if (!sawScroll && (mouseState.sx!=0 || mouseState.sy!=0)) {
             sawScroll=YES; note("Nonzero local scroll event received");
         }

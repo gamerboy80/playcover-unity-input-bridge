@@ -21,6 +21,13 @@ int main(void) {
         assert(CGEventGetIntegerValueField(copy, kCGScrollWheelEventScrollPhase)==0);
         assert(CGEventGetIntegerValueField(copy, kCGScrollWheelEventMomentumPhase)==0);
         assert(CGEventGetIntegerValueField(original, kCGScrollWheelEventIsContinuous)==1);
+        NSApplication *app=NSApplication.sharedApplication;
+        [app postEvent:wheel atStart:NO];
+        NSEvent *queued=[app nextEventMatchingMask:NSEventMaskScrollWheel
+            untilDate:[NSDate dateWithTimeIntervalSinceNow:1]
+            inMode:NSDefaultRunLoopMode dequeue:YES];
+        assert(queued && !queued.hasPreciseScrollingDeltas);
+        assert(queued.scrollingDeltaY==2 && queued.scrollingDeltaX==-1);
         CFRelease(copy); CFRelease(original);
     }
 }

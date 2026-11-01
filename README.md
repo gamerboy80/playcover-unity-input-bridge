@@ -45,6 +45,8 @@ two installer commands at once. Restore any earlier experimental patch first.
   **16 points** emits one standard **120-unit wheel step**; leftover movement
   carries into the next event. Each emitted step is also converted into a normal,
   non-precise AppKit wheel event with its original location/window metadata.
+  The original gesture is consumed and the wheel event is queued inside the app
+  to re-enter the ordinary wheel handler once.
   A new gesture or focus loss clears the remainder.
   Physical notched wheels remain immediate. The game's original mouse component
   processes scrolling against the current bridge Mouse, including login settings.
@@ -75,7 +77,8 @@ The tests cover exact instruction edits, Mach-O load-command padding and rejecti
 of unsafe headers, wheel/trackpad conversion, threshold/remainder/direction behavior,
 full-size Mouse state padding, and actual AppKit event conversion. The native
 event test checks that a precise gesture becomes a non-precise wheel with the
-expected notch counts while preserving its location. Builds enable warnings as errors
+expected notch counts while preserving its location, then survives an AppKit
+queue/dequeue cycle without becoming precise again. Builds enable warnings as errors
 and assert Unity event layouts. Keyboard, WASD release, F1/F2, mouse look, and
 capture/release were confirmed in a physical gameplay test before the scroll update.
 The scroll update passes configuration loading with the original mouse component
