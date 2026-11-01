@@ -17,7 +17,7 @@ FIELD_NAMES = {
     'StateBlock', 'MousePosition', 'MouseDelta', 'MouseScroll',
 }
 LEGACY_ADDRESSES = {'ScreenWidth','ScreenHeight','CursorLock','CursorVisible','FrameCount',
-    'SetKey','MousePositionSlot','MouseScrollSlot','MouseButtonSlot',
+    'KeySlot','KeyDownSlot','KeyUpSlot','AnyKeySlot','AnyKeyDownSlot','MousePositionSlot','MouseScrollSlot','MouseButtonSlot',
     'MouseButtonDownSlot','MouseButtonUpSlot','AxisSlot','AxisRawSlot','LegacyMousePresentSlot'}
 
 OPTIONAL_ADDRESSES = {'GetMouseProcessing', 'MouseProcessingEnabled', 'ReadProcessedScroll',
@@ -73,6 +73,9 @@ def validate(data, profile_id):
     bridge = data['bridge']
     require(bridge['backend'] in ('unity-input-system-v1','unity-legacy-v1'), 'Unsupported bridge backend')
     legacy = bridge['backend'] == 'unity-legacy-v1'
+    if legacy:
+        require(type(bridge.get('scroll_units_per_step')) is int and
+                1 <= bridge['scroll_units_per_step'] <= 1200, 'Invalid legacy scroll units per step')
     require(bridge['image_suffix'] == '/' + '/'.join(binary.parts[1:]), 'Image suffix mismatch')
     require(type(bridge['mouse_state_bytes']) is int and 30 <= bridge['mouse_state_bytes'] <= 64,
             'Mouse payload must fit the supported layout')
@@ -137,6 +140,8 @@ def generate_header(profile):
         lines.append(f'#define Game{name} {json.dumps(value)}')
     lines.append(f'#define GameLegacyBackend {int(bridge["backend"] == "unity-legacy-v1")}')
     lines.append(f'#define GameMouseStateBytes {bridge["mouse_state_bytes"]}')
+    if bridge['backend'] == 'unity-legacy-v1':
+        lines.append(f'#define GameLegacyScrollUnitsPerStep {bridge["scroll_units_per_step"]}')
     for group, prefix in (('addresses', 'Game'), ('fields', 'GameField')):
         values = dict(bridge[group])
         if group == 'addresses':

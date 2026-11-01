@@ -62,8 +62,10 @@ synthetic event tests. Do not infer hardware success from nonzero Unity state.
 ## Current known state
 
 ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`com.HoYoverse.hkrpgoversea-4.6.0`, alias `hsr`) uses legacy input
-and two PC-layout predicates. Initialization succeeds, but physical keyboard,
-capture and scrolling tests failed; some buttons also fail. Read `docs/hsr.md` for its ABI and provisional camera scale.
+and PC-layout predicates plus scoped mobile cursor checks. Keyboard movement,
+native capture and mouse look are now user-confirmed. Scrolling and some buttons
+remain under investigation. The legacy backend hooks key getters directly,
+matches lowercase mouse axis labels, and uses profile-defined scroll units. Read `docs/hsr.md` for its ABI and provisional camera scale.
 For ZZZ, keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.

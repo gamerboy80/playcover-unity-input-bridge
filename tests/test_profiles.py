@@ -20,7 +20,8 @@ class ProfileTests(unittest.TestCase):
                     self.assertIn('#define GameMouseMakeCurrent ', header)
                     self.assertIn('#define GameFieldMouseScroll ', header)
                 else:
-                    self.assertIn('#define GameSetKey ', header)
+                    self.assertIn('#define GameKeySlot ', header)
+                    self.assertIn('#define GameLegacyScrollUnitsPerStep 120', header)
                     self.assertIn('#define GameLegacyBackend 1', header)
                 self.assertEqual(header, generate_header(profile))
 
@@ -46,6 +47,13 @@ class ProfileTests(unittest.TestCase):
                 (directory / (name + '.json')).write_text(json.dumps(dict(profile, id=name)))
             with self.assertRaisesRegex(RuntimeError, 'Ambiguous'):
                 select_profile(info)
+
+    def test_legacy_scroll_units_require_a_bounded_integer(self):
+        for value in (0, -1, 1201, True, '120', None):
+            profile=copy.deepcopy(load_profile('hsr'))
+            profile['bridge']['scroll_units_per_step']=value
+            with self.assertRaisesRegex(RuntimeError, 'scroll units'):
+                validate(profile, profile['id'])
 
     def test_a_new_profile_changes_generated_runtime_values(self):
         profile = copy.deepcopy(load_profile())

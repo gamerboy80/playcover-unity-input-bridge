@@ -344,6 +344,29 @@ static id handleEvent(ZZZHostEvent *event) {
     return captured ? nil : event;
 }
 
+#if GameLegacyBackend
+static void traceLegacy(void) {
+    static double previous;
+    static unsigned lines;
+    double now=NSProcessInfo.processInfo.systemUptime;
+    if (!output || lines>=60 || now-previous<5) return;
+    previous=now; lines++;
+    unsigned intact=0;
+    const uintptr_t offsets[]={GameMousePositionSlot,GameMouseScrollSlot,GameMouseButtonSlot,
+        GameMouseButtonDownSlot,GameMouseButtonUpSlot,GameAxisSlot,GameAxisRawSlot,
+        GameKeySlot,GameKeyDownSlot,GameKeyUpSlot,GameAnyKeySlot,GameAnyKeyDownSlot};
+    void *callbacks[]={(void *)legacyPosition,(void *)legacyScroll,(void *)legacyHeld,
+        (void *)legacyDown,(void *)legacyUp,(void *)legacyAxisSmooth,(void *)legacyAxisRaw,
+        (void *)legacyKeyHeld,(void *)legacyKeyDown,(void *)legacyKeyUp,(void *)legacyAnyHeld,(void *)legacyAnyDown};
+    for (unsigned i=0;i<12;i++) intact+=*(void **)(slide+offsets[i])==callbacks[i];
+    fprintf(output,"Legacy input: keyWrites=%u keyReads=%u mouseReads=%u scrollReads=%u axisReads=%u presenceReads=%u hooks=%u/12 wheel=%u queued=%u frame=%d positiveKeys=%u positiveScrolls=%u namedAxes=%u\n",
+        legacyKeyWrites,legacyKeyReads,legacyMouseReads,legacyScrollReads,legacyAxisReads,
+        mousePresentCalls,intact,wheelEvents,queuedScrolls,legacyFrame,
+        legacyPositiveKeys,legacyPositiveScrolls,legacyNamedAxes);
+    fflush(output);
+}
+#endif
+
 static void initializeDevices(void) {
     if (!slide) {
         for (uint32_t i=0;i<_dyld_image_count();i++) {
@@ -424,6 +447,9 @@ static void initializeDevices(void) {
     if (!currentMouse || !*(uintptr_t *)(currentMouse+GameFieldMousePosition) || !*(uintptr_t *)(currentMouse+GameFieldMouseDelta)) {
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
     }
+#endif
+#if GameLegacyBackend
+    traceLegacy();
 #endif
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     BOOL active=[app isActive];

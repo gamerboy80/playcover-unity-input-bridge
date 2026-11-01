@@ -22,6 +22,27 @@
       "file_offset": "0x226c378",
       "expected": "f44fbea9fd7b01a9",
       "replacement": "20008052c0035fd6"
+    },
+    {
+      "name": "cursor-show-mobile-gate",
+      "reason": "MouseInputController.ShowCursor: allow its existing PC cursor path on mobile without changing global platform identity.",
+      "file_offset": "0x1b04180",
+      "expected": "20020037",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "cursor-hide-mobile-gate",
+      "reason": "MouseInputController.HideCursor: allow the PC cursor hide/lock path instead of returning for a mobile platform.",
+      "file_offset": "0x1b04248",
+      "expected": "60050037",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "cursor-mode-mobile-gate",
+      "reason": "MouseInputController.UseCursorMode: read the actual cursor-mode state instead of returning false on mobile.",
+      "file_offset": "0x1b04520",
+      "expected": "60000036",
+      "replacement": "03000014"
     }
   ],
   "bridge": {
@@ -35,7 +56,6 @@
       "CursorLock": "0xe827c48",
       "CursorVisible": "0xe827c28",
       "FrameCount": "0xe8732f4",
-      "SetKey": "0xe89c394",
       "MousePositionSlot": "0x15a50128",
       "MouseScrollSlot": "0x15a50130",
       "MouseButtonSlot": "0x15a50010",
@@ -43,12 +63,18 @@
       "MouseButtonUpSlot": "0x15a50020",
       "AxisSlot": "0x15a4ffe8",
       "AxisRawSlot": "0x15a4fff0",
-      "LegacyMousePresentSlot": "0x15a50090"
-    }
+      "LegacyMousePresentSlot": "0x15a50090",
+      "KeySlot": "0x15a4ffb0",
+      "KeyDownSlot": "0x15a4ffd8",
+      "KeyUpSlot": "0x15a4ffc0",
+      "AnyKeySlot": "0x15a50048",
+      "AnyKeyDownSlot": "0x15a50050"
+    },
+    "scroll_units_per_step": 120
   },
   "validation": {
-    "keyboard_mouse": "Experimental, physical test failed: keyboard and mouse capture do not respond; some buttons do not work.",
-    "trackpad": "Physical test failed: no scrolling response.",
+    "keyboard_mouse": "Experimental: user confirmed keyboard movement, native capture and mouse look after direct key getters, cursor mobile-gate edits and lowercase axis matching. Partial button behavior remains unverified.",
+    "trackpad": "Experimental: Unity receives nonzero scroll; the 120-unit wheel scale correction awaits physical testing.",
     "evidence": "docs/hsr.md"
   }
 }

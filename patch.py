@@ -298,7 +298,7 @@ def main():
         select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), profile['id'])
     for kind in ('keyboard_mouse', 'trackpad'):
         note = profile['validation'][kind]
-        if 'experimental' in note.lower() or 'failed' in note.lower():
+        if note.lower().startswith(('experimental', 'physical test failed')):
             print(f'Warning ({kind}): {note}')
     if args.command == 'build':
         build(profile)
