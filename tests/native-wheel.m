@@ -1,5 +1,6 @@
 #import <AppKit/AppKit.h>
 #include "../src/NativeWheel.h"
+#include "../src/Capture.h"
 #include <assert.h>
 
 @interface WheelTestView : NSView
@@ -15,6 +16,15 @@
 
 int main(void) {
     @autoreleasepool {
+        CGRect content=CGRectMake(10,20,300,200);
+        assert(cursorInsideContent(CGPointMake(100,100),content));
+        assert(!cursorInsideContent(CGPointMake(100,-10),content)); // Dock, below window.
+        assert(!cursorInsideContent(CGPointMake(-100,100),content));
+        assert(!cursorInsideContent(CGPointMake(310,220),content));
+        assert(!cursorInsideContent(CGPointZero,CGRectZero));
+        assert(CGPointEqualToPoint(captureScreenPoint(CGPointMake(300,200),900),CGPointMake(300,700)));
+        // Other displays may be left of or above the primary display.
+        assert(CGPointEqualToPoint(captureScreenPoint(CGPointMake(-500,1200),900),CGPointMake(-500,-300)));
         CGEventRef original=CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 2, 32, -16);
         CGEventSetLocation(original, CGPointMake(100, 200));
         NSEvent *precise=[NSEvent eventWithCGEvent:original];

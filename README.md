@@ -57,6 +57,9 @@ usable when their original hash matches. Restore any earlier experimental patch 
 - Disable PlayCover **keymapping**; an empty keymap alone still enables its handlers.
 - The game requests mouse capture natively. **Option+M** is an optional fallback
   toggle; **Escape** releases manual capture.
+- When capture starts with the pointer outside the content area (for example,
+  after clicking the Dock icon), the bridge moves it into the game before locking
+  it. A pointer already inside stays in place.
 - WASD, key releases, F1–F12, mouse look and buttons are forwarded. Physical
   trackpad scrolling was confirmed by the user after the legacy mouse-presence fix.
 - Trackpad/Magic Mouse movement accumulates independently on each axis. Every

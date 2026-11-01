@@ -144,3 +144,20 @@ processed-scroll samples, and the user confirmed: "Wow it works now" on
 2026-11-01. This is physical confirmation of the current scroll fix; camera zoom
 and other mouse hardware have not been independently tested. Diagnostics are
 bounded to 30 aggregate lines, at most one per second, without input coordinates.
+
+## Capture after Dock activation
+
+The user reported a frozen pointer after activating the game from the Dock while
+the cursor was outside its window; switching with the pointer inside worked.
+The bridge previously disconnected mouse/cursor association immediately when
+Unity requested capture. An outside cursor could then remain fixed outside the
+window, preventing app-local mouse events from reaching the game.
+
+On capture entry, the bridge now checks the cursor in content-view coordinates.
+If outside, it converts the content center through window and screen coordinates,
+flips the AppKit Y coordinate against the primary display's top edge, and uses
+CGWarpMouseCursorPosition before disconnecting association. This API does not
+generate a synthetic movement event. An inside cursor is left alone. Missing
+window/geometry defers capture; a failed warp restores association instead of
+locking outside. Geometry tests cover Dock positions, edges, empty content and
+displays above/left of the primary. Physical Dock reactivation awaits confirmation.

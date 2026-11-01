@@ -11,6 +11,7 @@
 #include "InputState.h"
 #include "NativeWheel.h"
 #include "MousePresence.h"
+#include "Capture.h"
 #include "Profile.h"
 
 // Catalyst hosts AppKit. Resolve its classes at runtime, as PlayCover's plugin does.
@@ -35,6 +36,10 @@
 @property(readonly) id window;
 @property(readonly) id contentView;
 @property(readonly) CGRect bounds;
+@property(readonly) CGRect frame;
++ (NSArray *)screens;
+- (CGPoint)convertPoint:(CGPoint)point toView:(id)view;
+- (CGPoint)convertPointToScreen:(CGPoint)point;
 @property(readonly) id keyWindow;
 @property(readonly) BOOL isActive;
 + (id)sharedApplication;
@@ -52,6 +57,7 @@ static FILE *output;
 static BOOL ready, captured, forcedCapture;
 static int lastLock = -1, lastVisible = -1;
 static int (*associateCursor)(int);
+static int (*warpCursor)(CGPoint);
 static BOOL sawScroll, sawScrollState, sawPreciseScroll;
 static size_t mouseStateBytes;
 static double scrollRemainderX, scrollRemainderY;
@@ -173,6 +179,25 @@ static void sendMouse(void) {
 
 static void setCapture(BOOL value) {
     if (captured == value) return;
+    if (value) {
+        id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
+        ZZZHostEvent *window=[app keyWindow];
+        ZZZHostEvent *view=window.contentView;
+        CGRect bounds=view.bounds;
+        CGPoint cursor=[view convertPoint:window.mouseLocationOutsideOfEventStream fromView:nil];
+        if (!window || !view || bounds.size.width<=0 || bounds.size.height<=0) return;
+        if (!cursorInsideContent(cursor,bounds)) {
+            NSArray *screens=[(id)NSClassFromString(@"NSScreen") screens];
+            ZZZHostEvent *primary=(id)screens.firstObject;
+            CGPoint center=CGPointMake(CGRectGetMidX(bounds),CGRectGetMidY(bounds));
+            CGPoint screen=[window convertPointToScreen:[view convertPoint:center toView:nil]];
+            if (!primary || !warpCursor || warpCursor(captureScreenPoint(screen,CGRectGetMaxY(primary.frame)))!=0) {
+                if (associateCursor) associateCursor(1);
+                return;
+            }
+            note("Moved outside pointer into the game before capture");
+        }
+    }
     if (value && (!associateCursor || associateCursor(0) != 0)) {
         note("Pointer capture unavailable");
         return;
@@ -376,6 +401,7 @@ __attribute__((constructor)) static void start(void) {
         output=fopen(path.fileSystemRepresentation,"w");
         note(GameProfileID " native input experiment; no key logging");
         associateCursor=(int (*)(int))dlsym(RTLD_DEFAULT,"CGAssociateMouseAndMouseCursorPosition");
+        warpCursor=(int (*)(CGPoint))dlsym(RTLD_DEFAULT,"CGWarpMouseCursorPosition");
         createCGWheel=(CreateWheel)dlsym(RTLD_DEFAULT,"CGEventCreateScrollWheelEvent");
         setCGInteger=(void (*)(void *,uint32_t,int64_t))dlsym(RTLD_DEFAULT,"CGEventSetIntegerValueField");
         getCGLocation=(CGPoint (*)(void *))dlsym(RTLD_DEFAULT,"CGEventGetLocation");

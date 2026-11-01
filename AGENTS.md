@@ -72,6 +72,13 @@ installed once after device validation. Earlier threshold/window/view fixes
 through `61cce82` were insufficient. Camera zoom and other hardware are unverified.
 A synthetic wheel event moving a list is separate evidence from physical input.
 
+Capture entry now checks whether the cursor is inside the content view before
+disassociating mouse movement. Outside pointers are moved into the game with
+CGWarpMouseCursorPosition to prevent freezing outside after Dock activation.
+`Capture.h` tests cover coordinate conversion and content boundaries; physical
+Dock reactivation still needs user confirmation. Preserve the no-warp path for
+an already-inside cursor and the existing focus-loss release behavior.
+
 The original config-loading failure was a local null Mouse control exception.
 Creating a valid Mouse before enabling the original game's mouse processing
 avoided it. The current game profile patches only the PC selector; do not restore

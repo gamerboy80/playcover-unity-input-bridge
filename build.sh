@@ -13,7 +13,7 @@ xcrun clang -target arm64-apple-ios15.0-macabi -isysroot "$sdk" \
   -F"$sdk/System/iOSSupport/System/Library/Frameworks" \
   -L"$sdk/System/iOSSupport/usr/lib" \
   -I"$build_dir" -dynamiclib -fobjc-arc -Wall -Wextra -Werror \
-  -framework Foundation -framework UIKit \
+  -framework Foundation -framework UIKit -framework CoreGraphics \
   -install_name @executable_path/Frameworks/NativeInputBridge.dylib \
   src/NativeInputBridge.m -o "$build_dir/NativeInputBridge.dylib"
 codesign --force --sign - "$build_dir/NativeInputBridge.dylib"
