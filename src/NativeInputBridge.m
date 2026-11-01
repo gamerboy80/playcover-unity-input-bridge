@@ -28,6 +28,7 @@
 @property(readonly) void *CGEvent;
 + (id)eventWithCGEvent:(void *)event;
 @property(readonly) CGPoint locationInWindow;
+@property(readonly) CGPoint mouseLocationOutsideOfEventStream;
 @property(readonly) id window;
 @property(readonly) id contentView;
 @property(readonly) CGRect bounds;
@@ -185,7 +186,8 @@ static id handleEvent(ZZZHostEvent *event) {
     int height=((int (*)(void))(slide+0x138906ac))();
     if (bounds.size.width<=0 || bounds.size.height<=0 || width<=0 || height<=0) return event;
     float scaleX=width/bounds.size.width, scaleY=height/bounds.size.height;
-    CGPoint point=event.locationInWindow;
+    // Precise gesture events can carry a stale location; use the actual window cursor.
+    CGPoint point=type==22 ? [window mouseLocationOutsideOfEventStream] : event.locationInWindow;
     mouseState.x=captured ? width*.5f : point.x*scaleX;
     mouseState.y=captured ? height*.5f : point.y*scaleY;
     if (type==5 || type==6 || type==7 || type==27) {
