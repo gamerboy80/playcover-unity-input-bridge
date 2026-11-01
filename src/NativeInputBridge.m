@@ -10,6 +10,7 @@
 #include "Scroll.h"
 #include "InputState.h"
 #include "NativeWheel.h"
+#include "MousePresence.h"
 #include "Profile.h"
 
 // Catalyst hosts AppKit. Resolve its classes at runtime, as PlayCover's plugin does.
@@ -59,9 +60,51 @@ static void (*setCGInteger)(void *, uint32_t, int64_t);
 static CGPoint (*getCGLocation)(void *);
 static void (*setCGLocation)(void *, CGPoint);
 static BOOL sawNativeWheel;
+static unsigned preciseEvents, wheelEvents, emittedSteps, queuedScrolls, traceLines;
+static unsigned controlSamples, processedSamples;
+static double lastTrace;
+static BOOL tracePending;
+static MousePresentCallback originalMousePresent;
+static unsigned mousePresentCalls;
+
+typedef struct {float x,y;} Vector2;
 
 static void note(const char *message) {
     if (output) { fprintf(output, "%s\n", message); fflush(output); }
+}
+
+static bool bridgeMousePresent(void) {
+    mousePresentCalls++;
+    return ready || (originalMousePresent && originalMousePresent());
+}
+
+static void traceScroll(void) {
+    if (!output || !tracePending || traceLines>=30) return;
+    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
+    uintptr_t current=statics ? *(uintptr_t *)(statics+GameFieldStaticMouse) : 0;
+    BOOL enabled=NO;
+    if (GameGetMouseProcessing!=0 && GameMouseProcessingEnabled!=0 && GameReadProcessedScroll!=0) {
+        uintptr_t processing=((uintptr_t (*)(void))(slide+GameGetMouseProcessing))();
+        if (processing) {
+            enabled=((BOOL (*)(uintptr_t))(slide+GameMouseProcessingEnabled))(processing);
+            Vector2 value=((Vector2 (*)(uintptr_t))(slide+GameReadProcessedScroll))(processing);
+            if (value.x!=0 || value.y!=0) processedSamples++;
+        }
+    }
+    uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
+    if (scroll) {
+        Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+GameReadVector2))(scroll,NULL);
+        if (value.x!=0 || value.y!=0) controlSamples++;
+    }
+    double now=NSProcessInfo.processInfo.systemUptime;
+    if (now-lastTrace<1) return;
+    lastTrace=now; traceLines++; tracePending=NO;
+    BOOL legacy=GameLegacyMousePresent!=0 ? ((BOOL (*)(void))(slide+GameLegacyMousePresent))() : NO;
+    fprintf(output,"Scroll trace t=%.1f precise=%u coarse=%u steps=%u queued=%u controlSamples=%u processedSamples=%u enabled=%d currentID=%d bridgeID=%d legacyMousePresent=%d presentCalls=%u\n",
+        now,preciseEvents,wheelEvents,emittedSteps,queuedScrolls,controlSamples,processedSamples,
+        enabled,current ? *(int *)(current+GameFieldDeviceID) : -1,*(int *)(mouse+GameFieldDeviceID),
+        legacy,mousePresentCalls);
+    fflush(output);
 }
 
 static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
@@ -165,6 +208,8 @@ static id handleEvent(ZZZHostEvent *event) {
     NSUInteger type=event.type, flags=event.modifierFlags;
     id window=event.window;
     if (type==22) {
+        if (event.hasPreciseScrollingDeltas) preciseEvents++; else wheelEvents++;
+        tracePending=YES;
         if (event.hasPreciseScrollingDeltas && !sawPreciseScroll) {
             sawPreciseScroll=YES; note("Precise trackpad scroll event received");
         }
@@ -212,6 +257,7 @@ static id handleEvent(ZZZHostEvent *event) {
         mouseState.sx=unityScroll(&scrollRemainderX, event.scrollingDeltaX, precise);
         mouseState.sy=unityScroll(&scrollRemainderY, event.scrollingDeltaY, precise);
         if (mouseState.sx==0 && mouseState.sy==0) return nil;
+        if (precise) emittedSteps++;
         wheelEvent=nativeWheelEvent(event, window, mouseState.sx, mouseState.sy);
         if (precise && wheelEvent && ![wheelEvent hasPreciseScrollingDeltas]) {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -224,6 +270,7 @@ static id handleEvent(ZZZHostEvent *event) {
         if (!sawScroll && (mouseState.sx!=0 || mouseState.sy!=0)) {
             sawScroll=YES; note("Nonzero local scroll event received");
         }
+        queuedScrolls++;
     } else {
         NSInteger button=event.buttonNumber;
         if (button>=0 && button<5) {
@@ -265,6 +312,12 @@ static void initializeDevices(void) {
             note("Unexpected Mouse state layout; bridge disabled"); [timer invalidate]; return;
         }
         ready=YES;
+        if (GameLegacyMousePresentSlot!=0) {
+            MousePresentCallback *slot=(void *)(slide+GameLegacyMousePresentSlot);
+            if (installMousePresence(slot, bridgeMousePresent, &originalMousePresent)) {
+                note("Legacy mouse presence bridged to the validated Unity Mouse");
+            }
+        }
         NSUInteger mask=0;
         const unsigned types[]={1,2,3,4,5,6,7,10,11,12,22,25,26,27};
         for (unsigned i=0;i<sizeof(types)/sizeof(types[0]);i++) mask|=(NSUInteger)1<<types[i];
@@ -289,11 +342,11 @@ static void initializeDevices(void) {
     if (sawScroll && !sawScrollState) {
         uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (scroll) {
-            typedef struct {float x,y;} Vector2;
             Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+GameReadVector2))(scroll,NULL);
             if (value.x!=0 || value.y!=0) { sawScrollState=YES; note("Unity scroll control received nonzero state"); }
         }
     }
+    traceScroll();
     uintptr_t currentMouse=*(uintptr_t *)(statics+GameFieldStaticMouse);
     if (!currentMouse || !*(uintptr_t *)(currentMouse+GameFieldMousePosition) || !*(uintptr_t *)(currentMouse+GameFieldMouseDelta)) {
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);

@@ -25,6 +25,17 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('#define GameNativeTime 0x123400ULL', header)
         self.assertIn('#define GameEnableMouseProcessing 0x0ULL', header)
 
+    def test_optional_mouse_callbacks_default_off_and_require_pointer_alignment(self):
+        profile = copy.deepcopy(load_profile())
+        from profiles import OPTIONAL_ADDRESSES
+        for key in OPTIONAL_ADDRESSES:
+            profile['bridge']['addresses'].pop(key, None)
+        header = generate_header(validate(profile, profile['id']))
+        self.assertIn('#define GameLegacyMousePresentSlot 0x0ULL', header)
+        profile['bridge']['addresses']['LegacyMousePresentSlot'] = '0x1004'
+        with self.assertRaisesRegex(RuntimeError, 'callback slot'):
+            validate(profile, profile['id'])
+
     def test_rejects_unknown_backend_paths_missing_addresses_and_unsafe_patches(self):
         original = load_profile()
         mutations = [

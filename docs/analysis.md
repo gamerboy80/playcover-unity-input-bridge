@@ -114,5 +114,33 @@ receives the correct coarse deltas through this same helper.
 The user reported **still no physical trackpad response with `61cce82`**. This
 invalidates any inference that direct native-view dispatch solved the gameplay
 problem. The event conversion and view-dispatch self-checks pass, while the actual
-trackpad-to-game path remains unresolved. The profile refactor changes how these
+trackpad-to-game path remained unresolved at that point. The profile refactor changes how these
 constants are supplied; it does not claim to fix scrolling.
+
+## Confirmed mouse-presence fix
+
+A bounded diagnostic on physical gestures recorded hundreds of precise AppKit
+events, thresholded wheel events, nonzero bridge Mouse scroll, and nonzero
+`MouseInputEnhancement.CurrentScrollDelta`. The processor was enabled and the
+bridge Mouse was current. GameController had one mouse but no registered wheel
+or axis callbacks; forwarding to an existing callback was therefore not applicable.
+
+Legacy `Input.mousePresent` still returned false. Native disassembly showed
+`StandaloneInputModule.Process` checking its BaseInput mouse-present getter before
+calling `ProcessMouseEvent` (`0x13933864` call, `0x13933868` conditional branch).
+Consequently the UI did not consume the already accumulated scroll. A trial NOP
+of that branch was insufficient and was removed; this game also has hotfix dispatch
+before the native body. Do not retain that unsuccessful instruction patch.
+
+The getter at `0x138d4d8c` tail-calls the native function pointer at preferred VM
+`0x1c693fe0 + 0x6f18 = 0x1c69aef8`. The bridge now saves that callback and replaces
+it in writable data after validating its Mouse. It returns true while ready and
+otherwise delegates to the original. Installation is idempotent to avoid saving
+the bridge as its own fallback. No additional framework instruction patch is used.
+
+The resulting runtime reported `legacyMousePresent=1`, with the callback called
+throughout UI updates. Physical gestures produced matched nonzero control and
+processed-scroll samples, and the user confirmed: "Wow it works now" on
+2026-11-01. This is physical confirmation of the current scroll fix; camera zoom
+and other mouse hardware have not been independently tested. Diagnostics are
+bounded to 30 aggregate lines, at most one per second, without input coordinates.

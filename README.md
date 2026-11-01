@@ -57,8 +57,8 @@ usable when their original hash matches. Restore any earlier experimental patch 
 - Disable PlayCover **keymapping**; an empty keymap alone still enables its handlers.
 - The game requests mouse capture natively. **Option+M** is an optional fallback
   toggle; **Escape** releases manual capture.
-- WASD, key releases, F1–F12, mouse look and buttons are forwarded. Scroll forwarding
-  is experimental: **physical trackpad scrolling still does not work in the user's game**.
+- WASD, key releases, F1–F12, mouse look and buttons are forwarded. Physical
+  trackpad scrolling was confirmed by the user after the legacy mouse-presence fix.
 - Trackpad/Magic Mouse movement accumulates independently on each axis. Every
   **16 points** emits one standard **120-unit wheel step**; leftover movement
   carries into the next event. Each emitted step is also converted into a normal,
@@ -70,6 +70,9 @@ usable when their original hash matches. Restore any earlier experimental patch 
   A new gesture or focus loss clears the remainder.
   Physical notched wheels remain immediate. The game's original mouse component
   processes scrolling against the current bridge Mouse, including login settings.
+- Unity's legacy `Input.mousePresent` callback also reports the validated bridge
+  Mouse. Without this, the iOS player reports no mouse and the UI skips mouse
+  processing even though the new Input System receives scroll events.
 - Losing application focus releases held input and mouse capture. Command shortcuts
   remain available to macOS. On Apple keyboards, F-keys may require Fn/Globe.
 
@@ -96,7 +99,8 @@ sh tests/run.sh
 ```
 
 The tests cover profile validation/header generation, backup isolation and legacy
-state compatibility, synthetic install/update/signing-failure rollback/restore,
+state compatibility, mouse-presence callback fallback/idempotence,
+synthetic install/update/signing-failure rollback/restore,
 exact instruction edits, Mach-O load-command padding and rejection
 of unsafe headers, wheel/trackpad conversion, threshold/remainder/direction behavior,
 full-size Mouse state padding, and actual AppKit event conversion. The native
@@ -110,9 +114,10 @@ and assert Unity event layouts. Keyboard, WASD release, F1/F2, mouse look, and
 capture/release were confirmed in a physical gameplay test before the scroll update.
 The scroll update passes configuration loading with the original mouse component
 enabled, and graphics-list scrolling was visually verified with a wheel event.
-The user reported no physical trackpad response through commit `61cce82`, including
-the native-view dispatch version. Passing conversion tests does not establish
-physical trackpad support.
+Physical trackpad scrolling was confirmed by the user on 2026-11-01 after bridging
+the legacy mouse-presence callback. Earlier versions through `61cce82` received
+scroll state but failed in the UI. Camera zoom and other wheel hardware have not
+been separately confirmed.
 See [analysis notes](docs/analysis.md) for the loading fix and runtime evidence.
 
 The bridge is experimental and version-specific. Chat/IME, non-US layouts, other
@@ -120,7 +125,8 @@ mouse hardware, and coexistence with PlayTools have not been fully tested. Game
 updates or PlayCover re-signing can invalidate recorded hashes. No server behavior
 or account-safety guarantees are established by these local tests.
 
-Logs contain device setup and capture status, not keystrokes:
+Logs contain device setup, capture status and up to 30 aggregate scroll diagnostic
+lines (at most one per second), not keystrokes or scroll coordinates:
 `~/Library/Containers/com.HoYoverse.Nap/Data/Documents/LogDir/NativeInputBridge.log`.
 
 ## PlayTools window and scaling fixes

@@ -94,6 +94,20 @@ binary-identity guard. Do not copy the dylib manually to an unverified build.
 | `ReadVector2` | Two-float struct return `(uintptr_t control, void *methodInfo)`; health check only. |
 | `EnableMouseProcessing` | `void(BOOL)`; ZZZ-specific initialization after Mouse creation. Use `"0x0"` only when verified unnecessary for a port. |
 
+Optional addresses default to `0x0` (disabled). `LegacyMousePresentSlot` is the
+preferred VM address of the **writable native callback pointer** behind legacy
+`Input.mousePresent`; it must be pointer-aligned. The bridge replaces that pointer
+once after device validation, returns true while ready, and calls the saved
+original callback otherwise. It does not patch the method's executable bytes.
+`LegacyMousePresent` is the `BOOL(void)` getter used for diagnostic verification.
+Recover and verify both on each port; the examined iOS player returned false
+while the bridge Mouse existed, causing the UI to skip mouse processing.
+
+The optional `GetMouseProcessing` (`uintptr_t(void)`), `MouseProcessingEnabled`
+(`BOOL(uintptr_t)`), and `ReadProcessedScroll` (two-float struct return
+`(uintptr_t)`) inspect the game's mouse processor for bounded diagnostics only.
+These names are accepted by `profiles.py`; unsupported profiles need not include them.
+
 These are the casts used by the existing code. Verify native calling conventions,
 hidden MethodInfo parameters, static versus instance methods, and arm64 struct
 return rules against the new binary; a matching managed method name is insufficient.
@@ -138,8 +152,8 @@ different static storage, or an engine without this Input System require code.
    display/window fixes and its native pointer-lock source patch when applicable.
 7. Test physical wheels and precise trackpads separately, in menus and gameplay.
    Record successes and failures in `validation` and analysis notes. The present
-   ZZZ trackpad implementation **still does not move the user's graphics list**,
-   despite native event tests and nonzero Unity scroll state. Do not inherit a
-   success claim when copying its profile.
+   ZZZ trackpad implementation was confirmed working only after bridging the
+   legacy mouse-presence callback; native event tests and nonzero scroll state
+   alone had been insufficient. Do not inherit a success claim for a new port.
 8. Exercise restore and retain the original backup. Commit authored profiles,
    source and notes only; never game binaries, metadata dumps or account logs.

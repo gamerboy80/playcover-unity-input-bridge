@@ -15,6 +15,8 @@ FIELD_NAMES = {
     'StaticInputManager', 'StaticKeyboard', 'StaticMouse', 'DeviceID',
     'StateBlock', 'MousePosition', 'MouseDelta', 'MouseScroll',
 }
+OPTIONAL_ADDRESSES = {'GetMouseProcessing', 'MouseProcessingEnabled', 'ReadProcessedScroll',
+                      'LegacyMousePresent', 'LegacyMousePresentSlot'}
 
 
 def require(condition, message):
@@ -69,12 +71,16 @@ def validate(data, profile_id):
     require(type(bridge['mouse_state_bytes']) is int and 30 <= bridge['mouse_state_bytes'] <= 64,
             'Mouse payload must fit the supported layout')
     for group, expected_names in (('addresses', ADDRESS_NAMES), ('fields', FIELD_NAMES)):
-        require(set(bridge[group]) == expected_names, f'Unexpected/missing bridge {group}')
+        names = set(bridge[group])
+        allowed = expected_names | (OPTIONAL_ADDRESSES if group == 'addresses' else set())
+        require(expected_names <= names <= allowed, f'Unexpected/missing bridge {group}')
         for name, value in bridge[group].items():
             number = hex_number(value)
-            require(number > 0 or name == 'EnableMouseProcessing', f'Zero {name}')
+            require(number > 0 or name == 'EnableMouseProcessing' or name in OPTIONAL_ADDRESSES, f'Zero {name}')
             if group == 'addresses':
                 require(number % 4 == 0, f'Unaligned address: {name}')
+                if name == 'LegacyMousePresentSlot':
+                    require(number % 8 == 0, 'Unaligned mouse presence callback slot')
     require(all(isinstance(data['validation'][key], str) and data['validation'][key]
                 for key in ('keyboard_mouse', 'trackpad', 'evidence')), 'Missing validation notes')
     return data
@@ -102,7 +108,10 @@ def generate_header(profile):
         lines.append(f'#define Game{name} {json.dumps(value)}')
     lines.append(f'#define GameMouseStateBytes {bridge["mouse_state_bytes"]}')
     for group, prefix in (('addresses', 'Game'), ('fields', 'GameField')):
-        for name, value in sorted(bridge[group].items()):
+        values = dict(bridge[group])
+        if group == 'addresses':
+            values = {**dict.fromkeys(OPTIONAL_ADDRESSES, '0x0'), **values}
+        for name, value in sorted(values.items()):
             lines.append(f'#define {prefix}{name} {hex_number(value):#x}ULL')
     return '\n'.join(lines) + '\n'
 

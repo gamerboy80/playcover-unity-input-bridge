@@ -14,7 +14,7 @@ exact-build patcher. Read `README.md`, `docs/porting.md`, the selected profile, 
   It contains the supported backend contract's required constant names.
 - `src/NativeInputBridge.m`: shared AppKit event monitoring, Unity device setup,
   keyboard/mouse state queueing and capture. It consumes named generated constants.
-  `InputState.h`, `Scroll.h`, and `NativeWheel.h` hold shared event handling.
+  `InputState.h`, `Scroll.h`, `NativeWheel.h`, and `MousePresence.h` hold shared handling.
 - `patch.py`: identity/hash guards, byte edits, Mach-O library linking, originals,
   signing, rollback, status and restore. `build.sh` builds a profile-specific dylib.
 - `patches/`: optional PlayTools source changes, separate from game byte patches.
@@ -63,11 +63,14 @@ Only ZZZ 3.3.0's listed arm64 binary has been analyzed. Keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.
 
-**Trackpad scrolling remains broken in the user's game through `61cce82`.**
-Threshold conversion, Unity scroll state, window binding and native-view dispatch
-tests have succeeded without fixing physical scrolling. Do not describe the
-trackpad feature as working or repeat the same hardware request as proof. A wheel
-event that moves a list is separate evidence from a physical trackpad gesture.
+**Physical trackpad scrolling was confirmed working by the user on 2026-11-01**
+after bridging the legacy `Input.mousePresent` callback. The iOS player returned
+false despite a valid bridge Mouse and nonzero scroll state. StandaloneInputModule
+checks that legacy flag before processing mouse events. Preserve the profile's
+`LegacyMousePresentSlot` hook and its original-callback fallback; the hook is
+installed once after device validation. Earlier threshold/window/view fixes
+through `61cce82` were insufficient. Camera zoom and other hardware are unverified.
+A synthetic wheel event moving a list is separate evidence from physical input.
 
 The original config-loading failure was a local null Mouse control exception.
 Creating a valid Mouse before enabling the original game's mouse processing
