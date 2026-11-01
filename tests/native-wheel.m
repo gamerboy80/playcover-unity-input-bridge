@@ -16,6 +16,13 @@
 
 int main(void) {
     @autoreleasepool {
+        bool first=true;
+        assert(!captureMotionReady(&first,5,1)); // First movement may arrive long after capture.
+        assert(captureMotionReady(&first,6,1));
+        first=true;
+        assert(!captureMotionReady(&first,0,1));
+        assert(!captureMotionReady(&first,.5,1));
+        assert(captureMotionReady(&first,1,1));
         CGRect content=CGRectMake(10,20,300,200);
         assert(cursorInsideContent(CGPointMake(100,100),content));
         assert(!cursorInsideContent(CGPointMake(100,-10),content)); // Dock, below window.

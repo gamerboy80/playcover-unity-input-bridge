@@ -3,6 +3,12 @@
 #include <CoreGraphics/CGGeometry.h>
 #include <stdbool.h>
 
+static inline bool captureMotionReady(bool *first, double now, double settleUntil) {
+    bool skip=*first || now<settleUntil;
+    *first=false;
+    return !skip;
+}
+
 // AppKit uses a bottom-left origin; Quartz uses the primary display's top-left.
 static inline CGPoint captureScreenPoint(CGPoint appKitPoint, double primaryTop) {
     return CGPointMake(appKitPoint.x, primaryTop-appKitPoint.y);

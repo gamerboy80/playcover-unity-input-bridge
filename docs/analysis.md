@@ -161,3 +161,12 @@ generate a synthetic movement event. An inside cursor is left alone. Missing
 window/geometry defers capture; a failed warp restores association instead of
 locking outside. Geometry tests cover Dock positions, edges, empty content and
 displays above/left of the primary. Physical Dock reactivation awaits confirmation.
+
+The user confirmed initial Dock capture worked, then reported intermittent visible
+cursor/capture failures and a first-motion camera jump. Capture now waits 150 ms
+after activation while restoring association, allowing native focus handlers to
+settle before recapturing. During capture, a visible Quartz cursor is hidden again
+without blindly incrementing the hide count every frame. The first movement sample
+and samples in the first 100 ms of capture are discarded so cursor repositioning
+cannot become a camera delta. Tests cover delayed first movement and subsequent
+settled samples. Physical confirmation of this follow-up remains pending.

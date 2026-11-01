@@ -76,7 +76,10 @@ Capture entry now checks whether the cursor is inside the content view before
 disassociating mouse movement. Outside pointers are moved into the game with
 CGWarpMouseCursorPosition to prevent freezing outside after Dock activation.
 `Capture.h` tests cover coordinate conversion and content boundaries; physical
-Dock reactivation still needs user confirmation. Preserve the no-warp path for
+Dock reactivation initially worked but the user reported intermittent cursor
+visibility/capture and first-motion jumps. A follow-up waits for focus to settle,
+re-hides a visible captured cursor and suppresses initial movement; confirmation
+of that follow-up is pending. Preserve the no-warp path for
 an already-inside cursor and the existing focus-loss release behavior.
 
 The original config-loading failure was a local null Mouse control exception.

@@ -58,6 +58,10 @@ static BOOL ready, captured, forcedCapture;
 static int lastLock = -1, lastVisible = -1;
 static int (*associateCursor)(int);
 static int (*warpCursor)(CGPoint);
+static unsigned int (*cursorVisible)(void);
+static BOOL wasActive;
+static bool discardFirstMotion;
+static double captureNotBefore, ignoreMotionUntil;
 static BOOL sawScroll, sawScrollState, sawPreciseScroll;
 static size_t mouseStateBytes;
 static double scrollRemainderX, scrollRemainderY;
@@ -178,7 +182,12 @@ static void sendMouse(void) {
 }
 
 static void setCapture(BOOL value) {
-    if (captured == value) return;
+    Class cursorClass = NSClassFromString(@"NSCursor");
+    if (captured == value) {
+        // AppKit/Unity can restore visibility after Dock activation finishes.
+        if (captured && cursorVisible && cursorVisible()) [(id)cursorClass hide];
+        return;
+    }
     if (value) {
         id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
         ZZZHostEvent *window=[app keyWindow];
@@ -204,7 +213,10 @@ static void setCapture(BOOL value) {
     }
     if (!value && associateCursor) associateCursor(1);
     captured = value;
-    Class cursorClass = NSClassFromString(@"NSCursor");
+    if (value) {
+        ignoreMotionUntil=NSProcessInfo.processInfo.systemUptime+.1;
+        discardFirstMotion=YES;
+    }
     if (value) [(id)cursorClass hide]; else [(id)cursorClass unhide];
     note(value ? "Pointer captured" : "Pointer released");
 }
@@ -272,6 +284,9 @@ static id handleEvent(ZZZHostEvent *event) {
     mouseState.x=captured ? width*.5f : point.x*scaleX;
     mouseState.y=captured ? height*.5f : point.y*scaleY;
     if (type==5 || type==6 || type==7 || type==27) {
+        // Focus/cursor repositioning can be included in the first relative delta.
+        if (captured && !captureMotionReady(&discardFirstMotion,
+                NSProcessInfo.processInfo.systemUptime,ignoreMotionUntil)) return nil;
         mouseState.dx=(float)event.deltaX*scaleX;
         mouseState.dy=-(float)event.deltaY*scaleY;
     } else if (type==22) {
@@ -378,6 +393,17 @@ static void initializeDevices(void) {
     }
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     BOOL active=[app isActive];
+    double now=NSProcessInfo.processInfo.systemUptime;
+    if (active && !wasActive) {
+        captureNotBefore=now+.15;
+        setCapture(NO);
+    }
+    wasActive=active;
+    if (active && now<captureNotBefore) {
+        // Let Dock activation and the game's native focus handler finish first.
+        if (associateCursor) associateCursor(1);
+        return;
+    }
     int lock=((int (*)(void))(slide+GameCursorLock))();
     int visible=((BOOL (*)(void))(slide+GameCursorVisible))();
     if (lock!=lastLock || visible!=lastVisible) {
@@ -402,6 +428,7 @@ __attribute__((constructor)) static void start(void) {
         note(GameProfileID " native input experiment; no key logging");
         associateCursor=(int (*)(int))dlsym(RTLD_DEFAULT,"CGAssociateMouseAndMouseCursorPosition");
         warpCursor=(int (*)(CGPoint))dlsym(RTLD_DEFAULT,"CGWarpMouseCursorPosition");
+        cursorVisible=(unsigned int (*)(void))dlsym(RTLD_DEFAULT,"CGCursorIsVisible");
         createCGWheel=(CreateWheel)dlsym(RTLD_DEFAULT,"CGEventCreateScrollWheelEvent");
         setCGInteger=(void (*)(void *,uint32_t,int64_t))dlsym(RTLD_DEFAULT,"CGEventSetIntegerValueField");
         getCGLocation=(CGPoint (*)(void *))dlsym(RTLD_DEFAULT,"CGEventGetLocation");
