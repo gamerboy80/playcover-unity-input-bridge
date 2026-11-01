@@ -7,7 +7,7 @@ exact-build patcher. Read `README.md`, `docs/porting.md`, the selected profile, 
 
 ## Where things live
 
-- `profiles/*.json`: one immutable build identity per game/version/binary hash;
+- `profiles/*.json`: named `<bundle-id>-<version>.json`; one immutable build identity per game/version/binary hash;
   named instruction edits with expected/replacement bytes; preferred VM addresses;
   managed-object/static field offsets; mouse payload size; physical-test status.
 - `profiles.py`: validates profiles and generates `build/<id>/Profile.h`.
@@ -61,9 +61,9 @@ synthetic event tests. Do not infer hardware success from nonzero Unity state.
 
 ## Current known state
 
-ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`hsr`) uses legacy input
-and two PC-layout predicates; initialization is observed but physical gameplay
-is unconfirmed. Read `docs/hsr.md` for its ABI and provisional camera scale.
+ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`com.HoYoverse.hkrpgoversea-4.6.0`, alias `hsr`) uses legacy input
+and two PC-layout predicates. Initialization succeeds, but physical keyboard,
+capture and scrolling tests failed; some buttons also fail. Read `docs/hsr.md` for its ABI and provisional camera scale.
 For ZZZ, keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.

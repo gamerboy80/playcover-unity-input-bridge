@@ -5,14 +5,14 @@ under PlayCover, then bridges macOS keyboard and mouse events into Unity's
 Input System. This uses native Unity devices, rather than touch keymapping.
 
 **Examined build:** ZZZ 3.3.0, bundle `com.HoYoverse.Nap`, defined in
-[`profiles/zzz-3.3.0.json`](profiles/zzz-3.3.0.json). Each game/build profile lists
+[`profiles/com.HoYoverse.Nap-3.3.0.json`](profiles/com.HoYoverse.Nap-3.3.0.json). Each game/build profile lists
 its exact original framework hash, named byte patches with expected/replacement
 bytes, runtime addresses, field offsets and validation status. The installer
 refuses other binaries. An update to the game requires new analysis.
 
 See [porting instructions](docs/porting.md) to add a version or another compatible
 Unity game, and [AGENTS.md](AGENTS.md) for repository architecture and development
-rules. HSR 4.6.0 also has an experimental [`hsr` profile](profiles/hsr.json)
+rules. HSR 4.6.0 also has an experimental [`hsr` profile](profiles/com.HoYoverse.hkrpgoversea-4.6.0.json)
 using the legacy Unity/InControl backend; see [HSR status and analysis](docs/hsr.md).
 
 ## Build and install
@@ -33,10 +33,15 @@ List profiles or select one explicitly:
 python3 patch.py profiles
 python3 patch.py build --profile zzz-3.3.0
 python3 patch.py install --profile zzz-3.3.0
-python3 patch.py install --profile hsr
+python3 patch.py install --app '/path/to/com.HoYoverse.hkrpgoversea.app'
 ```
 
-`zzz-3.3.0` remains the default. Builds generate `build/<profile-id>/Profile.h`
+`com.HoYoverse.Nap-3.3.0` remains the default without `--app`.
+Profile filenames are `<bundle-id>-<version>.json`; `--app` automatically selects
+by bundle ID, version and executable. Unknown versions, ambiguous matches, and
+explicit mismatches are rejected. Installation also requires the exact original
+framework hash. The old `zzz-3.3.0` and `hsr` names remain aliases and existing
+backup locations are preserved. Builds generate `build/<profile-id>/Profile.h`
 from JSON and compile a matching `NativeInputBridge.dylib` in that directory.
 The profiles share macOS input/capture handling and select different game-facing
 backends. HSR builds and backups are independent of ZZZ.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "hsr",
+  "id": "com.HoYoverse.hkrpgoversea-4.6.0",
   "game": "Honkai: Star Rail",
   "version": "4.6.0",
   "bundle_id": "com.HoYoverse.hkrpgoversea",
@@ -47,8 +47,8 @@
     }
   },
   "validation": {
-    "keyboard_mouse": "Experimental: native legacy hooks initialized and the game reached its resource downloader. About 47 GB of resources must download before physical gameplay validation.",
-    "trackpad": "Not yet tested on HSR.",
+    "keyboard_mouse": "Experimental, physical test failed: keyboard and mouse capture do not respond; some buttons do not work.",
+    "trackpad": "Physical test failed: no scrolling response.",
     "evidence": "docs/hsr.md"
   }
 }

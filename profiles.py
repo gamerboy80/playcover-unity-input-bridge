@@ -5,7 +5,8 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_PROFILE = 'zzz-3.3.0'
+DEFAULT_PROFILE = 'com.HoYoverse.Nap-3.3.0'
+PROFILE_ALIASES = {'zzz-3.3.0': DEFAULT_PROFILE, 'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0'}
 ADDRESS_NAMES = {
     'Statics', 'NewString', 'AddDevice', 'MouseMakeCurrent', 'NativeTime',
     'QueueInputEvent', 'ScreenWidth', 'ScreenHeight', 'CursorLock', 'CursorVisible',
@@ -93,12 +94,34 @@ def validate(data, profile_id):
 
 
 def load_profile(profile_id=DEFAULT_PROFILE):
-    require(isinstance(profile_id, str) and re.fullmatch(r'[a-z0-9][a-z0-9.-]*', profile_id),
+    profile_id = PROFILE_ALIASES.get(profile_id, profile_id)
+    require(isinstance(profile_id, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', profile_id),
             'Invalid profile ID')
     try:
         return validate(json.loads((ROOT / 'profiles' / (profile_id + '.json')).read_text()), profile_id)
     except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError(f'Invalid profile {profile_id}: {error}') from error
+
+
+def match_app(profile, info):
+    return all(info.get(key) == profile[field] for key, field in (
+        ('CFBundleIdentifier', 'bundle_id'), ('CFBundleShortVersionString', 'version'),
+        ('CFBundleExecutable', 'executable')))
+
+
+def select_profile(info, profile_id=None):
+    if profile_id:
+        profile = load_profile(profile_id)
+        require(match_app(profile, info),
+                f"App identity/version does not match profile {profile['id']}")
+        return profile
+    matches = [p for p in (load_profile(path.stem) for path in sorted((ROOT / 'profiles').glob('*.json')))
+               if match_app(p, info)]
+    identity = f"{info.get('CFBundleIdentifier', '?')} {info.get('CFBundleShortVersionString', '?')}"
+    require(matches, f'No matching profile for {identity}; supported builds: ' +
+            ', '.join(path.stem for path in sorted((ROOT / 'profiles').glob('*.json'))))
+    require(len(matches) == 1, f'Ambiguous profiles for {identity}; select --profile explicitly')
+    return matches[0]
 
 
 def instruction_patches(profile):

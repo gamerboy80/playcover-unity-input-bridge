@@ -1,8 +1,12 @@
 import copy
 from pathlib import Path
 import unittest
+import json
+import tempfile
+from unittest.mock import patch
+import profiles as module
 
-from profiles import ROOT, generate_header, load_profile, validate
+from profiles import ROOT, generate_header, load_profile, validate, select_profile
 
 
 class ProfileTests(unittest.TestCase):
@@ -19,6 +23,29 @@ class ProfileTests(unittest.TestCase):
                     self.assertIn('#define GameSetKey ', header)
                     self.assertIn('#define GameLegacyBackend 1', header)
                 self.assertEqual(header, generate_header(profile))
+
+    def test_app_selection_aliases_and_mismatches(self):
+        for alias in ('hsr', 'zzz-3.3.0'):
+            profile = load_profile(alias)
+            self.assertEqual(profile['id'], profile['bundle_id'] + '-' + profile['version'])
+            info = {'CFBundleIdentifier': profile['bundle_id'],
+                    'CFBundleShortVersionString': profile['version'],
+                    'CFBundleExecutable': profile['executable']}
+            self.assertEqual(select_profile(info), profile)
+            self.assertEqual(select_profile(info, alias), profile)
+            for key in info:
+                wrong = dict(info, **{key: 'unsupported'})
+                with self.assertRaisesRegex(RuntimeError, 'No matching profile'):
+                    select_profile(wrong)
+                with self.assertRaisesRegex(RuntimeError, 'does not match'):
+                    select_profile(wrong, alias)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(module, 'ROOT', Path(tmp)):
+            directory = Path(tmp) / 'profiles'
+            directory.mkdir()
+            for name in ('build-a', 'build-b'):
+                (directory / (name + '.json')).write_text(json.dumps(dict(profile, id=name)))
+            with self.assertRaisesRegex(RuntimeError, 'Ambiguous'):
+                select_profile(info)
 
     def test_a_new_profile_changes_generated_runtime_values(self):
         profile = copy.deepcopy(load_profile())

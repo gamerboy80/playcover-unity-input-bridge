@@ -11,7 +11,7 @@ import struct
 import subprocess
 import tempfile
 
-from profiles import DEFAULT_PROFILE, instruction_patches, load_profile, require
+from profiles import DEFAULT_PROFILE, PROFILE_ALIASES, instruction_patches, load_profile, require, select_profile
 
 ROOT = Path(__file__).resolve().parent
 LIBRARY = 'Frameworks/NativeInputBridge.dylib'
@@ -24,13 +24,23 @@ def app_paths(profile):
 
 def local_directory(profile):
     local = ROOT / '.local'
-    # Pre-profile installations used .local directly. Reuse only a matching backup.
-    legacy = local / 'state.json'
-    if legacy.exists():
-        state = json.loads(legacy.read_text())
+    # Preserve existing backup locations and accept only known aliases of this identity.
+    candidates = [local, local / profile['id']]
+    candidates += [local / alias for alias, canonical in PROFILE_ALIASES.items()
+                   if canonical == profile['id']]
+    matches = []
+    for candidate in candidates:
+        state_path = candidate / 'state.json'
+        if not state_path.exists():
+            continue
+        state = json.loads(state_path.read_text())
         if state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256']:
-            require(state.get('profile', profile['id']) == profile['id'], 'Legacy profile mismatch')
-            return local
+            recorded = state.get('profile', profile['id'])
+            require(PROFILE_ALIASES.get(recorded, recorded) == profile['id'], 'Legacy profile mismatch')
+            matches.append(candidate)
+    require(len(matches) <= 1, 'Multiple matching installation states; resolve duplicate backups first')
+    if matches:
+        return matches[0]
     return local / profile['id']
 
 
@@ -142,7 +152,8 @@ def restore_files(app, profile, local):
 
 
 def check_installed(app, state, profile):
-    require(state.get('profile', profile['id']) == profile['id'], 'Installation profile mismatch')
+    recorded = state.get('profile', profile['id'])
+    require(PROFILE_ALIASES.get(recorded, recorded) == profile['id'], 'Installation profile mismatch')
     require(state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256'],
             'Profile does not match the recorded original framework')
     require(state['app'] == str(app), 'Backup belongs to a different app')
@@ -268,7 +279,7 @@ def update(app, state, profile, local):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['profiles', 'build', 'install', 'update', 'restore', 'status'])
-    parser.add_argument('--profile', default=DEFAULT_PROFILE, help='ID from profiles/*.json')
+    parser.add_argument('--profile', help='ID from profiles/*.json; auto-selected when --app is supplied')
     parser.add_argument('--app', type=Path, help="Override the profile bundle's PlayCover location")
     args = parser.parse_args()
     if args.command == 'profiles':
@@ -276,10 +287,19 @@ def main():
             profile = load_profile(path.stem)
             print(f'{profile["id"]}: {profile["game"]} {profile["version"]} ({profile["bundle_id"]})')
         return
-    profile = load_profile(args.profile)
+    app = args.app.expanduser().resolve() if args.app else None
+    profile = (select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), args.profile)
+               if app else load_profile(args.profile or DEFAULT_PROFILE))
     local = local_directory(profile)
-    app = (args.app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' /
+    app = (app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' /
            (profile['bundle_id'] + '.app')).expanduser().resolve()
+    print(f'Selected profile: {profile["id"]}')
+    if args.command != 'build':
+        select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), profile['id'])
+    for kind in ('keyboard_mouse', 'trackpad'):
+        note = profile['validation'][kind]
+        if 'experimental' in note.lower() or 'failed' in note.lower():
+            print(f'Warning ({kind}): {note}')
     if args.command == 'build':
         build(profile)
     elif args.command == 'install':

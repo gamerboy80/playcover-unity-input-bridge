@@ -1,9 +1,9 @@
 # HSR 4.6.0
 
-Profile: `hsr`; bundle: `com.HoYoverse.hkrpgoversea`; executable: `hkrpg`.
-Initialization was observed, but physical gameplay validation is pending.
-The patched app reached its resource downloader (about 47 GB outstanding), which
-currently prevents entering gameplay for input verification.
+Profile: `com.HoYoverse.hkrpgoversea-4.6.0` (alias `hsr`); bundle: `com.HoYoverse.hkrpgoversea`; executable: `hkrpg`.
+Initialization succeeds, but the user’s physical gameplay test failed: keyboard,
+mouse capture (including the fallback) and scrolling do not respond. Most clicks
+work, but some buttons do not. This profile is experimental, not a working port.
 
 ```sh
 python3 patch.py install --profile hsr
@@ -12,7 +12,8 @@ python3 patch.py update --profile hsr
 python3 patch.py restore --profile hsr
 ```
 
-Builds and backups are separate from ZZZ in `build/hsr/` and `.local/hsr/`.
+Builds and backups are separate from ZZZ under the canonical profile ID. Existing `.local/hsr/` backups are reused
+without moving them. `--app` can auto-select this exact build.
 Disable PlayCover keymapping and preserve the PlayTools pointer-lock fix.
 
 ## Analysis

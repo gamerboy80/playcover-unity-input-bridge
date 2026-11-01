@@ -19,7 +19,12 @@ python3 patch.py update --profile zzz-3.3.0 --app '/path/to/Game.app'
 python3 patch.py restore --profile zzz-3.3.0 --app '/path/to/Game.app'
 ```
 
-`zzz-3.3.0` remains the default for existing commands. Without `--app`, the bundle
+`com.HoYoverse.Nap-3.3.0` remains the default without `--app`.
+Profiles use `<bundle-id>-<version>.json`. With `--app`, bundle ID, version and
+executable select an exact profile automatically. Unknown versions and explicit
+profile mismatches are rejected; ambiguous matches require `--profile`. The
+original framework SHA-256 must still match before installation.
+Old `zzz-3.3.0` and `hsr` names remain aliases; existing backups stay in place. Without `--app`, the bundle
 ID selects PlayCover's application path. `update` rebuilds/reapplies the **same
 exact game build's** patch; it does not port a patch to a game update.
 
