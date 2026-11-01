@@ -89,3 +89,11 @@ wheel alone does not establish trackpad support. Status logging reports the firs
 local/precise scroll event and first nonzero Unity scroll state without recording
 scroll values or keystrokes. The unused legacy and direct-reader experiments
 were removed.
+
+AppKit's public CGEvent window-under-pointer fields do not bind `NSEvent.window`.
+A native runtime test found window number 0 on a fresh wheel event.
+`_eventRelativeToWindow:` binds it to the target NSWindow, but queue/dequeue can
+discard that binding. The ordinary wheel handler therefore reapplies the binding
+after dequeueing, before returning the event for UI dispatch. A WindowServer-backed
+test verifies this routing sequence with an invisible test window. The private
+selector is checked at runtime; its availability is an OS compatibility constraint.

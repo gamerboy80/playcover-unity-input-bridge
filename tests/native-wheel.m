@@ -18,12 +18,28 @@ int main(void) {
         assert(CGEventGetIntegerValueField(copy, kCGScrollWheelEventMomentumPhase)==0);
         assert(CGEventGetIntegerValueField(original, kCGScrollWheelEventIsContinuous)==1);
         NSApplication *app=NSApplication.sharedApplication;
+        NSWindow *window=[[NSWindow alloc] initWithContentRect:NSMakeRect(100,100,300,200)
+            styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+        if (window.windowNumber>0) {
+            assert(wheel.windowNumber==0);
+            wheel=bindNativeWheelToWindow(wheel, window);
+            assert(wheel.window==window && wheel.windowNumber==window.windowNumber);
+            assert(!wheel.hasPreciseScrollingDeltas);
+        } else {
+            fprintf(stderr,"SKIP: Window binding needs WindowServer access\n");
+        }
         [app postEvent:wheel atStart:NO];
         NSEvent *queued=[app nextEventMatchingMask:NSEventMaskScrollWheel
             untilDate:[NSDate dateWithTimeIntervalSinceNow:1]
             inMode:NSDefaultRunLoopMode dequeue:YES];
         assert(queued && !queued.hasPreciseScrollingDeltas);
         assert(queued.scrollingDeltaY==2 && queued.scrollingDeltaX==-1);
+        // AppKit queueing can discard the binding; reapply it in the normal handler.
+        if (window.windowNumber>0) {
+            queued=bindNativeWheelToWindow(queued, window);
+            assert(queued.window==window);
+            assert(queued.scrollingDeltaY==2 && queued.scrollingDeltaX==-1);
+        }
         CFRelease(copy); CFRelease(original);
     }
 }

@@ -3,6 +3,18 @@
 #include <stdint.h>
 #include <CoreGraphics/CGGeometry.h>
 #include "Scroll.h"
+#import <Foundation/Foundation.h>
+
+@interface NSObject (ZZZWheelWindowBinding)
+- (id)_eventRelativeToWindow:(id)window;
+@end
+
+static inline id bindNativeWheelToWindow(id event, id window) {
+    if (window && [event respondsToSelector:@selector(_eventRelativeToWindow:)]) {
+        return [event _eventRelativeToWindow:window];
+    }
+    return event;
+}
 
 typedef void *(*CreateWheel)(void *, uint32_t, uint32_t, int32_t, ...);
 

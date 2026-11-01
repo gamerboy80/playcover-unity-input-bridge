@@ -64,7 +64,7 @@ static void note(const char *message) {
 }
 
 static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
-    if (!event.hasPreciseScrollingDeltas) return event;
+    if (!event.hasPreciseScrollingDeltas) return bindNativeWheelToWindow(event, window);
     if (!createCGWheel || !setCGInteger || !getCGLocation || !setCGLocation || !event.CGEvent) return event;
     void *copy=createNativeWheel(createCGWheel, x, y);
     if (!copy) return event;
@@ -75,6 +75,8 @@ static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     }
     id wheel=[(id)NSClassFromString(@"NSEvent") eventWithCGEvent:copy];
     CFRelease(copy);
+    // CGEvent's window-under-pointer fields do not bind NSEvent.window.
+    wheel=bindNativeWheelToWindow(wheel, window);
     if (wheel && !sawNativeWheel) { sawNativeWheel=YES; note("Trackpad threshold emitted a native wheel event"); }
     return wheel ?: event;
 }

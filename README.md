@@ -79,7 +79,9 @@ of unsafe headers, wheel/trackpad conversion, threshold/remainder/direction beha
 full-size Mouse state padding, and actual AppKit event conversion. The native
 event test checks that a precise gesture becomes a non-precise wheel with the
 expected notch counts while preserving its location, then survives an AppKit
-queue/dequeue cycle without becoming precise again. Builds enable warnings as errors
+queue/dequeue cycle without becoming precise again. With WindowServer access,
+it also checks destination-window binding after dequeueing. That check is skipped
+in a headless sandbox. Builds enable warnings as errors
 and assert Unity event layouts. Keyboard, WASD release, F1/F2, mouse look, and
 capture/release were confirmed in a physical gameplay test before the scroll update.
 The scroll update passes configuration loading with the original mouse component
