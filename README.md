@@ -44,7 +44,8 @@ two installer commands at once. Restore any earlier experimental patch first.
 - Trackpad/Magic Mouse movement accumulates independently on each axis. Every
   **16 points** emits one standard **120-unit wheel step**; leftover movement
   carries into the next event. Each emitted step is also converted into a normal,
-  non-precise AppKit wheel event with its original location/window metadata.
+  non-precise AppKit line-wheel event, preserving its location and targeting the
+  active game window. It is freshly created, without copied gesture metadata.
   The original gesture is consumed and the wheel event is queued inside the app
   to re-enter the ordinary wheel handler once.
   A new gesture or focus loss clears the remainder.

@@ -73,9 +73,9 @@ its Mouse current before queueing events, so the original mouse enhancement
 component compares scroll controls from the correct device. Native scroll
 processing is preserved rather than bypassed with a game-action patch.
 Both axes accumulate precise trackpad deltas until 16 points produce a standard
-120-unit wheel event. The copied native CGEvent is converted to a non-continuous
-AppKit wheel event, including line/fixed-point/pixel deltas and cleared gesture
-phases; event location/window metadata is retained. It is queued within the app
+120-unit wheel event. A fresh native line-scroll CGEvent becomes a non-continuous
+AppKit wheel event, preserving the source location and targeting the game window.
+Trackpad gesture metadata is not copied. It is queued within the app
 to re-enter the normal wheel handler; the original precise event is consumed,
 avoiding recursive conversion or duplicate Unity delivery. Fractions carry forward; gesture start/cancel and focus loss
 clear the remainders. A scroll event without a window can use the active

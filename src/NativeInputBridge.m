@@ -29,6 +29,7 @@
 + (id)eventWithCGEvent:(void *)event;
 @property(readonly) CGPoint locationInWindow;
 @property(readonly) CGPoint mouseLocationOutsideOfEventStream;
+@property(readonly) NSInteger windowNumber;
 @property(readonly) id window;
 @property(readonly) id contentView;
 @property(readonly) CGRect bounds;
@@ -52,20 +53,26 @@ static int (*associateCursor)(int);
 static BOOL sawScroll, sawScrollState, sawPreciseScroll;
 static size_t mouseStateBytes;
 static double scrollRemainderX, scrollRemainderY;
-static void *(*copyCGEvent)(void *);
+static CreateWheel createCGWheel;
 static void (*setCGInteger)(void *, uint32_t, int64_t);
+static CGPoint (*getCGLocation)(void *);
+static void (*setCGLocation)(void *, CGPoint);
 static BOOL sawNativeWheel;
 
 static void note(const char *message) {
     if (output) { fprintf(output, "%s\n", message); fflush(output); }
 }
 
-static id nativeWheelEvent(ZZZHostEvent *event, float x, float y) {
+static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     if (!event.hasPreciseScrollingDeltas) return event;
-    if (!copyCGEvent || !setCGInteger || !event.CGEvent) return event;
-    void *copy=copyCGEvent(event.CGEvent);
+    if (!createCGWheel || !setCGInteger || !getCGLocation || !setCGLocation || !event.CGEvent) return event;
+    void *copy=createNativeWheel(createCGWheel, x, y);
     if (!copy) return event;
-    setNativeWheelFields(copy, setCGInteger, x, y);
+    setCGLocation(copy, getCGLocation(event.CGEvent));
+    if (window) {
+        setCGInteger(copy, 91, [window windowNumber]);
+        setCGInteger(copy, 92, [window windowNumber]);
+    }
     id wheel=[(id)NSClassFromString(@"NSEvent") eventWithCGEvent:copy];
     CFRelease(copy);
     if (wheel && !sawNativeWheel) { sawNativeWheel=YES; note("Trackpad threshold emitted a native wheel event"); }
@@ -202,7 +209,7 @@ static id handleEvent(ZZZHostEvent *event) {
         mouseState.sx=unityScroll(&scrollRemainderX, event.scrollingDeltaX, precise);
         mouseState.sy=unityScroll(&scrollRemainderY, event.scrollingDeltaY, precise);
         if (mouseState.sx==0 && mouseState.sy==0) return nil;
-        wheelEvent=nativeWheelEvent(event, mouseState.sx, mouseState.sy);
+        wheelEvent=nativeWheelEvent(event, window, mouseState.sx, mouseState.sy);
         if (precise && wheelEvent && ![wheelEvent hasPreciseScrollingDeltas]) {
             id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
             [app postEvent:wheelEvent atStart:NO];
@@ -303,8 +310,10 @@ __attribute__((constructor)) static void start(void) {
         output=fopen(path.fileSystemRepresentation,"w");
         note("ZZZ 3.3.0 native input experiment; no key logging");
         associateCursor=(int (*)(int))dlsym(RTLD_DEFAULT,"CGAssociateMouseAndMouseCursorPosition");
-        copyCGEvent=(void *(*)(void *))dlsym(RTLD_DEFAULT,"CGEventCreateCopy");
+        createCGWheel=(CreateWheel)dlsym(RTLD_DEFAULT,"CGEventCreateScrollWheelEvent");
         setCGInteger=(void (*)(void *,uint32_t,int64_t))dlsym(RTLD_DEFAULT,"CGEventSetIntegerValueField");
+        getCGLocation=(CGPoint (*)(void *))dlsym(RTLD_DEFAULT,"CGEventGetLocation");
+        setCGLocation=(void (*)(void *,CGPoint))dlsym(RTLD_DEFAULT,"CGEventSetLocation");
         timer=[NSTimer scheduledTimerWithTimeInterval:1.0/60.0 repeats:YES block:^(NSTimer *t) { (void)t; initializeDevices(); }];
     });
 }
