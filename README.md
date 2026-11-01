@@ -4,10 +4,15 @@ Enables the existing PC control path in Zenless Zone Zero's iOS build running
 under PlayCover, then bridges macOS keyboard and mouse events into Unity's
 Input System. This uses native Unity devices, rather than touch keymapping.
 
-**Supported build:** ZZZ 3.3.0, bundle `com.HoYoverse.Nap`, with UnityFramework
-SHA-256 `8514f6ecf03272586a5c722db0d407608b5b28e9815b046e7b3f71ce588ee037`.
-The installer refuses other binaries. An update to the game requires new analysis;
-do not reuse these addresses on another build.
+**Examined build:** ZZZ 3.3.0, bundle `com.HoYoverse.Nap`, defined in
+[`profiles/zzz-3.3.0.json`](profiles/zzz-3.3.0.json). Each game/build profile lists
+its exact original framework hash, named byte patches with expected/replacement
+bytes, runtime addresses, field offsets and validation status. The installer
+refuses other binaries. An update to the game requires new analysis.
+
+See [porting instructions](docs/porting.md) to add a version or another compatible
+Unity game, and [AGENTS.md](AGENTS.md) for repository architecture and development
+rules. Only the listed ZZZ build has been examined; other games are not yet supported.
 
 ## Build and install
 
@@ -21,6 +26,17 @@ Quit the game, then run:
 python3 patch.py install
 ```
 
+List profiles or select one explicitly:
+
+```sh
+python3 patch.py profiles
+python3 patch.py build --profile zzz-3.3.0
+python3 patch.py install --profile zzz-3.3.0
+```
+
+`zzz-3.3.0` remains the default. Builds generate `build/<profile-id>/Profile.h`
+from JSON and compile a matching `NativeInputBridge.dylib` in that directory.
+
 The default app location is
 `~/Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app`.
 For another location:
@@ -30,17 +46,19 @@ python3 patch.py install --app '/path/to/Zenless Zone Zero.app'
 ```
 
 The script builds and signs the bridge, checks the exact original framework hash,
-backs up the original framework/executable/signatures in `.local/`, applies the version-locked
+backs up the original framework/executable/signatures in `.local/<profile-id>/`, applies the version-locked
 PC input selector patch, links the bridge using unused executable header
 padding, and signs/verifies the app. Keep `.local/` for restoration. Avoid running
-two installer commands at once. Restore any earlier experimental patch first.
+two installer commands at once. Existing pre-profile backups in `.local/` remain
+usable when their original hash matches. Restore any earlier experimental patch first.
 
 ## Controls
 
 - Disable PlayCover **keymapping**; an empty keymap alone still enables its handlers.
 - The game requests mouse capture natively. **Option+M** is an optional fallback
   toggle; **Escape** releases manual capture.
-- WASD, key releases, F1–F12, mouse look, buttons, and both scroll axes are forwarded.
+- WASD, key releases, F1–F12, mouse look and buttons are forwarded. Scroll forwarding
+  is experimental: **physical trackpad scrolling still does not work in the user's game**.
 - Trackpad/Magic Mouse movement accumulates independently on each axis. Every
   **16 points** emits one standard **120-unit wheel step**; leftover movement
   carries into the next event. Each emitted step is also converted into a normal,
@@ -64,10 +82,12 @@ python3 patch.py status
 python3 patch.py restore
 ```
 
-Use the same `--app` when needed. Updates verify installed hashes before changing
+Use the same `--profile` and `--app` when needed. Updates verify installed hashes before changing
 files. Restore reinstates original bytes and signature resources and removes the
 bridge. It refuses to overwrite an app changed since installation. Backups remain
-after restoration; archive `.local/` before starting a fresh installation.
+after restoration; archive that profile's local directory before a fresh install.
+Restore before updating the game. The `update` command updates this patch for the
+same exact game binary; a new game version needs a newly analyzed profile.
 
 ## Validation and limits
 
@@ -75,7 +95,9 @@ after restoration; archive `.local/` before starting a fresh installation.
 sh tests/run.sh
 ```
 
-The tests cover exact instruction edits, Mach-O load-command padding and rejection
+The tests cover profile validation/header generation, backup isolation and legacy
+state compatibility, synthetic install/update/signing-failure rollback/restore,
+exact instruction edits, Mach-O load-command padding and rejection
 of unsafe headers, wheel/trackpad conversion, threshold/remainder/direction behavior,
 full-size Mouse state padding, and actual AppKit event conversion. The native
 event test checks that a precise gesture becomes a non-precise wheel with the
@@ -88,7 +110,9 @@ and assert Unity event layouts. Keyboard, WASD release, F1/F2, mouse look, and
 capture/release were confirmed in a physical gameplay test before the scroll update.
 The scroll update passes configuration loading with the original mouse component
 enabled, and graphics-list scrolling was visually verified with a wheel event.
-Physical trackpad testing is still in progress.
+The user reported no physical trackpad response through commit `61cce82`, including
+the native-view dispatch version. Passing conversion tests does not establish
+physical trackpad support.
 See [analysis notes](docs/analysis.md) for the loading fix and runtime evidence.
 
 The bridge is experimental and version-specific. Chat/IME, non-US layouts, other

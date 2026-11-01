@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Version-locked ZZZ 3.3.0 desktop input patch; local backups never enter Git."""
+"""Profile-locked native Unity input patch; local backups never enter Git."""
 import argparse
 import hashlib
 import json
@@ -11,23 +11,27 @@ import struct
 import subprocess
 import tempfile
 
+from profiles import DEFAULT_PROFILE, instruction_patches, load_profile, require
+
 ROOT = Path(__file__).resolve().parent
-LOCAL = ROOT / '.local'
-STATE = LOCAL / 'state.json'
-BACKUP = LOCAL / 'original'
 LIBRARY = 'Frameworks/NativeInputBridge.dylib'
-FRAMEWORK = 'Frameworks/UnityFramework.framework'
-BINARY = FRAMEWORK + '/UnityFramework'
-MAIN = 'ZenlessZoneZero'
-ORIGINAL_HASH = '8514f6ecf03272586a5c722db0d407608b5b28e9815b046e7b3f71ce588ee037'
-PATCHES = (
-    (0xc22d6b8, bytes.fromhex('f44fbea9fd7b01a9'), bytes.fromhex('40008052c0035fd6')),
-)
 
 
-def require(condition, message):
-    if not condition:
-        raise RuntimeError(message)
+def app_paths(profile):
+    binary = profile['framework_binary']
+    return binary, str(Path(binary).parent), profile['executable']
+
+
+def local_directory(profile):
+    local = ROOT / '.local'
+    # Pre-profile installations used .local directly. Reuse only a matching backup.
+    legacy = local / 'state.json'
+    if legacy.exists():
+        state = json.loads(legacy.read_text())
+        if state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256']:
+            require(state.get('profile', profile['id']) == profile['id'], 'Legacy profile mismatch')
+            return local
+    return local / profile['id']
 
 
 def digest(path):
@@ -42,10 +46,11 @@ def run(*args):
     subprocess.run(args, check=True)
 
 
-def save_state(state):
-    temporary = STATE.with_suffix('.tmp')
+def save_state(state, local):
+    state_path = local / 'state.json'
+    temporary = state_path.with_suffix('.tmp')
     temporary.write_text(json.dumps(state, indent=2) + '\n')
-    temporary.replace(STATE)
+    temporary.replace(state_path)
 
 
 def replace_file(source, target):
@@ -70,19 +75,20 @@ def replace_signature(source, target):
             file.unlink()
 
 
-def closed():
-    result = subprocess.run(['/usr/bin/pgrep', '-x', MAIN], capture_output=True)
-    require(result.returncode == 1, 'Quit Zenless Zone Zero before changing its files.')
+def closed(profile):
+    result = subprocess.run(['/usr/bin/pgrep', '-x', profile['executable']], capture_output=True)
+    require(result.returncode == 1, f'Quit {profile["game"]} before changing its files.')
 
 
-def patch_instructions(binary):
+def patch_instructions(binary, profile):
+    patches = instruction_patches(profile)
     before = bytes(binary)
-    for offset, expected, replacement in PATCHES:
+    for offset, expected, replacement in patches:
         require(before[offset:offset + len(expected)] == expected,
                 f'Unexpected instructions at {offset:#x}')
         binary[offset:offset + len(expected)] = replacement
     cursor = 0
-    for offset, expected, replacement in sorted(PATCHES):
+    for offset, expected, replacement in sorted(patches):
         require(binary[cursor:offset] == before[cursor:offset], 'Unintended patch change')
         require(binary[offset:offset + len(expected)] == replacement, 'Patch failed')
         cursor = offset + len(expected)
@@ -93,6 +99,7 @@ def patch_instructions(binary):
 def link_library(binary):
     require(len(binary) >= 32 and struct.unpack_from('<I', binary)[0] == 0xfeedfacf,
             'Expected a thin 64-bit Mach-O executable')
+    require(struct.unpack_from('<I', binary, 4)[0] == 0x100000c, 'Expected an arm64 executable')
     count, size = struct.unpack_from('<II', binary, 16)
     require(32 + size <= len(binary), 'Invalid Mach-O header size')
     pos, first_section = 32, len(binary)
@@ -124,7 +131,9 @@ def link_library(binary):
     return binary
 
 
-def restore_files(app):
+def restore_files(app, profile, local):
+    BINARY, FRAMEWORK, MAIN = app_paths(profile)
+    BACKUP = local / 'original'
     for relative in (BINARY, MAIN):
         replace_file(BACKUP / relative, app / relative)
     for relative in (FRAMEWORK + '/_CodeSignature', '_CodeSignature'):
@@ -132,105 +141,120 @@ def restore_files(app):
     (app / LIBRARY).unlink(missing_ok=True)
 
 
-def check_installed(app, state):
+def check_installed(app, state, profile):
+    require(state.get('profile', profile['id']) == profile['id'], 'Installation profile mismatch')
+    require(state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256'],
+            'Profile does not match the recorded original framework')
     require(state['app'] == str(app), 'Backup belongs to a different app')
     for relative, expected in state['installed'].items():
         require((app / relative).is_file() and digest(app / relative) == expected,
                 f'{relative} changed since installation; refusing to overwrite it')
 
 
-def build():
-    run('/bin/sh', str(ROOT / 'build.sh'))
+def build(profile):
+    run('/bin/sh', str(ROOT / 'build.sh'), profile['id'])
 
 
-def stage_framework(directory):
-    require(digest(BACKUP / BINARY) == ORIGINAL_HASH, 'Original framework backup changed')
-    framework = directory / 'UnityFramework.framework'
+def stage_framework(directory, profile, local):
+    BINARY, FRAMEWORK, _ = app_paths(profile)
+    BACKUP = local / 'original'
+    require(digest(BACKUP / BINARY) == profile['original_sha256'], 'Original framework backup changed')
+    framework = directory / Path(FRAMEWORK).name
     shutil.copytree(BACKUP / FRAMEWORK, framework, symlinks=True)
-    (framework / 'UnityFramework').write_bytes(patch_instructions(bytearray((BACKUP / BINARY).read_bytes())))
+    (framework / Path(BINARY).name).write_bytes(
+        patch_instructions(bytearray((BACKUP / BINARY).read_bytes()), profile))
     run('/usr/bin/codesign', '--force', '--sign', '-', str(framework))
     run('/usr/bin/codesign', '--verify', '--strict', str(framework))
     return framework
 
 
-def install(app):
-    closed()
+def install(app, profile, local):
+    BINARY, FRAMEWORK, MAIN = app_paths(profile)
+    BACKUP = local / 'original'
+    STATE = local / 'state.json'
+    closed(profile)
     require(not STATE.exists() and not BACKUP.exists(),
             'Local backup/state already exists; use status, update, or restore.')
     info = plistlib.loads((app / 'Info.plist').read_bytes())
-    require(info.get('CFBundleIdentifier') == 'com.HoYoverse.Nap', 'Wrong app bundle')
+    require(info.get('CFBundleIdentifier') == profile['bundle_id'] and
+            info.get('CFBundleShortVersionString') == profile['version'] and
+            info.get('CFBundleExecutable') == MAIN, 'App identity/version does not match the profile')
     require(os.access(app / MAIN, os.X_OK), 'Game executable is missing its execute permission')
-    require(digest(app / BINARY) == ORIGINAL_HASH,
-            'Unsupported UnityFramework; restore earlier patches first. Only the documented 3.3.0 build is supported.')
+    require(digest(app / BINARY) == profile['original_sha256'],
+            'Unsupported framework hash; restore earlier patches first and select an exact matching profile.')
     require(not (app / LIBRARY).exists(), 'A native input bridge is already installed')
-    build()
-    LOCAL.mkdir(exist_ok=True)
+    build(profile)
+    local.mkdir(parents=True, exist_ok=True)
     BACKUP.mkdir()
     # Copy originals before any app mutation. Retain them if signing fails.
     shutil.copytree(app / FRAMEWORK, BACKUP / FRAMEWORK, symlinks=True)
     shutil.copy2(app / MAIN, BACKUP / MAIN)
     shutil.copytree(app / '_CodeSignature', BACKUP / '_CodeSignature')
     original = {p: digest(BACKUP / p) for p in (BINARY, MAIN)}
-    state = {'app': str(app), 'original': original, 'installed': {}, 'status': 'prepared'}
-    with tempfile.TemporaryDirectory(dir=LOCAL) as tmp:
+    state = {'profile': profile['id'], 'app': str(app), 'original': original, 'installed': {}, 'status': 'prepared'}
+    with tempfile.TemporaryDirectory(dir=local) as tmp:
         staged = Path(tmp)
-        framework = stage_framework(staged)
+        framework = stage_framework(staged, profile, local)
         main = staged / MAIN
         main.write_bytes(link_library(bytearray((app / MAIN).read_bytes())))
         shutil.copystat(app / MAIN, main)
-        save_state(state)
+        save_state(state, local)
         try:
-            replace_file(framework / 'UnityFramework', app / BINARY)
+            replace_file(framework / Path(BINARY).name, app / BINARY)
             replace_signature(framework / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
             replace_file(main, app / MAIN)
-            replace_file(ROOT / 'build/NativeInputBridge.dylib', app / LIBRARY)
+            replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', app / LIBRARY)
             run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(app))
             run('/usr/bin/codesign', '--verify', '--strict', str(app))
+            state['profile'] = profile['id']
             state['installed'] = {p: digest(app / p) for p in (BINARY, MAIN, LIBRARY)}
             state['status'] = 'installed'
-            save_state(state)
+            save_state(state, local)
         except BaseException:
-            restore_files(app)
+            restore_files(app, profile, local)
             state['status'] = 'restored'
-            save_state(state)
+            save_state(state, local)
             raise
-    print('Desktop input patch installed. Option+M captures the pointer; Escape releases it.')
+    print(f'{profile["id"]} installed. Native capture is automatic; Option+M is an optional fallback.')
 
 
-def restore(app, state):
-    closed()
+def restore(app, state, profile, local):
+    BACKUP = local / 'original'
+    closed(profile)
     require(state['status'] == 'installed', 'Expected an installed patch')
-    check_installed(app, state)
+    check_installed(app, state, profile)
     for relative, expected in state['original'].items():
         require(digest(BACKUP / relative) == expected, 'Original backup changed')
-    restore_files(app)
+    restore_files(app, profile, local)
     run('/usr/bin/codesign', '--verify', '--strict', str(app))
     state['status'] = 'restored'
-    save_state(state)
-    print('Original executable, framework, and signatures restored. Backup retained in .local/.')
+    save_state(state, local)
+    print(f'Original executable, framework, and signatures restored. Backup retained in {local}.')
 
 
-def update(app, state):
-    closed()
+def update(app, state, profile, local):
+    BINARY, FRAMEWORK, MAIN = app_paths(profile)
+    closed(profile)
     require(state['status'] == 'installed', 'Expected an installed patch')
-    check_installed(app, state)
-    build()
-    with tempfile.TemporaryDirectory(dir=LOCAL) as tmp:
+    check_installed(app, state, profile)
+    build(profile)
+    with tempfile.TemporaryDirectory(dir=local) as tmp:
         previous = Path(tmp)
         shutil.copy2(app / LIBRARY, previous / 'bridge')
         shutil.copy2(app / MAIN, previous / MAIN)
         shutil.copytree(app / '_CodeSignature', previous / '_CodeSignature')
         shutil.copy2(app / BINARY, previous / 'UnityFramework')
         shutil.copytree(app / FRAMEWORK / '_CodeSignature', previous / 'framework-signature')
-        framework = stage_framework(previous)
+        framework = stage_framework(previous, profile, local)
         try:
-            replace_file(framework / 'UnityFramework', app / BINARY)
+            replace_file(framework / Path(BINARY).name, app / BINARY)
             replace_signature(framework / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
-            replace_file(ROOT / 'build/NativeInputBridge.dylib', app / LIBRARY)
+            replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', app / LIBRARY)
             run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(app))
             run('/usr/bin/codesign', '--verify', '--strict', str(app))
+            state['profile'] = profile['id']
             state['installed'] = {p: digest(app / p) for p in (BINARY, MAIN, LIBRARY)}
-            save_state(state)
+            save_state(state, local)
         except BaseException:
             replace_file(previous / 'bridge', app / LIBRARY)
             replace_file(previous / MAIN, app / MAIN)
@@ -243,27 +267,36 @@ def update(app, state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['build', 'install', 'update', 'restore', 'status'])
-    parser.add_argument('--app', type=Path,
-                        default=Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app')
+    parser.add_argument('command', choices=['profiles', 'build', 'install', 'update', 'restore', 'status'])
+    parser.add_argument('--profile', default=DEFAULT_PROFILE, help='ID from profiles/*.json')
+    parser.add_argument('--app', type=Path, help="Override the profile bundle's PlayCover location")
     args = parser.parse_args()
-    app = args.app.expanduser().resolve()
+    if args.command == 'profiles':
+        for path in sorted((ROOT / 'profiles').glob('*.json')):
+            profile = load_profile(path.stem)
+            print(f'{profile["id"]}: {profile["game"]} {profile["version"]} ({profile["bundle_id"]})')
+        return
+    profile = load_profile(args.profile)
+    local = local_directory(profile)
+    app = (args.app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' /
+           (profile['bundle_id'] + '.app')).expanduser().resolve()
     if args.command == 'build':
-        build()
+        build(profile)
     elif args.command == 'install':
-        install(app)
+        install(app, profile, local)
     else:
-        require(STATE.exists(), 'No local installation state')
-        state = json.loads(STATE.read_text())
+        state_path = local / 'state.json'
+        require(state_path.exists(), 'No local installation state for this profile')
+        state = json.loads(state_path.read_text())
         require(state['app'] == str(app), 'Backup belongs to a different app')
         if args.command == 'status':
             if state['status'] == 'installed':
-                check_installed(app, state)
+                check_installed(app, state, profile)
             print(json.dumps(state, indent=2))
         elif args.command == 'restore':
-            restore(app, state)
+            restore(app, state, profile, local)
         else:
-            update(app, state)
+            update(app, state, profile, local)
 
 
 if __name__ == '__main__':

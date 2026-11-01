@@ -10,6 +10,7 @@
 #include "Scroll.h"
 #include "InputState.h"
 #include "NativeWheel.h"
+#include "Profile.h"
 
 // Catalyst hosts AppKit. Resolve its classes at runtime, as PlayCover's plugin does.
 @interface ZZZHostEvent : NSObject
@@ -41,6 +42,7 @@
 @end
 
 static uintptr_t slide, mouse, keyboard;
+// The unity-input-system-v1 backend uses the 110-key, 14-byte Unity Key bitset.
 static uint8_t keys[14];
 static MouseState mouseState;
 static id monitor;
@@ -80,7 +82,7 @@ static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     return wheel ?: event;
 }
 
-// macOS virtual keycodes -> this build's verified Unity Key enum.
+// macOS virtual keycodes -> the unity-input-system-v1 backend's Unity Key enum.
 static unsigned unityKey(unsigned code) {
     static const uint8_t map[128] = {
         [0]=15,[1]=33,[2]=18,[3]=20,[4]=22,[5]=21,[6]=40,[7]=38,
@@ -104,14 +106,14 @@ static unsigned unityKey(unsigned code) {
 
 static void queueState(uintptr_t device, uint32_t format, const void *state, size_t size) {
     if (!ready || !device) return;
-    int deviceID = *(int *)(device + 0x144);
+    int deviceID = *(int *)(device + GameFieldDeviceID);
     if (deviceID <= 0 || deviceID > UINT16_MAX || size > MaxDeviceStateBytes) return;
     uint8_t bytes[sizeof(StateHeader) + MaxDeviceStateBytes] = {0};
     StateHeader header = { .type=0x53544154, .size=(uint16_t)(sizeof(StateHeader)+size),
-        .device=(uint16_t)deviceID, .time=((double (*)(void))(slide+0x138d66b4))(), .format=format };
+        .device=(uint16_t)deviceID, .time=((double (*)(void))(slide+GameNativeTime))(), .format=format };
     memcpy(bytes, &header, sizeof(header));
     memcpy(bytes+sizeof(header), state, size);
-    ((void (*)(void *))(slide+0x138d66f0))(bytes);
+    ((void (*)(void *))(slide+GameQueueInputEvent))(bytes);
 }
 
 static void sendKeyboard(void) { queueState(keyboard, 0x4b455953, keys, sizeof(keys)); }
@@ -120,7 +122,7 @@ static void sendMouse(void) {
     uint8_t state[MaxDeviceStateBytes];
     size_t size=packMouseState(state, &mouseState, mouseStateBytes);
     if (size) {
-        ((void (*)(uintptr_t))(slide+0x133ade68))(mouse);
+        ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
         queueState(mouse, 0x4d4f5553, state, size);
     }
     mouseState.dx = mouseState.dy = mouseState.sx = mouseState.sy = 0;
@@ -191,8 +193,8 @@ static id handleEvent(ZZZHostEvent *event) {
     }
     ZZZHostEvent *view=[window contentView];
     CGRect bounds=view.bounds;
-    int width=((int (*)(void))(slide+0x1389069c))();
-    int height=((int (*)(void))(slide+0x138906ac))();
+    int width=((int (*)(void))(slide+GameScreenWidth))();
+    int height=((int (*)(void))(slide+GameScreenHeight))();
     if (bounds.size.width<=0 || bounds.size.height<=0 || width<=0 || height<=0) return event;
     float scaleX=width/bounds.size.width, scaleY=height/bounds.size.height;
     // Precise gesture events can carry a stale location; use the actual window cursor.
@@ -239,27 +241,27 @@ static void initializeDevices(void) {
     if (!slide) {
         for (uint32_t i=0;i<_dyld_image_count();i++) {
             const char *name=_dyld_get_image_name(i);
-            if (name && strstr(name,"/UnityFramework.framework/UnityFramework")) {
+            if (name && [[NSString stringWithUTF8String:name] hasSuffix:@GameImageSuffix]) {
                 slide=(uintptr_t)_dyld_get_image_vmaddr_slide(i); break;
             }
         }
     }
     if (!slide) return;
-    uintptr_t statics=*(uintptr_t *)(slide+0x1c69e278);
-    if (!statics || !*(uintptr_t *)(statics+0x2ae78) || !*(uintptr_t *)(statics+0x2b2c0)) return;
+    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
+    if (!statics || !*(uintptr_t *)(statics+GameFieldStaticInputManager) || !*(uintptr_t *)(statics+GameFieldStaticKeyboard)) return;
     if (!ready) {
         Class eventClass=NSClassFromString(@"NSEvent");
         if (!eventClass) { note("AppKit event class unavailable"); [timer invalidate]; return; }
-        void *(*newString)(const char *,int)=(void *)(slide+0x13a84cb0);
-        uintptr_t (*addDevice)(void *,void *,void *)=(void *)(slide+0x133fa120);
+        void *(*newString)(const char *,int)=(void *)(slide+GameNewString);
+        uintptr_t (*addDevice)(void *,void *,void *)=(void *)(slide+GameAddDevice);
         mouse=addDevice(newString("Mouse",5),newString("Desktop Mouse",13),NULL);
         keyboard=addDevice(newString("Keyboard",8),newString("Desktop Keyboard",16),NULL);
-        if (!mouse || !keyboard || !*(uintptr_t *)(mouse+0x178) || !*(uintptr_t *)(mouse+0x170)) {
+        if (!mouse || !keyboard || !*(uintptr_t *)(mouse+GameFieldMousePosition) || !*(uintptr_t *)(mouse+GameFieldMouseDelta)) {
             note("Device creation failed validation; bridge disabled"); [timer invalidate]; return;
         }
-        uint32_t *mouseBlock=(uint32_t *)(mouse+0x98);
+        uint32_t *mouseBlock=(uint32_t *)(mouse+GameFieldStateBlock);
         mouseStateBytes=(mouseBlock[3]+7u)/8u;
-        if (mouseBlock[0]!=0x4d4f5553 || mouseStateBytes<sizeof(MouseState) || mouseStateBytes>MaxDeviceStateBytes) {
+        if (mouseBlock[0]!=0x4d4f5553 || mouseStateBytes!=GameMouseStateBytes) {
             note("Unexpected Mouse state layout; bridge disabled"); [timer invalidate]; return;
         }
         ready=YES;
@@ -268,36 +270,38 @@ static void initializeDevices(void) {
         for (unsigned i=0;i<sizeof(types)/sizeof(types[0]);i++) mask|=(NSUInteger)1<<types[i];
         monitor=[(id)eventClass addLocalMonitorForEventsMatchingMask:mask handler:^id(id e) { return handleEvent(e); }];
         if (!monitor) { ready=NO; note("Event monitor unavailable"); [timer invalidate]; return; }
-        uintptr_t scroll=*(uintptr_t *)(mouse+0x188);
+        uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (output && scroll) {
-            uint32_t *block=(uint32_t *)(scroll+0x98);
+            uint32_t *block=(uint32_t *)(scroll+GameFieldStateBlock);
             fprintf(output,"Scroll control format=%08x byteOffset=%u bitOffset=%u size=%u\n",block[0],block[1],block[2],block[3]);
             fflush(output);
         }
         [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationDidResignActiveNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
         [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationWillTerminateNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
-        ((void (*)(uintptr_t))(slide+0x133ade68))(mouse);
-        ((void (*)(BOOL))(slide+0xb0a61d4))(YES);
-        note("Game mouse processing initialized before login");
+        ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
+        if (GameEnableMouseProcessing) {
+            ((void (*)(BOOL))(slide+GameEnableMouseProcessing))(YES);
+            note("Game mouse processing initialized before login");
+        }
         note("Native devices initialized; local keyboard/mouse events enabled. Option+M toggles capture; Escape releases manual capture.");
-        if (output) { fprintf(output,"mouseID=%d keyboardID=%d position=%p delta=%p\n",*(int *)(mouse+0x144),*(int *)(keyboard+0x144),(void *)*(uintptr_t *)(mouse+0x178),(void *)*(uintptr_t *)(mouse+0x170)); fflush(output); }
+        if (output) { fprintf(output,"mouseID=%d keyboardID=%d position=%p delta=%p\n",*(int *)(mouse+GameFieldDeviceID),*(int *)(keyboard+GameFieldDeviceID),(void *)*(uintptr_t *)(mouse+GameFieldMousePosition),(void *)*(uintptr_t *)(mouse+GameFieldMouseDelta)); fflush(output); }
     }
     if (sawScroll && !sawScrollState) {
-        uintptr_t scroll=*(uintptr_t *)(mouse+0x188);
+        uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (scroll) {
             typedef struct {float x,y;} Vector2;
-            Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+0x9b2cd20))(scroll,NULL);
+            Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+GameReadVector2))(scroll,NULL);
             if (value.x!=0 || value.y!=0) { sawScrollState=YES; note("Unity scroll control received nonzero state"); }
         }
     }
-    uintptr_t currentMouse=*(uintptr_t *)(statics+0x2b4c0);
-    if (!currentMouse || !*(uintptr_t *)(currentMouse+0x178) || !*(uintptr_t *)(currentMouse+0x170)) {
-        ((void (*)(uintptr_t))(slide+0x133ade68))(mouse);
+    uintptr_t currentMouse=*(uintptr_t *)(statics+GameFieldStaticMouse);
+    if (!currentMouse || !*(uintptr_t *)(currentMouse+GameFieldMousePosition) || !*(uintptr_t *)(currentMouse+GameFieldMouseDelta)) {
+        ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
     }
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     BOOL active=[app isActive];
-    int lock=((int (*)(void))(slide+0x1380e1c8))();
-    int visible=((BOOL (*)(void))(slide+0x1380e1a8))();
+    int lock=((int (*)(void))(slide+GameCursorLock))();
+    int visible=((BOOL (*)(void))(slide+GameCursorVisible))();
     if (lock!=lastLock || visible!=lastVisible) {
         if (output) { fprintf(output,"Unity cursor lock=%d visible=%d\n",lock,visible); fflush(output); }
         lastLock=lock; lastVisible=visible;
@@ -309,9 +313,15 @@ __attribute__((constructor)) static void start(void) {
     assert(unityKey(13)==37 && unityKey(0)==15 && unityKey(122)==94 && unityKey(111)==105);
     assert(unityKey(128)==0 && unityKey(10)==0);
     dispatch_async(dispatch_get_main_queue(), ^{
+        NSBundle *bundle=[NSBundle mainBundle];
+        if (![bundle.bundleIdentifier isEqualToString:@GameBundleID] ||
+            ![[bundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] isEqualToString:@GameVersion]) {
+            NSLog(@"NativeInputBridge: profile %@ does not match this app; disabled", @GameProfileID);
+            return;
+        }
         NSString *path=[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/LogDir/NativeInputBridge.log"];
         output=fopen(path.fileSystemRepresentation,"w");
-        note("ZZZ 3.3.0 native input experiment; no key logging");
+        note(GameProfileID " native input experiment; no key logging");
         associateCursor=(int (*)(int))dlsym(RTLD_DEFAULT,"CGAssociateMouseAndMouseCursorPosition");
         createCGWheel=(CreateWheel)dlsym(RTLD_DEFAULT,"CGEventCreateScrollWheelEvent");
         setCGInteger=(void (*)(void *,uint32_t,int64_t))dlsym(RTLD_DEFAULT,"CGEventSetIntegerValueField");

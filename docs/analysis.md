@@ -1,5 +1,10 @@
 # Analysis of the supported 3.3.0 build
 
+The machine-readable source for byte patches, VM addresses and object/static
+offsets is [`profiles/zzz-3.3.0.json`](../profiles/zzz-3.3.0.json). The shared
+bridge consumes a header generated from that profile. See [porting](porting.md)
+for the ABI contract and the process for adding another build.
+
 The decrypted arm64 UnityFramework exposes an IL2CPP PC layout/input path even
 though the packaged player is an iOS build converted for Catalyst by PlayCover.
 The obfuscated layout selector at `0xc22d6b8` returns an enum whose PC value is 2.
@@ -105,3 +110,9 @@ callback processes its coarse event once, binds it to the game window, hit-tests
 the window's content view and invokes the native target's scrollWheel handler.
 The WindowServer-backed regression test verifies that the real target NSView
 receives the correct coarse deltas through this same helper.
+
+The user reported **still no physical trackpad response with `61cce82`**. This
+invalidates any inference that direct native-view dispatch solved the gameplay
+problem. The event conversion and view-dispatch self-checks pass, while the actual
+trackpad-to-game path remains unresolved. The profile refactor changes how these
+constants are supplied; it does not claim to fix scrolling.
