@@ -47,8 +47,8 @@
     "scroll_units_per_step": 120
   },
   "validation": {
-    "keyboard_mouse": "Experimental: only the app-level platform mapping is changed to PC. Input and cursor behavior with the global PC platform has not been physically tested.",
-    "trackpad": "Experimental: only the app-level platform mapping is changed to PC. Scrolling with the global PC platform has not been physically tested.",
+    "keyboard_mouse": "Experimental: the user reports other features seem to work, but changing the app-level platform to PC breaks the Graphics settings page and its backdrop.",
+    "trackpad": "Experimental: the Graphics page shows only Resolution and Graphics Quality and loses its normal dim/blur backdrop with app platform PC; the scoped mobile-platform profile restores both.",
     "evidence": "docs/hsr.md"
   },
   "test_only": true

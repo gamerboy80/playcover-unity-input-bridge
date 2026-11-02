@@ -151,3 +151,11 @@ python3 patch.py install --profile com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-
 After testing, restore the test profile and reinstall the working HSR profile with
 `restore --profile com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-test` and
 `install --profile hsr`. Both profiles retain their own original backups.
+
+The PC-enum build was tested on 2026-11-01. It made `AppUtils.IsMobilePlatform()`
+false (that predicate accepts app platform values `1` and `2` only). The Graphics
+page then showed only Resolution and Graphics Quality, and the settings backdrop
+lost its normal dim/blur treatment. Restoring the scoped `hsr` profile brought
+back the full graphics list and backdrop. Keep the global platform mobile for
+normal use; the scoped PC-layout, cursor, and UI input edits provide the tested
+desktop input behavior without changing the broader platform-dependent UI paths.
