@@ -45,6 +45,8 @@ Before changing address-dependent behavior, review the [README](README.md),
 7. Do not commit proprietary binaries, metadata or disassembly dumps, runtime
    account logs, installation backups, build output, personal paths or
    credentials. Retain the license notice for the optional PlayTools patch.
+8. The root MIT license covers original project files. Honor separate
+   third-party license notices; do not relicense the PlayTools patch.
 
 ## Build and validation
 

@@ -121,6 +121,7 @@ state and scroll counters; they do not record key identities or pointer
 coordinates. Logs are stored in the app container under
 `Data/Documents/LogDir/NativeInputBridge.log`.
 
-The optional PlayTools patch retains its upstream AGPL-3.0 license notice in
-[patches/PlayTools-LICENSE](patches/PlayTools-LICENSE). No game binaries are
-included.
+Original project code and documentation are licensed under the [MIT License](LICENSE).
+That license does not grant rights to game code or assets. The optional
+PlayTools patch remains under its upstream AGPL-3.0 license in
+[patches/PlayTools-LICENSE](patches/PlayTools-LICENSE).
