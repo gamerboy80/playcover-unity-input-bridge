@@ -48,6 +48,11 @@ from JSON and compile a matching `NativeInputBridge.dylib` in that directory.
 The profiles share macOS input/capture handling and select different game-facing
 backends. HSR builds and backups are independent of ZZZ.
 
+ZZZ also has an explicit test-only profile that overrides Unity's managed
+`Application.platform` result to `WindowsPlayer` to exercise the broader PC
+platform path. It is excluded from automatic profile selection; see the test
+notes in [analysis](docs/analysis.md).
+
 The default app location is
 `~/Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app`.
 For another location:

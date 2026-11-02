@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "com.HoYoverse.Nap-3.3.0-unity-platform-pc-test",
+  "game": "Zenless Zone Zero",
+  "version": "3.3.0",
+  "bundle_id": "com.HoYoverse.Nap",
+  "executable": "ZenlessZoneZero",
+  "architecture": "arm64",
+  "framework_binary": "Frameworks/UnityFramework.framework/UnityFramework",
+  "original_sha256": "8514f6ecf03272586a5c722db0d407608b5b28e9815b046e7b3f71ce588ee037",
+  "patches": [
+    {
+      "name": "pc-input-selector",
+      "reason": "Return PC enum 2 (mov w0,#2; ret). Create the bridge Mouse before enabling original mouse processing to avoid the startup null-control exception.",
+      "file_offset": "0xc22d6b8",
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "40008052c0035fd6"
+    },
+    {
+      "name": "unity-runtime-platform-windows-player-test",
+      "reason": "Experimental: make UnityEngine.Application.get_platform report RuntimePlatform.WindowsPlayer (2) instead of iPhonePlayer (8), enabling ZZZ Unity PC-platform checks while the native player remains iOS.",
+      "file_offset": "0x1381fc04",
+      "expected": "a873049008813f91",
+      "replacement": "40008052c0035fd6"
+    }
+  ],
+  "bridge": {
+    "backend": "unity-input-system-v1",
+    "image_suffix": "/UnityFramework.framework/UnityFramework",
+    "mouse_state_bytes": 49,
+    "addresses": {
+      "Statics": "0x1c69e278",
+      "NewString": "0x13a84cb0",
+      "AddDevice": "0x133fa120",
+      "MouseMakeCurrent": "0x133ade68",
+      "NativeTime": "0x138d66b4",
+      "QueueInputEvent": "0x138d66f0",
+      "ScreenWidth": "0x1389069c",
+      "ScreenHeight": "0x138906ac",
+      "CursorLock": "0x1380e1c8",
+      "CursorVisible": "0x1380e1a8",
+      "ReadVector2": "0x9b2cd20",
+      "EnableMouseProcessing": "0xb0a61d4",
+      "GetMouseProcessing": "0xb0a60d4",
+      "MouseProcessingEnabled": "0xb0a5f50",
+      "ReadProcessedScroll": "0xb0a5bf0",
+      "LegacyMousePresent": "0x138d4d8c",
+      "LegacyMousePresentSlot": "0x1c69aef8"
+    },
+    "fields": {
+      "StaticInputManager": "0x2ae78",
+      "StaticKeyboard": "0x2b2c0",
+      "StaticMouse": "0x2b4c0",
+      "DeviceID": "0x144",
+      "StateBlock": "0x98",
+      "MousePosition": "0x178",
+      "MouseDelta": "0x170",
+      "MouseScroll": "0x188"
+    }
+  },
+  "validation": {
+    "keyboard_mouse": "Experimental; not runtime-tested. The Unity RuntimePlatform.WindowsPlayer override changes broad managed platform checks.",
+    "trackpad": "Experimental; not runtime-tested. The Unity RuntimePlatform.WindowsPlayer override changes broad managed platform checks.",
+    "evidence": "docs/analysis.md"
+  },
+  "test_only": true
+}

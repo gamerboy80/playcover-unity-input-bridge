@@ -11,6 +11,30 @@ The obfuscated layout selector at `0xc22d6b8` returns an enum whose PC value is 
 Changing its entry to `mov w0,#2; ret` makes the game display PC control prompts
 and enables its keyboard path.
 
+## Unity PC-platform test build
+
+`com.HoYoverse.Nap-3.3.0-unity-platform-pc-test` is an explicit, test-only
+profile. It retains the working PC input selector and bridge, then changes the
+managed `UnityEngine.Application.get_platform` entry at `0x1381fc04` to return
+`RuntimePlatform.WindowsPlayer` (`2`) instead of the iOS value
+`RuntimePlatform.IPhonePlayer` (`8`). The native player is still an iOS build;
+this only changes the value reported through the managed Unity API. ZZZ's
+`AppUtils.ResetUnityPlatformValues` consumes that getter and uses value `2` for
+its Unity PC-platform flag. The patch therefore tests the broader Unity and
+game PC branches, not only the game's input selector. It can also affect other
+platform-dependent setup and UI paths, so it is excluded from auto-selection.
+
+The normal profile continues to report the mobile platform. Build and install
+the experiment explicitly, after restoring any current ZZZ profile:
+
+```sh
+python3 patch.py build --profile com.HoYoverse.Nap-3.3.0-unity-platform-pc-test
+python3 patch.py install --profile com.HoYoverse.Nap-3.3.0-unity-platform-pc-test
+```
+
+Restoring this test profile returns the app to the original unpatched files.
+The stable profile's retained backup remains separate.
+
 That patch alone stalled configuration loading. Three local launch logs reported
 `NullReferenceException` from `Foundation.MouseInputEnhancement.InitAllState`.
 The throw at `0xb0a4ffc` follows a null position-control check at `0xb0a4aa8`.
