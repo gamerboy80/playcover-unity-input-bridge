@@ -104,7 +104,7 @@
   },
   "validation": {
     "keyboard_mouse": "User confirmed keyboard movement, native capture, mouse look and menu cursor visibility. UI mouse processing responds; broader button testing remains pending.",
-    "trackpad": "Experimental: camera zoom and menu scrolling work. The first UI scale correction missed the wrapper frame; corrected wrapper-aware normalization awaits physical speed testing.",
+    "trackpad": "User confirmed camera zoom and menu scrolling at a reasonable speed with wrapper-aware UI notch normalization on 2026-11-01.",
     "evidence": "docs/hsr.md"
   }
 }

@@ -6,9 +6,9 @@ did not respond; some buttons also failed. The user then confirmed keyboard
 movement works after hooking GetKey callbacks directly. Native capture and
 mouse look were subsequently confirmed after scoped cursor checks and matching
 HSR’s lowercase axis labels. Camera zoom was then confirmed with 120-unit scroll steps, followed by correct
-menu cursor visibility after force-show/host hide balancing fixes. Menu scrolling
-and partial button behavior remain unresolved; the UI mouse-processing redirect
-awaits physical testing. This profile
+menu cursor visibility after force-show/host hide balancing fixes. Menu scrolling, menu cursor visibility and camera zoom are now user-confirmed,
+including reasonable menu speed after wrapper-aware normalization. Broader
+button coverage remains unverified. This profile
 is experimental.
 
 ```sh
@@ -126,4 +126,4 @@ read its parent return PC to identify the UI callsite. The legacy callback
 normalizes only that caller by `scroll_units_per_step`; gameplay retains its
 confirmed zoom scale. Synthetic tests verify both callers can read the same
 frame without consuming or rescaling each other's state. Runtime startup now logs that the UI caller was verified and normalization
-is active. Physical speed testing is pending.
+is active. The user confirmed reasonable menu speed and working camera zoom on 2026-11-01.

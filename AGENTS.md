@@ -72,7 +72,8 @@ redirects it to its existing ProcessMouseEvent. Menu scrolling is user-confirmed
 UI getter caller for notch normalization while gameplay retains wheel units.
 The callback must skip the verified ScrollWrapperReturn frame before checking
 UIScrollReturn; the immediate caller is Unity’s wrapper, not the UI module.
-Physical speed validation is pending. Read `docs/hsr.md` for its ABI and provisional camera scale.
+The user confirmed reasonable menu scroll speed and working camera zoom on
+2026-11-01 after the wrapper-aware normalization fix. Read `docs/hsr.md` for its ABI and provisional camera scale.
 For ZZZ, keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.
