@@ -54,6 +54,6 @@
   "validation": {
     "keyboard_mouse": "User confirmed keyboard, WASD release, F1/F2 and mouse look before the scroll experiments; native capture works with PlayTools retained.",
     "trackpad": "User confirmed physical scrolling works after bridging legacy Input.mousePresent to the validated bridge Mouse on 2026-11-01. Earlier conversion/native-view versions through 61cce82 failed. Camera zoom and other mouse hardware have not been separately confirmed.",
-    "evidence": "docs/analysis.md"
+    "evidence": "docs/games/zzz.md"
   }
 }

@@ -1,10 +1,17 @@
 #import <AppKit/AppKit.h>
 #include "../src/NativeWheel.h"
 #include "../src/Capture.h"
+#include "../src/EventRouting.h"
 #include <assert.h>
 
 @interface WheelTestView : NSView
 @property NSInteger received;
+@end
+
+@interface RoutingWindow : NSObject
+@property(strong) id firstResponder;
+@end
+@implementation RoutingWindow
 @end
 @implementation WheelTestView
 - (void)scrollWheel:(NSEvent *)event {
@@ -20,6 +27,12 @@ static void testUnhide(void) { cursorDepth--; }
 
 int main(void) {
     @autoreleasepool {
+        RoutingWindow *game=[RoutingWindow new], *panel=[RoutingWindow new];
+        assert(routeGameEvent(game,game));
+        assert(!routeGameEvent(panel,game));
+        assert(!routeGameEvent(game,nil));
+        game.firstResponder=[NSTextField new];
+        assert(!routeGameEvent(game,game));
         unsigned owned=0;
         balanceCursorHide(&owned,true,true,testHide,testUnhide);
         assert(owned==1 && cursorDepth==3);

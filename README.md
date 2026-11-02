@@ -96,11 +96,17 @@ changed after installation rather than overwriting them.
 Only one install, update or restore operation should run at a time. Builds are
 stored under `build/<profile-id>/`.
 
+If an operation is interrupted, close the game and run `restore --app` with
+the same app path. Restore can resume when the files match recorded originals
+or planned patch files. It stops if it finds an unrecognized file, preserving
+independent changes. Keep `.local/` even when an operation fails.
+
 ## Input behavior
 
 Disable PlayCover keymapping while using the bridge. The game can capture the
 mouse natively; Option+M is an optional fallback capture toggle and Escape
 releases manual capture. Losing app focus releases held keys and mouse capture.
+Native text fields and other app windows retain their normal keyboard input.
 
 Trackpad and Magic Mouse movement is accumulated until 16 points produce one
 standard 120-unit wheel step. Physical notched wheels remain immediate. See the

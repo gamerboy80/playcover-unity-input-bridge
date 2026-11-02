@@ -70,7 +70,7 @@
   "validation": {
     "keyboard_mouse": "Experimental; the global app platform remains PC, while AppUtils.IsMobilePlatform also returns true for PC enum 3. Broader call sites may change.",
     "trackpad": "Experimental; graphics options and backdrop are visually restored. This variant adds the tested InControl mouse-processing route for settings UI; physical scroll behavior still needs confirmation.",
-    "evidence": "docs/hsr.md"
+    "evidence": "docs/games/hsr.md"
   },
   "test_only": true
 }

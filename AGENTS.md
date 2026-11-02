@@ -18,6 +18,7 @@ Before changing address-dependent behavior, review the [README](README.md),
 - `src/LegacyBackend.h`: HSR legacy Unity/InControl input backend.
 - `src/InputState.h`, `src/Scroll.h`, `src/NativeWheel.h` and
   `src/MousePresence.h`: shared event and state handling.
+- `src/EventRouting.h`: game-window and native text-responder filtering.
 - `patch.py`, `build.sh`: profile selection, binary editing, Mach-O linking,
   signing, backup, rollback, status and restoration.
 - `patches/`: optional PlayTools source changes, separate from game profiles.
@@ -40,6 +41,8 @@ Before changing address-dependent behavior, review the [README](README.md),
 5. Keep installer hash checks, backup isolation, installed-file checks, rollback
    and signature verification intact. Do not overwrite an independently changed
    app. Never remove `.local/` as routine cleanup.
+   Record original and planned file hashes before app writes. Interrupted
+   recovery may accept either recorded version, but must reject unknown files.
 6. Test-only profiles require explicit selection and must remain excluded from
    automatic app matching.
 7. Do not commit proprietary binaries, metadata or disassembly dumps, runtime

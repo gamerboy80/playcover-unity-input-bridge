@@ -105,6 +105,6 @@
   "validation": {
     "keyboard_mouse": "User confirmed keyboard movement, native capture, mouse look and menu cursor visibility. UI mouse processing responds; broader button testing remains pending.",
     "trackpad": "User confirmed camera zoom and menu scrolling at a reasonable speed with wrapper-aware UI notch normalization on 2026-11-01.",
-    "evidence": "docs/hsr.md"
+    "evidence": "docs/games/hsr.md"
   }
 }

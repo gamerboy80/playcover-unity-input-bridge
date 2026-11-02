@@ -74,11 +74,14 @@ class PatchTests(unittest.TestCase):
             }))
             backup_hash = module.digest(backup / binary)
             with patch.object(module, 'ROOT', root), patch.object(module, 'closed'), \
-                    patch.object(module, 'build'), patch.object(module, 'run'):
+                    patch.object(module, 'build'), patch.object(module, 'run'), \
+                    patch.object(module, 'clone_app', side_effect=lambda source, target: shutil.copytree(source, target, symlinks=True)):
                 module.install(app, profile, local)
             state = json.loads((local / 'state.json').read_text())
             self.assertEqual(state['status'], 'installed')
-            self.assertEqual(state['original'], original)
+            self.assertEqual({p: state['original'][p] for p in original}, original)
+            self.assertEqual({p: state['original'][p] for p in module.signature_hashes(backup, profile)},
+                             module.signature_hashes(backup, profile))
             self.assertEqual(module.digest(backup / binary), backup_hash)
 
     def test_status_labels(self):
@@ -186,7 +189,8 @@ class PatchTests(unittest.TestCase):
             binary, framework, main = module.app_paths(profile)
             original_main = (app / main).read_bytes()
             with patch.object(module, 'ROOT', root), patch.object(module, 'closed'), \
-                    patch.object(module, 'build'), patch.object(module, 'run'):
+                    patch.object(module, 'build'), patch.object(module, 'run'), \
+                    patch.object(module, 'clone_app', side_effect=lambda source, target: shutil.copytree(source, target, symlinks=True)):
                 module.install(app, profile, local)
                 state = json.loads((local / 'state.json').read_text())
                 self.assertEqual(state['profile'], profile['id'])
@@ -200,8 +204,8 @@ class PatchTests(unittest.TestCase):
                 bridge.write_bytes(b'bad-build')
 
                 def fail_app_sign(*args):
-                    if '--force' in args and args[-1] == str(app):
-                        (app / '_CodeSignature/CodeResources').write_bytes(b'failed signature')
+                    if '--force' in args and args[-1].endswith(app.name):
+                        (Path(args[-1]) / '_CodeSignature/CodeResources').write_bytes(b'failed signature')
                         raise RuntimeError('signing failed')
 
                 with patch.object(module, 'run', side_effect=fail_app_sign):

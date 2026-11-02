@@ -12,6 +12,7 @@
 #include "NativeWheel.h"
 #include "MousePresence.h"
 #include "Capture.h"
+#include "EventRouting.h"
 #include "Profile.h"
 
 // Catalyst hosts AppKit. Resolve its classes at runtime, as PlayCover's plugin does.
@@ -41,6 +42,7 @@
 - (CGPoint)convertPoint:(CGPoint)point toView:(id)view;
 - (CGPoint)convertPointToScreen:(CGPoint)point;
 @property(readonly) id keyWindow;
+@property(readonly) id mainWindow;
 @property(readonly) BOOL isActive;
 + (id)sharedApplication;
 + (void)hide;
@@ -55,6 +57,7 @@ static uintptr_t mouse, keyboard;
 static uint8_t keys[14];
 static MouseState mouseState;
 static id monitor;
+static __weak id gameWindow;
 static NSTimer *timer;
 static FILE *output;
 static BOOL ready, captured, forcedCapture;
@@ -212,7 +215,8 @@ static void setCapture(BOOL value) {
     }
     if (value) {
         id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-        ZZZHostEvent *window=[app keyWindow];
+        ZZZHostEvent *window=gameWindow;
+        if ([app keyWindow]!=window) return;
         ZZZHostEvent *view=window.contentView;
         CGRect bounds=view.bounds;
         CGPoint cursor=[view convertPoint:window.mouseLocationOutsideOfEventStream fromView:nil];
@@ -262,6 +266,22 @@ static void updateModifiers(NSUInteger flags) {
     }
 }
 
+static BOOL editingUIKitText(UIView *view) {
+    if (view.isFirstResponder &&
+        ([view isKindOfClass:UITextField.class] || [view isKindOfClass:UITextView.class])) return YES;
+    for (UIView *child in view.subviews) if (editingUIKitText(child)) return YES;
+    return NO;
+}
+
+static BOOL editingGameText(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows)
+            if (window.isKeyWindow && editingUIKitText(window)) return YES;
+    }
+    return NO;
+}
+
 static id handleEvent(ZZZHostEvent *event) {
     if (!ready) return event;
     NSUInteger type=event.type, flags=event.modifierFlags;
@@ -280,8 +300,10 @@ static id handleEvent(ZZZHostEvent *event) {
         }
     }
     if (!window) return event;
+    if (!routeGameEvent(window,gameWindow)) { releaseInput(); return event; }
     id wheelEvent=nil;
     if (type==10 || type==11 || type==12) {
+        if (editingGameText()) { releaseInput(); return event; }
         unsigned code=event.keyCode, key=unityKey(code);
         // Keep macOS Command shortcuts available; clear held game keys first.
         if (flags & (1u<<20)) { releaseInput(); return event; }
@@ -372,6 +394,8 @@ static void traceLegacy(void) {
 #endif
 
 static void initializeDevices(void) {
+    id hostApp=[(id)NSClassFromString(@"NSApplication") sharedApplication];
+    if (!gameWindow) gameWindow=[hostApp mainWindow];
     if (!slide) {
         for (uint32_t i=0;i<_dyld_image_count();i++) {
             const char *name=_dyld_get_image_name(i);
@@ -456,7 +480,9 @@ static void initializeDevices(void) {
     traceLegacy();
 #endif
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-    BOOL active=[app isActive];
+    BOOL active=[app isActive] && [app keyWindow]==gameWindow &&
+        routeGameEvent(gameWindow,gameWindow) && !editingGameText();
+    if (!active && wasActive) releaseInput();
     double now=NSProcessInfo.processInfo.systemUptime;
     if (active && !wasActive) {
         captureNotBefore=now+.15;

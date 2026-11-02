@@ -43,6 +43,8 @@ def local_directory(profile):
         state = json.loads(state_path.read_text())
         if state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256']:
             recorded = state.get('profile', profile['id'])
+            if candidate == local and PROFILE_ALIASES.get(recorded, recorded) != profile['id']:
+                continue
             require(PROFILE_ALIASES.get(recorded, recorded) == profile['id'], 'Legacy profile mismatch')
             matches.append(candidate)
     require(len(matches) <= 1,
@@ -98,9 +100,66 @@ def replace_signature(source, target):
             file.unlink()
 
 
+def signature_hashes(app, profile):
+    _, framework, _ = app_paths(profile)
+    result = {}
+    for relative in ('_CodeSignature', framework + '/_CodeSignature'):
+        directory = app / relative
+        require(directory.is_dir(), f'Missing signature resources: {relative}')
+        for path in directory.rglob('*'):
+            require(path.is_file() and not path.is_symlink(),
+                    f'Unexpected signature resource: {path}')
+            result[str(path.relative_to(app))] = digest(path)
+    return result
+
+
+def clone_app(app, destination):
+    # The clone keeps signing off the live app and uses APFS copy-on-write.
+    run('/bin/cp', '-cR', str(app), str(destination))
+
+
 def closed(profile):
     result = subprocess.run(['/usr/bin/pgrep', '-x', profile['executable']], capture_output=True)
+    require(result.returncode in (0, 1),
+            f'Could not check whether {profile["game"]} is running: ' +
+            result.stderr.decode(errors='replace').strip())
     require(result.returncode == 1, f'Quit {profile["game"]} before changing its files.')
+
+
+def begin_change(state, profile, local, planned):
+    binary, _, main = app_paths(profile)
+    recovery = state.setdefault('recovery', {})
+    signature_paths = set(state.get('original', {})) | set(state.get('installed', {})) | set(planned)
+    signature_paths = {p for p in signature_paths
+                       if p.startswith('_CodeSignature/') or '/_CodeSignature/' in p}
+    for relative in (binary, main, LIBRARY, *sorted(signature_paths)):
+        values = recovery.setdefault(relative, [])
+        for expected in (state['original'].get(relative), state.get('installed', {}).get(relative), planned.get(relative)):
+            if expected not in values:
+                values.append(expected)
+    state['status'] = 'prepared'
+    save_state(state, local)
+
+
+def check_recoverable(app, state, profile, local):
+    binary, _, main = app_paths(profile)
+    require(state.get('app') == str(app) and
+            PROFILE_ALIASES.get(state.get('profile'), state.get('profile')) == profile['id'],
+            'The saved backup belongs to a different app or profile.')
+    require(state.get('original', {}).get(binary) == profile['original_sha256'],
+            'The saved original framework does not match this profile.')
+    for relative, expected in state.get('original', {}).items():
+        source = local / 'original' / relative
+        require(expected and source.is_file() and digest(source) == expected, 'Original backup changed')
+    known_paths = set(state.get('original', {})) | set(state.get('installed', {})) | set(state.get('recovery', {}))
+    for relative in known_paths | {binary, main, LIBRARY}:
+        target = app / relative
+        actual = digest(target) if target.is_file() else None
+        known = list(state.get('recovery', {}).get(relative, []))
+        known += [state['original'].get(relative), state.get('installed', {}).get(relative)]
+        signature = relative.startswith('_CodeSignature/') or '/_CodeSignature/' in relative
+        require(actual in known and (actual is not None or relative == LIBRARY or signature),
+                f'Cannot recover {relative}: it does not match a recorded original or patched file. No files were changed.')
 
 
 def read_app_info(app):
@@ -201,8 +260,8 @@ def applied_profile(app, info):
             raise RuntimeError(f"Couldn't read saved patch information at {state_path}: {error}") from error
         if not isinstance(state, dict) or state.get('app') != str(app):
             continue
-        if state.get('status') == 'prepared':
-            changed.append((profile, state, local, 'prepared'))
+        if state.get('status') in ('prepared', 'restoring'):
+            changed.append((profile, state, local, state['status']))
         elif state.get('status') == 'installed':
             try:
                 check_installed(app, state, profile)
@@ -310,47 +369,56 @@ def install(app, profile, local):
         shutil.copy2(app / MAIN, BACKUP / MAIN)
         shutil.copytree(app / '_CodeSignature', BACKUP / '_CodeSignature')
         original = {p: digest(BACKUP / p) for p in (BINARY, MAIN)}
-    state = {'profile': profile['id'], 'app': str(app), 'original': original, 'installed': {}, 'status': 'prepared'}
-    with tempfile.TemporaryDirectory(dir=local) as tmp:
-        staged = Path(tmp)
-        framework = stage_framework(staged, profile, local)
+    original = dict(original)
+    original.update(signature_hashes(BACKUP, profile))
+    state = {'profile': profile['id'], 'app': str(app), 'original': original, 'installed': {}, 'status': 'restored'}
+    save_state(state, local)
+    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
+        staged = Path(tmp) / app.name
+        clone_app(app, staged)
+        framework = stage_framework(Path(tmp), profile, local)
+        replace_file(framework / Path(BINARY).name, staged / BINARY)
+        replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
         main = staged / MAIN
         main.write_bytes(link_library(bytearray((app / MAIN).read_bytes())))
         shutil.copystat(app / MAIN, main)
-        save_state(state, local)
+        replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
+        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
+        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
+        planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
+                   LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
+        begin_change(state, profile, local, planned)
         try:
             print('Installing the bridge and checking the app signature...', flush=True)
-            replace_file(framework / Path(BINARY).name, app / BINARY)
-            replace_signature(framework / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
-            replace_file(main, app / MAIN)
-            replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', app / LIBRARY)
-            run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(app))
-            run('/usr/bin/codesign', '--verify', '--strict', str(app))
+            replace_file(staged / BINARY, app / BINARY)
+            replace_file(staged / MAIN, app / MAIN)
+            replace_file(staged / LIBRARY, app / LIBRARY)
+            replace_signature(staged / '_CodeSignature', app / '_CodeSignature')
+            replace_signature(staged / FRAMEWORK / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
             state['profile'] = profile['id']
-            state['installed'] = {p: digest(app / p) for p in (BINARY, MAIN, LIBRARY)}
+            state['installed'] = {p: digest(app / p) for p in planned}
             state['status'] = 'installed'
+            state.pop('recovery', None)
             save_state(state, local)
         except BaseException:
-            restore_files(app, profile, local)
-            state['status'] = 'restored'
-            save_state(state, local)
+            restore(app, state, profile, local)
             raise
     print(f'Done. The input bridge is installed for {profile["game"]} {profile["version"]}.')
     print('Native mouse capture is enabled. Option+M remains available as a fallback.')
 
 
 def restore(app, state, profile, local):
-    BACKUP = local / 'original'
     closed(profile)
-    require(state.get('status') == 'installed',
+    require(state.get('status') in ('installed', 'prepared', 'restoring'),
             f'{profile_name(profile)} is not currently patched, so there is nothing to restore. Run status to check the active profile.')
-    check_installed(app, state, profile)
-    for relative, expected in state['original'].items():
-        require(digest(BACKUP / relative) == expected, 'Original backup changed')
+    check_recoverable(app, state, profile, local)
+    state['status'] = 'restoring'
+    save_state(state, local)
     print(f'Restoring the original {profile["game"]} files...', flush=True)
     restore_files(app, profile, local)
     run('/usr/bin/codesign', '--verify', '--strict', str(app))
     state['status'] = 'restored'
+    state.pop('recovery', None)
     save_state(state, local)
     print('Done. The original game files are restored. The backup is kept for future installs.')
 
@@ -363,29 +431,31 @@ def update(app, state, profile, local):
     check_installed(app, state, profile)
     build(profile)
     print('Updating the bridge and checking the app signature...', flush=True)
-    with tempfile.TemporaryDirectory(dir=local) as tmp:
-        previous = Path(tmp)
-        shutil.copy2(app / LIBRARY, previous / 'bridge')
-        shutil.copy2(app / MAIN, previous / MAIN)
-        shutil.copytree(app / '_CodeSignature', previous / '_CodeSignature')
-        shutil.copy2(app / BINARY, previous / 'UnityFramework')
-        shutil.copytree(app / FRAMEWORK / '_CodeSignature', previous / 'framework-signature')
-        framework = stage_framework(previous, profile, local)
+    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
+        staged = Path(tmp) / app.name
+        clone_app(app, staged)
+        framework = stage_framework(Path(tmp), profile, local)
+        replace_file(framework / Path(BINARY).name, staged / BINARY)
+        replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
+        replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
+        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
+        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
+        planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
+                   LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
+        begin_change(state, profile, local, planned)
         try:
-            replace_file(framework / Path(BINARY).name, app / BINARY)
-            replace_signature(framework / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
-            replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', app / LIBRARY)
-            run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(app))
-            run('/usr/bin/codesign', '--verify', '--strict', str(app))
+            replace_file(staged / BINARY, app / BINARY)
+            replace_file(staged / MAIN, app / MAIN)
+            replace_file(staged / LIBRARY, app / LIBRARY)
+            replace_signature(staged / '_CodeSignature', app / '_CodeSignature')
+            replace_signature(staged / FRAMEWORK / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
             state['profile'] = profile['id']
-            state['installed'] = {p: digest(app / p) for p in (BINARY, MAIN, LIBRARY)}
+            state['installed'] = {p: digest(app / p) for p in planned}
+            state['status'] = 'installed'
+            state.pop('recovery', None)
             save_state(state, local)
         except BaseException:
-            replace_file(previous / 'bridge', app / LIBRARY)
-            replace_file(previous / MAIN, app / MAIN)
-            replace_signature(previous / '_CodeSignature', app / '_CodeSignature')
-            replace_file(previous / 'UnityFramework', app / BINARY)
-            replace_signature(previous / 'framework-signature', app / FRAMEWORK / '_CodeSignature')
+            restore(app, state, profile, local)
             raise
     print('Done. The input bridge is updated. Your original backup is unchanged.')
 
@@ -397,6 +467,7 @@ def print_status(state, profile, local, verbose=False):
         'restored': 'Unpatched',
         'unpatched': 'Unpatched',
         'prepared': 'The installation may not have finished.',
+        'restoring': 'Restore was interrupted; run restore again to finish.',
         'changed': f'Needs attention ({name}); installed files have changed.',
     }
     print(f'{profile["game"]} {profile["version"]}')
@@ -502,6 +573,20 @@ def main():
         if detected:
             state = dict(state, status=detected_status)
         else:
+            require((app / profile['executable']).is_file() and os.access(app / profile['executable'], os.X_OK),
+                    'The game executable is missing or cannot be run. Cannot confirm an unpatched app.')
+            candidates = [profile] + [load_profile(path.stem) for path in (ROOT / 'profiles').glob('*.json')
+                                      if path.stem != profile['id']]
+            for candidate in candidates:
+                if not match_app(candidate, app_info):
+                    continue
+                record = local_directory(candidate) / 'state.json'
+                if record.exists():
+                    saved = json.loads(record.read_text())
+                    if saved.get('app') == str(app):
+                        expected = saved.get('original', {}).get(profile['executable'])
+                        require(expected and digest(app / profile['executable']) == expected,
+                                'The game executable differs from its saved original. Cannot confirm an unpatched app.')
             require(digest(app / profile['framework_binary']) == profile['original_sha256']
                     and not (app / LIBRARY).exists(),
                     'The game has modified files but no saved patch information. Cannot determine patch status safely.')
@@ -511,7 +596,8 @@ def main():
         else:
             print_status(state, profile, local, args.verbose)
     elif args.command in ('restore', 'update') and detected is not None:
-        require(detected_status == 'installed',
+        require(detected_status == 'installed' or
+                (args.command == 'restore' and detected_status in ('prepared', 'restoring', 'changed')),
                 'The saved install is incomplete or its files changed. No update or restore was made; run status --verbose for details.')
         if args.command == 'restore':
             restore(app, state, profile, local)

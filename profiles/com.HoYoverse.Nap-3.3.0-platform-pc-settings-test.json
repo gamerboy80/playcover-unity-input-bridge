@@ -75,7 +75,7 @@
   "validation": {
     "keyboard_mouse": "The inherited ZZZ bridge and PC input selector are user-tested. The app-level PC and mobile settings overrides are experimental and need runtime validation.",
     "trackpad": "The stable ZZZ bridge's physical trackpad scroll is user-confirmed. App-level platform overrides are experimental and need settings-list and camera-zoom validation.",
-    "evidence": "docs/analysis.md"
+    "evidence": "docs/games/zzz.md"
   },
   "test_only": true
 }

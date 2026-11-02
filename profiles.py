@@ -100,6 +100,10 @@ def validate(data, profile_id):
                     require(number % 8 == 0, 'Unaligned mouse presence callback slot')
     require(all(isinstance(data['validation'][key], str) and data['validation'][key]
                 for key in ('keyboard_mouse', 'trackpad', 'evidence')), 'Missing validation notes')
+    evidence = Path(data['validation']['evidence'])
+    require(not evidence.is_absolute() and '..' not in evidence.parts and
+            (Path(__file__).resolve().parent / evidence).is_file(),
+            'Profile evidence must point to an existing repository document')
     return data
 
 
