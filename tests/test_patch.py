@@ -1,3 +1,5 @@
+import contextlib
+import io
 import importlib.util
 from pathlib import Path
 import struct
@@ -5,6 +7,7 @@ import unittest
 import copy
 import json
 import plistlib
+import shutil
 import tempfile
 from unittest.mock import patch
 
@@ -17,6 +20,94 @@ spec.loader.exec_module(module)
 
 
 class PatchTests(unittest.TestCase):
+    def test_profiles_list_copyable_commands_regular_before_test(self):
+        with patch('sys.argv', ['patch.py', 'profiles']), contextlib.redirect_stdout(io.StringIO()) as out:
+            module.main()
+        output = out.getvalue()
+        self.assertIn('python3 patch.py apply --profile hsr\n', output)
+        self.assertIn('python3 patch.py apply --profile hsr-test\n', output)
+        self.assertLess(output.index('--profile hsr\n'), output.index('--profile hsr-test\n'))
+
+    def test_apply_alias_invokes_install(self):
+        profile = copy.deepcopy(load_profile('hsr'))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, _ = self.fake_app(root, profile)
+            local = root / '.local' / profile['id']
+            with patch.object(module, 'select_profile', return_value=profile), \
+                    patch.object(module, 'local_directory', return_value=local), \
+                    patch.object(module, 'install') as install, \
+                    patch('sys.argv', ['patch.py', 'apply', '--profile', 'hsr', '--app', str(app)]):
+                module.main()
+            install.assert_called_once_with(app.resolve(), profile, local)
+
+    def test_restore_with_app_uses_detected_active_profile(self):
+        profile = copy.deepcopy(load_profile('hsr'))
+        test_profile = copy.deepcopy(load_profile('hsr-test'))
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _ = self.fake_app(Path(tmp), profile)
+            local = Path(tmp) / '.local' / test_profile['id']
+            state = {'profile': test_profile['id'], 'app': str(app), 'status': 'installed'}
+            with patch.object(module, 'select_profile', return_value=profile), \
+                    patch.object(module, 'applied_profile', return_value=(test_profile, state, local, 'installed')), \
+                    patch.object(module, 'restore') as restore, \
+                    patch('sys.argv', ['patch.py', 'restore', '--app', str(app)]):
+                module.main()
+            restore.assert_called_once_with(app.resolve(), state, test_profile, local)
+
+    def test_apply_reuses_verified_backup_after_restore(self):
+        profile = copy.deepcopy(load_profile())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, _ = self.fake_app(root, profile)
+            local = root / '.local' / profile['id']
+            backup = local / 'original'
+            binary, framework, main = module.app_paths(profile)
+            backup.mkdir(parents=True)
+            shutil.copytree(app / framework, backup / framework, symlinks=True)
+            shutil.copy2(app / main, backup / main)
+            shutil.copytree(app / '_CodeSignature', backup / '_CodeSignature')
+            original = {path: module.digest(backup / path) for path in (binary, main)}
+            (local / 'state.json').write_text(json.dumps({
+                'profile': profile['id'], 'app': str(app), 'original': original,
+                'installed': {}, 'status': 'restored',
+            }))
+            backup_hash = module.digest(backup / binary)
+            with patch.object(module, 'ROOT', root), patch.object(module, 'closed'), \
+                    patch.object(module, 'build'), patch.object(module, 'run'):
+                module.install(app, profile, local)
+            state = json.loads((local / 'state.json').read_text())
+            self.assertEqual(state['status'], 'installed')
+            self.assertEqual(state['original'], original)
+            self.assertEqual(module.digest(backup / binary), backup_hash)
+
+    def test_status_labels(self):
+        for name in ('zzz', 'hsr', 'zzz-test', 'hsr-test'):
+            profile = load_profile(name)
+            for status, expected in [('installed', f'Patched ({name})'),
+                                     ('restored', 'Unpatched'), ('unpatched', 'Unpatched')]:
+                with self.subTest(profile=name, status=status), contextlib.redirect_stdout(io.StringIO()) as out:
+                    module.print_status({'status': status}, profile, Path('/unused'))
+                    self.assertIn(f'Status: {expected}\n', out.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            module.print_status({'status': 'prepared'}, load_profile(), Path('/unused'))
+            self.assertNotIn('Status: Unpatched', out.getvalue())
+
+    def test_status_without_saved_installation(self):
+        profile = copy.deepcopy(load_profile())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, _ = self.fake_app(root, profile)
+            with patch.object(module, 'select_profile', return_value=profile), \
+                    patch.object(module, 'local_directory', return_value=root / '.local'), \
+                    patch('sys.argv', ['patch.py', 'status', '--app', str(app)]):
+                with contextlib.redirect_stdout(io.StringIO()) as out:
+                    module.main()
+                self.assertIn('Status: Unpatched\n', out.getvalue())
+                (app / profile['framework_binary']).write_bytes(b'changed')
+                with self.assertRaisesRegex(RuntimeError, 'Cannot determine patch status safely'):
+                    module.main()
+
     def test_instruction_changes_are_exact_and_reject_wrong_bytes(self):
         profile = {'patches': [
             {'file_offset': '0x4', 'expected': '61626364', 'replacement': '5758595a'},

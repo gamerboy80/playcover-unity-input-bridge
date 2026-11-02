@@ -32,50 +32,60 @@ remaining limitations.
 Full Xcode is not required. Keep a copy of the original app available for
 restoration.
 
-## Build and install
+## Apply a profile
 
-Close the game before installing, updating or restoring a profile. List available
-profiles:
+Close the game before applying, updating or restoring a profile. List the
+profiles and copy-ready apply commands:
 
 ~~~sh
 python3 patch.py profiles
 ~~~
 
-Build and install the stable ZZZ profile:
+For example, apply the regular HSR profile or its experimental test profile:
 
 ~~~sh
-python3 patch.py build --profile com.HoYoverse.Nap-3.3.0
-python3 patch.py install --profile com.HoYoverse.Nap-3.3.0
+python3 patch.py apply --profile hsr
+python3 patch.py apply --profile hsr-test
 ~~~
 
-For another app location, pass its bundle path:
+`apply` builds the bridge and installs it. To only build without installing,
+run `python3 patch.py build --profile hsr`. `install` is also accepted as an
+alias for `apply`.
+
+For a game stored outside PlayCover's standard location, pass the app path:
 
 ~~~sh
-python3 patch.py install --profile com.HoYoverse.Nap-3.3.0 --app '/path/to/Zenless Zone Zero.app'
+python3 patch.py apply --profile hsr --app '/path/to/Honkai: Star Rail.app'
 ~~~
 
-When an app path is provided, its bundle ID, version and executable are matched
-to an exact profile. Unknown versions and mismatches are rejected. The framework
-SHA-256 and every expected patch byte must also match before installation.
-Test-only profiles must be selected explicitly with `--profile`.
+The app's bundle ID, version and executable must match the selected profile.
+Unknown versions and mismatches are rejected. Test profiles must be selected
+explicitly with `--profile`.
 
-The default ZZZ app path is
-`~/Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app`.
-The standard profiles have short names: `zzz` and `hsr`. Their test profiles
-can be selected with `zzz-test` and `hsr-test`.
+The standard PlayCover app locations are under
+`~/Library/Containers/io.playcover.PlayCover/Applications/`. Short profile names
+are `zzz`, `hsr`, `zzz-test` and `hsr-test`.
 
 ## Inspect, update and restore
 
+Use `--app` to check or operate on whichever profile is currently applied:
+
 ~~~sh
-python3 patch.py status --profile com.HoYoverse.Nap-3.3.0
-python3 patch.py update --profile com.HoYoverse.Nap-3.3.0
-python3 patch.py restore --profile com.HoYoverse.Nap-3.3.0
+python3 patch.py status --app '/path/to/Honkai: Star Rail.app'
+python3 patch.py update --app '/path/to/Honkai: Star Rail.app'
+python3 patch.py restore --app '/path/to/Honkai: Star Rail.app'
 ~~~
 
-`status` prints a short summary by default. Add `--verbose` to show profile IDs,
-file locations and technical notes, or `--json` to get saved installation
-details in JSON format. Use `python3 patch.py --help` for command options and
-examples.
+`status` reports `Patched (profile name)` when a saved profile matches the
+installed files, and `Unpatched` when the original game files are present. With
+`--app`, `status`, `update` and `restore` detect the active profile, including
+test profiles. To switch profiles, restore the active one first, then apply the
+new profile. A verified backup can be reused when applying that profile again.
+
+Add `--verbose` to see profile IDs and file locations, or `--json` to print
+status details as JSON. Incomplete or modified installs report that they need
+attention instead of claiming to be unpatched. Run `python3 patch.py --help` for
+the command options and examples.
 
 The installer stores original binaries and signature resources under
 `.local/<profile-id>/`. Preserve this directory for restoration. Update applies

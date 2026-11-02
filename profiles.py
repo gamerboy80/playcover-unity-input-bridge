@@ -106,7 +106,7 @@ def validate(data, profile_id):
 def load_profile(profile_id=DEFAULT_PROFILE):
     profile_id = PROFILE_ALIASES.get(profile_id, profile_id)
     require(isinstance(profile_id, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', profile_id),
-            'Profile ID must contain only letters, numbers, periods, underscores or hyphens.')
+            'Invalid profile ID. Use only letters, numbers, periods, underscores or hyphens.')
     path = ROOT / 'profiles' / (profile_id + '.json')
     try:
         data = json.loads(path.read_text())
