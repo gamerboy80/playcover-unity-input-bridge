@@ -6,7 +6,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_PROFILE = 'com.HoYoverse.Nap-3.3.0'
-PROFILE_ALIASES = {'zzz-3.3.0': DEFAULT_PROFILE, 'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0'}
+PROFILE_ALIASES = {
+    'zzz': DEFAULT_PROFILE,
+    'zzz-3.3.0': DEFAULT_PROFILE,
+    'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0',
+    'zzz-test': 'com.HoYoverse.Nap-3.3.0-platform-pc-settings-test',
+    'hsr-test': 'com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test',
+}
 ADDRESS_NAMES = {
     'Statics', 'NewString', 'AddDevice', 'MouseMakeCurrent', 'NativeTime',
     'QueueInputEvent', 'ScreenWidth', 'ScreenHeight', 'CursorLock', 'CursorVisible',
@@ -100,11 +106,18 @@ def validate(data, profile_id):
 def load_profile(profile_id=DEFAULT_PROFILE):
     profile_id = PROFILE_ALIASES.get(profile_id, profile_id)
     require(isinstance(profile_id, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', profile_id),
-            'Invalid profile ID')
+            'Profile ID must contain only letters, numbers, periods, underscores or hyphens.')
+    path = ROOT / 'profiles' / (profile_id + '.json')
     try:
-        return validate(json.loads((ROOT / 'profiles' / (profile_id + '.json')).read_text()), profile_id)
+        data = json.loads(path.read_text())
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Unknown profile '{profile_id}'. Run `python3 patch.py profiles` to see supported profiles.") from error
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"Profile '{profile_id}' contains invalid JSON: {error}") from error
+    try:
+        return validate(data, profile_id)
     except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError(f'Invalid profile {profile_id}: {error}') from error
+        raise RuntimeError(f"Profile '{profile_id}' is incomplete or invalid: {error}") from error
 
 
 def match_app(profile, info):
@@ -117,13 +130,12 @@ def select_profile(info, profile_id=None):
     if profile_id:
         profile = load_profile(profile_id)
         require(match_app(profile, info),
-                f"App identity/version does not match profile {profile['id']}")
+                f"This app does not match profile {profile['id']}. Check the game version or choose another profile.")
         return profile
     matches = [p for p in (load_profile(path.stem) for path in sorted((ROOT / 'profiles').glob('*.json')))
                if not p.get('test_only') and match_app(p, info)]
     identity = f"{info.get('CFBundleIdentifier', '?')} {info.get('CFBundleShortVersionString', '?')}"
-    require(matches, f'No matching profile for {identity}; supported builds: ' +
-            ', '.join(path.stem for path in sorted((ROOT / 'profiles').glob('*.json'))))
+    require(matches, f"No matching profile for {identity}. Run `python3 patch.py profiles` to see supported game versions.")
     require(len(matches) == 1, f'Ambiguous profiles for {identity}; select --profile explicitly')
     return matches[0]
 
@@ -157,4 +169,4 @@ if __name__ == '__main__':
         profile = load_profile(sys.argv[1])
         Path(sys.argv[2]).write_text(generate_header(profile))
     except (RuntimeError, OSError, IndexError) as error:
-        raise SystemExit(str(error))
+        raise SystemExit(f'Could not prepare the profile settings: {error}')

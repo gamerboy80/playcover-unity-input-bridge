@@ -9,6 +9,7 @@ import plistlib
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 
 from profiles import DEFAULT_PROFILE, PROFILE_ALIASES, instruction_patches, load_profile, require, select_profile
@@ -53,7 +54,11 @@ def digest(path):
 
 
 def run(*args):
-    subprocess.run(args, check=True)
+    try:
+        subprocess.run(args, check=True)
+    except FileNotFoundError as error:
+        tool = Path(args[0]).name
+        raise RuntimeError(f"Required tool '{tool}' was not found. Install Xcode Command Line Tools and try again.") from error
 
 
 def save_state(state, local):
@@ -88,6 +93,15 @@ def replace_signature(source, target):
 def closed(profile):
     result = subprocess.run(['/usr/bin/pgrep', '-x', profile['executable']], capture_output=True)
     require(result.returncode == 1, f'Quit {profile["game"]} before changing its files.')
+
+
+def read_app_info(app):
+    require(app.is_dir(), f'Game app not found: {app}')
+    info_path = app / 'Info.plist'
+    try:
+        return plistlib.loads(info_path.read_bytes())
+    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+        raise RuntimeError(f"Couldn't read game details from {info_path}: {error}") from error
 
 
 def patch_instructions(binary, profile):
@@ -159,10 +173,11 @@ def check_installed(app, state, profile):
     require(state['app'] == str(app), 'Backup belongs to a different app')
     for relative, expected in state['installed'].items():
         require((app / relative).is_file() and digest(app / relative) == expected,
-                f'{relative} changed since installation; refusing to overwrite it')
+                f'The installed file {relative} has changed since patching. It may have been updated; refusing to overwrite it.')
 
 
 def build(profile):
+    print(f'Building the input bridge for {profile["game"]} {profile["version"]}...', flush=True)
     run('/bin/sh', str(ROOT / 'build.sh'), profile['id'])
 
 
@@ -185,16 +200,20 @@ def install(app, profile, local):
     STATE = local / 'state.json'
     closed(profile)
     require(not STATE.exists() and not BACKUP.exists(),
-            'Local backup/state already exists; use status, update, or restore.')
-    info = plistlib.loads((app / 'Info.plist').read_bytes())
+            'A backup for this profile already exists. Run status to inspect it, then use update or restore.')
+    info = read_app_info(app)
     require(info.get('CFBundleIdentifier') == profile['bundle_id'] and
             info.get('CFBundleShortVersionString') == profile['version'] and
-            info.get('CFBundleExecutable') == MAIN, 'App identity/version does not match the profile')
-    require(os.access(app / MAIN, os.X_OK), 'Game executable is missing its execute permission')
+            info.get('CFBundleExecutable') == MAIN,
+            f'This app does not match the selected {profile["game"]} {profile["version"]} profile.')
+    require(os.access(app / MAIN, os.X_OK),
+            'The game app is missing its executable file permission. Reinstall the app in PlayCover, then try again.')
     require(digest(app / BINARY) == profile['original_sha256'],
-            'Unsupported framework hash; restore earlier patches first and select an exact matching profile.')
-    require(not (app / LIBRARY).exists(), 'A native input bridge is already installed')
+            'This game build does not match the selected profile. Restore any older patch, then choose a profile for this exact game version.')
+    require(not (app / LIBRARY).exists(),
+            'An input bridge is already present in this app. Run status or restore before installing again.')
     build(profile)
+    print(f'Saving the original game files in {local}...', flush=True)
     local.mkdir(parents=True, exist_ok=True)
     BACKUP.mkdir()
     # Copy originals before any app mutation. Retain them if signing fails.
@@ -211,6 +230,7 @@ def install(app, profile, local):
         shutil.copystat(app / MAIN, main)
         save_state(state, local)
         try:
+            print('Installing the bridge and checking the app signature...', flush=True)
             replace_file(framework / Path(BINARY).name, app / BINARY)
             replace_signature(framework / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
             replace_file(main, app / MAIN)
@@ -226,7 +246,8 @@ def install(app, profile, local):
             state['status'] = 'restored'
             save_state(state, local)
             raise
-    print(f'{profile["id"]} installed. Native capture is automatic; Option+M is an optional fallback.')
+    print(f'Done. The input bridge is installed for {profile["game"]} {profile["version"]}.')
+    print('Native mouse capture is enabled. Option+M remains available as a fallback.')
 
 
 def restore(app, state, profile, local):
@@ -236,11 +257,12 @@ def restore(app, state, profile, local):
     check_installed(app, state, profile)
     for relative, expected in state['original'].items():
         require(digest(BACKUP / relative) == expected, 'Original backup changed')
+    print(f'Restoring the original {profile["game"]} files...', flush=True)
     restore_files(app, profile, local)
     run('/usr/bin/codesign', '--verify', '--strict', str(app))
     state['status'] = 'restored'
     save_state(state, local)
-    print(f'Original executable, framework, and signatures restored. Backup retained in {local}.')
+    print(f'Done. The original game files are restored. Your backup is kept in {local}.')
 
 
 def update(app, state, profile, local):
@@ -249,6 +271,7 @@ def update(app, state, profile, local):
     require(state['status'] == 'installed', 'Expected an installed patch')
     check_installed(app, state, profile)
     build(profile)
+    print('Updating the bridge and checking the app signature...', flush=True)
     with tempfile.TemporaryDirectory(dir=local) as tmp:
         previous = Path(tmp)
         shutil.copy2(app / LIBRARY, previous / 'bridge')
@@ -273,47 +296,111 @@ def update(app, state, profile, local):
             replace_file(previous / 'UnityFramework', app / BINARY)
             replace_signature(previous / 'framework-signature', app / FRAMEWORK / '_CodeSignature')
             raise
-    print('Native input bridge updated; original backup retained.')
+    print('Done. The input bridge is updated. Your original backup is unchanged.')
+
+
+def print_status(state, profile, local, verbose=False):
+    labels = {
+        'installed': 'The patch is installed.',
+        'restored': 'The original game files are restored.',
+        'prepared': 'The installation may not have finished.',
+    }
+    print(f'{profile["game"]} {profile["version"]}')
+    if profile.get('test_only'):
+        print('Profile type: Test version (experimental)')
+    print(f'Status: {labels.get(state["status"], "Unknown status. Use --verbose for details.")}')
+    if state['status'] == 'installed':
+        print('Original files are saved so you can restore them later.')
+    elif state['status'] == 'restored':
+        print('A backup copy is still saved.')
+    elif state['status'] == 'prepared':
+        print('Keep the backup. Check the game before trying to install again.')
+    if verbose:
+        print(f'Profile ID: {profile["id"]}')
+        print(f'App location: {state["app"]}')
+        print(f'Backup location: {local}')
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['profiles', 'build', 'install', 'update', 'restore', 'status'])
-    parser.add_argument('--profile', help='ID from profiles/*.json; auto-selected when --app is supplied')
-    parser.add_argument('--app', type=Path, help="Override the profile bundle's PlayCover location")
+    parser = argparse.ArgumentParser(
+        description='Build and manage native keyboard and mouse input support for supported PlayCover games.',
+        epilog='Examples:\n'
+               '  python3 patch.py profiles\n'
+               '  python3 patch.py install --profile hsr\n'
+               '  python3 patch.py restore --profile hsr',
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        'command', choices=['profiles', 'build', 'install', 'update', 'restore', 'status'],
+        help='profiles: list supported games; build: compile; install/update/restore: manage the patch; status: show its state')
+    parser.add_argument(
+        '--profile',
+        help='Profile name or ID (see the profiles command). Defaults to ZZZ; with --app, a matching profile is selected automatically.')
+    parser.add_argument(
+        '--app', type=Path,
+        help='Path to the game .app bundle (uses the standard PlayCover location if omitted)')
+    parser.add_argument(
+        '--json', action='store_true',
+        help='Print status as JSON (only applies to the status command)')
+    parser.add_argument(
+        '--verbose', action='store_true',
+        help='Show profile IDs, file locations and technical notes')
     args = parser.parse_args()
+    if args.json and args.command != 'status':
+        parser.error('--json can only be used with the status command')
     if args.command == 'profiles':
+        print('Available game profiles:')
         for path in sorted((ROOT / 'profiles').glob('*.json')):
             profile = load_profile(path.stem)
-            suffix = ' [test only; select explicitly]' if profile.get('test_only') else ''
-            print(f'{profile["id"]}: {profile["game"]} {profile["version"]} ({profile["bundle_id"]}){suffix}')
+            label = ' (test version)' if profile.get('test_only') else ''
+            short_name = next(
+                (alias for alias, canonical in PROFILE_ALIASES.items() if canonical == profile['id']),
+                profile['id'])
+            print(f'- {profile["game"]} {profile["version"]}{label}')
+            if args.verbose:
+                print(f'  Profile ID: {profile["id"]}')
+                print(f'  App ID: {profile["bundle_id"]}')
+            else:
+                print(f'  Select with: --profile {short_name}')
         return
     app = args.app.expanduser().resolve() if args.app else None
-    profile = (select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), args.profile)
+    profile = (select_profile(read_app_info(app), args.profile)
                if app else load_profile(args.profile or DEFAULT_PROFILE))
     local = local_directory(profile)
     app = (app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' /
            (profile['bundle_id'] + '.app')).expanduser().resolve()
-    print(f'Selected profile: {profile["id"]}')
-    if args.command != 'build':
-        select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), profile['id'])
-    for kind in ('keyboard_mouse', 'trackpad'):
-        note = profile['validation'][kind]
-        if note.lower().startswith(('experimental', 'physical test failed')):
-            print(f'Warning ({kind}): {note}')
+    if args.command != 'status' and not args.json:
+        print(f'{profile["game"]} {profile["version"]}')
+        if profile.get('test_only'):
+            print('This is an experimental test version; some game features may not work as expected.')
+        if args.verbose:
+            print(f'Profile ID: {profile["id"]}')
+            print(f'App location: {app}')
+            print(f'Backup location: {local}')
+    if args.command != 'build' and not args.app:
+        select_profile(read_app_info(app), profile['id'])
+    if args.verbose and args.command != 'profiles':
+        for kind in ('keyboard_mouse', 'trackpad'):
+            print(f'{kind.replace("_", "/")} notes: {profile["validation"][kind]}',
+                  file=sys.stderr if args.json else sys.stdout)
     if args.command == 'build':
         build(profile)
     elif args.command == 'install':
         install(app, profile, local)
     else:
         state_path = local / 'state.json'
-        require(state_path.exists(), 'No local installation state for this profile')
-        state = json.loads(state_path.read_text())
-        require(state['app'] == str(app), 'Backup belongs to a different app')
+        require(state_path.exists(), 'No patch information was found for this profile. Install the patch first.')
+        try:
+            state = json.loads(state_path.read_text())
+        except (OSError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Couldn't read saved patch information at {state_path}: {error}") from error
+        require(state.get('app') == str(app), 'The saved backup belongs to a different game app.')
         if args.command == 'status':
             if state['status'] == 'installed':
                 check_installed(app, state, profile)
-            print(json.dumps(state, indent=2))
+            if args.json:
+                print(json.dumps(state, indent=2))
+            else:
+                print_status(state, profile, local, args.verbose)
         elif args.command == 'restore':
             restore(app, state, profile, local)
         else:
@@ -323,5 +410,16 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
-        raise SystemExit(str(error))
+    except subprocess.CalledProcessError as error:
+        command = Path(error.cmd[0]).name if isinstance(error.cmd, (list, tuple)) else str(error.cmd)
+        if command == 'codesign':
+            message = f'macOS could not sign or verify the app (exit status {error.returncode}). See the signing output above.'
+        elif command == 'sh':
+            message = f'The bridge build failed (exit status {error.returncode}). See the build output above.'
+        else:
+            message = f"The required tool '{command}' stopped with exit status {error.returncode}. See the output above."
+        print(f'Error: {message}', file=sys.stderr)
+        raise SystemExit(1)
+    except (RuntimeError, OSError) as error:
+        print(f'Error: {error}', file=sys.stderr)
+        raise SystemExit(1)

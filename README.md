@@ -61,7 +61,8 @@ Test-only profiles must be selected explicitly with `--profile`.
 
 The default ZZZ app path is
 `~/Library/Containers/io.playcover.PlayCover/Applications/com.HoYoverse.Nap.app`.
-The HSR profile can be selected by its canonical ID or the `hsr` alias.
+The standard profiles have short names: `zzz` and `hsr`. Their test profiles
+can be selected with `zzz-test` and `hsr-test`.
 
 ## Inspect, update and restore
 
@@ -70,6 +71,11 @@ python3 patch.py status --profile com.HoYoverse.Nap-3.3.0
 python3 patch.py update --profile com.HoYoverse.Nap-3.3.0
 python3 patch.py restore --profile com.HoYoverse.Nap-3.3.0
 ~~~
+
+`status` prints a short summary by default. Add `--verbose` to show profile IDs,
+file locations and technical notes, or `--json` to get saved installation
+details in JSON format. Use `python3 patch.py --help` for command options and
+examples.
 
 The installer stores original binaries and signature resources under
 `.local/<profile-id>/`. Preserve this directory for restoration. Update applies
