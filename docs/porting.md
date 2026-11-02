@@ -38,9 +38,10 @@ fail the installed-hash guard and must not be overwritten with an old backup.
 ## Profile format
 
 Copy the existing JSON to a **new** filename/ID such as `game-1.2.3-build2.json`.
-Do not create a purported supported profile with guessed addresses. Keep old
-profiles for restoration and reproducibility. `profiles.py` validates the data;
-no third-party Python packages are required.
+Do not create a purported supported profile with guessed addresses. Keep profiles
+for restoration and reproducibility, except test-only profiles explicitly retired
+at the user's request; preserve their `.local` backups in the archive. `profiles.py`
+validates the data; no third-party Python packages are required.
 
 | Field | Meaning |
 | --- | --- |
