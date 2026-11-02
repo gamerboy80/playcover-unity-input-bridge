@@ -181,6 +181,7 @@ omitted the two settings UI call-site edits present in the working mobile-platfo
 profile. It now also clears the touch-only guard and redirects
 `InControlInputModule.Process` to its existing `ProcessMouseEvent` path. This
 keeps the change scoped to settings pointer processing and uses the path already
-confirmed in the mobile profile. Physical scrolling, dropdown interaction, and
-other settings tabs still need runtime validation. The profile remains test-only
-and excluded from automatic selection.
+confirmed in the mobile profile. In the revised PC build, injected wheel input
+moved the Graphics list in both directions. Physical trackpad scrolling,
+dropdown interaction, and other settings tabs still need user validation. The
+profile remains test-only and excluded from automatic selection.
