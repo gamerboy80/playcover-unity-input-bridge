@@ -173,7 +173,9 @@ representable as the default underlying value; the inspected predicate does not
 classify it as mobile.
 
 This is the smallest settings compatibility experiment identified so far. It
-may restore mobile-gated settings entries and the backdrop while keeping the PC
-platform identity, but `IsMobilePlatform` has callers outside Settings too. The
-profile is test-only and excluded from automatic selection; its graphics menu
-and backdrop still need runtime confirmation.
+keeps the PC platform identity, but `IsMobilePlatform` has callers outside
+Settings too. On its first runtime launch, the Graphics Settings page showed
+the extended quality options and the dimmed backdrop that were missing in the
+PC-only test. Dropdown interaction, scrolling, and other settings tabs still
+need user validation. The profile remains test-only and excluded from automatic
+selection.
