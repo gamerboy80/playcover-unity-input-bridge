@@ -176,6 +176,11 @@ This is the smallest settings compatibility experiment identified so far. It
 keeps the PC platform identity, but `IsMobilePlatform` has callers outside
 Settings too. On its first runtime launch, the Graphics Settings page showed
 the extended quality options and the dimmed backdrop that were missing in the
-PC-only test. Dropdown interaction, scrolling, and other settings tabs still
-need user validation. The profile remains test-only and excluded from automatic
-selection.
+PC-only test. That first launch still did not scroll the list: this variant had
+omitted the two settings UI call-site edits present in the working mobile-platform
+profile. It now also clears the touch-only guard and redirects
+`InControlInputModule.Process` to its existing `ProcessMouseEvent` path. This
+keeps the change scoped to settings pointer processing and uses the path already
+confirmed in the mobile profile. Physical scrolling, dropdown interaction, and
+other settings tabs still need runtime validation. The profile remains test-only
+and excluded from automatic selection.

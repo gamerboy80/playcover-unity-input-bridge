@@ -22,6 +22,20 @@
       "file_offset": "0xf2b1c0",
       "expected": "1f050071",
       "replacement": "1f0d0071"
+    },
+    {
+      "name": "ui-mouse-input-enabled",
+      "reason": "InControlInputModule.Process: allow the native mouse-processing path to run when the touch-only enable flag is clear.",
+      "file_offset": "0xc1c3398",
+      "expected": "61000054",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "ui-mouse-processing",
+      "reason": "InControlInputModule.Process: route settings UI through its existing ProcessMouseEvent path so pointer and scroll data reach menu controls.",
+      "file_offset": "0xc1c33a0",
+      "expected": "1b010094",
+      "replacement": "be060094"
     }
   ],
   "bridge": {
@@ -55,7 +69,7 @@
   },
   "validation": {
     "keyboard_mouse": "Experimental; the global app platform remains PC, while AppUtils.IsMobilePlatform also returns true for PC enum 3. Broader call sites may change.",
-    "trackpad": "Experimental; intended to restore mobile-gated settings/UI paths. Graphics options and backdrop are not yet confirmed.",
+    "trackpad": "Experimental; graphics options and backdrop are visually restored. This variant adds the tested InControl mouse-processing route for settings UI; physical scroll behavior still needs confirmation.",
     "evidence": "docs/hsr.md"
   },
   "test_only": true

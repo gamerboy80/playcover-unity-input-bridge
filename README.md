@@ -15,8 +15,9 @@ Unity game, and [AGENTS.md](AGENTS.md) for repository architecture and developme
 rules. HSR 4.6.0 also has an experimental [`hsr` profile](profiles/com.HoYoverse.hkrpgoversea-4.6.0.json)
 using the legacy Unity/InControl backend. An explicit test-only profile changes only
 HSR's app-level platform mapping to PC; a second test-only variant also adjusts the
-mobile-settings predicate while keeping the PC enum. Both are excluded from automatic
-profile selection. See [HSR status and analysis](docs/hsr.md).
+mobile-settings predicate and routes settings through mouse processing while keeping
+the PC enum. Both are excluded from automatic profile selection. See
+[HSR status and analysis](docs/hsr.md).
 
 ## Build and install
 
