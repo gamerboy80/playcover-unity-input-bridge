@@ -1,5 +1,7 @@
 #import <Foundation/Foundation.h>
 #include <assert.h>
+#include <stdio.h>
+static FILE *output;
 #include "../src/InputState.h"
 #include "../src/Scroll.h"
 static uintptr_t slide;
@@ -13,6 +15,7 @@ static BOOL anyKey(void) { return NO; }
 static BOOL button(int b) { return b==4; }
 static float axis(void *s) { (void)s; return 7; }
 static void position(float *p) { p[0]=5;p[1]=6;p[2]=0; }
+#define GameScrollWrapperReturn 0x2000
 #define GameUIScrollReturn 0x1000
 #define GameLegacyScrollUnitsPerStep 120
 #define GameFrameCount ((uintptr_t)frameCount)

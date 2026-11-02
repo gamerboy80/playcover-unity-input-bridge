@@ -66,9 +66,21 @@ static void legacyScrollForCaller(float *result, uintptr_t caller) {
     result[0]=frameScrollX/divisor; result[1]=frameScrollY/divisor;
     if (frameScrollX!=0 || frameScrollY!=0) legacyPositiveScrolls++;
 }
-static void legacyScroll(float *result) {
-    legacyScrollForCaller(result,(uintptr_t)__builtin_return_address(0));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+__attribute__((noinline)) static void legacyScroll(float *result) {
+    uintptr_t caller=(uintptr_t)__builtin_return_address(0);
+    // This exact wrapper saves x29/x30; its parent identifies UI versus gameplay.
+    if (caller==slide+GameScrollWrapperReturn)
+        caller=(uintptr_t)__builtin_return_address(1);
+    static BOOL reportedUI;
+    if (!reportedUI && caller==slide+GameUIScrollReturn) {
+        reportedUI=YES;
+        if (output) { fprintf(output,"UI scroll caller verified; normalizing wheel units to notches\n"); fflush(output); }
+    }
+    legacyScrollForCaller(result,caller);
 }
+#pragma clang diagnostic pop
 static BOOL legacyName(void *string, const char *name) {
     if (!string) return NO;
     int length=*(int *)((uint8_t *)string+16);

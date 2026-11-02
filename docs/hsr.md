@@ -117,9 +117,13 @@ to menu input; global mobile platform identity remains unchanged.
 The user confirmed menu scrolling after the redirect. PointerInputModule expects
 notches, while gameplay uses 120 wheel units. `bridge.addresses.UIScrollReturn`
 records the preferred return PC `0xe8ed8f0` after the UI's virtual scroll-getter
-call at `0xe8ed8ec`. BaseInput.get_mouseScrollDelta tail-branches through Unity's
-wrapper into the native callback, preserving that return PC. The legacy callback
+call at `0xe8ed8ec`. BaseInput.get_mouseScrollDelta tail-branches to Unity's wrapper, but the wrapper
+itself calls the native callback with BLR and saves x29/x30. The initial correction
+incorrectly checked the immediate return PC and did not normalize menu reads.
+Runtime diagnostics verified that immediate PC is `0xe89c508`, now recorded as
+`ScrollWrapperReturn`. Only when that exact wrapper is present does the callback
+read its parent return PC to identify the UI callsite. The legacy callback
 normalizes only that caller by `scroll_units_per_step`; gameplay retains its
 confirmed zoom scale. Synthetic tests verify both callers can read the same
-frame without consuming or rescaling each other's state. Physical speed testing
-is pending.
+frame without consuming or rescaling each other's state. Runtime startup now logs that the UI caller was verified and normalization
+is active. Physical speed testing is pending.
