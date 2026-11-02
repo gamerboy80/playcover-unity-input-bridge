@@ -285,7 +285,8 @@ def main():
     if args.command == 'profiles':
         for path in sorted((ROOT / 'profiles').glob('*.json')):
             profile = load_profile(path.stem)
-            print(f'{profile["id"]}: {profile["game"]} {profile["version"]} ({profile["bundle_id"]})')
+            suffix = ' [test only; select explicitly]' if profile.get('test_only') else ''
+            print(f'{profile["id"]}: {profile["game"]} {profile["version"]} ({profile["bundle_id"]}){suffix}')
         return
     app = args.app.expanduser().resolve() if args.app else None
     profile = (select_profile(plistlib.loads((app / 'Info.plist').read_bytes()), args.profile)

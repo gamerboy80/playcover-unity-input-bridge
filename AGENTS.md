@@ -10,6 +10,7 @@ exact-build patcher. Read `README.md`, `docs/porting.md`, the selected profile, 
 - `profiles/*.json`: named `<bundle-id>-<version>.json`; one immutable build identity per game/version/binary hash;
   named instruction edits with expected/replacement bytes; preferred VM addresses;
   managed-object/static field offsets; mouse payload size; physical-test status.
+  Profiles marked `test_only` require explicit selection and are excluded from app auto-detection.
 - `profiles.py`: validates profiles and generates `build/<id>/Profile.h`.
   It contains the supported backend contract's required constant names.
 - `src/NativeInputBridge.m`: shared AppKit event monitoring, Unity device setup,

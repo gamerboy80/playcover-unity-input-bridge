@@ -127,3 +127,27 @@ normalizes only that caller by `scroll_units_per_step`; gameplay retains its
 confirmed zoom scale. Synthetic tests verify both callers can read the same
 frame without consuming or rescaling each other's state. Runtime startup now logs that the UI caller was verified and normalization
 is active. The user confirmed reasonable menu speed and working camera zoom on 2026-11-01.
+
+## Global-platform test build
+
+`com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-test` is an explicit, test-only
+profile that carries the same HSR input bridge but has exactly one game-code edit.
+At file offset `0xf2b5a4`, `AppUtils.InitPlatformType` maps the iOS/macOS runtime
+branch to the app's PC/Windows platform enum (`3`) instead of its mobile enum
+(`1`). This updates the app's global platform value. Unity's underlying
+`RuntimePlatform` remains iOS, while game checks that query this app-level value
+will see PC. The profile does not include the scoped PC-layout, cursor, or UI-input
+edits in the regular HSR profile. Explicit selection keeps it out of normal app
+auto-detection.
+
+Build and install the experiment with:
+
+```sh
+python3 patch.py build --profile com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-test
+python3 patch.py restore --profile hsr
+python3 patch.py install --profile com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-test
+```
+
+After testing, restore the test profile and reinstall the working HSR profile with
+`restore --profile com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-test` and
+`install --profile hsr`. Both profiles retain their own original backups.

@@ -40,6 +40,7 @@ def hex_number(value):
 def validate(data, profile_id):
     require(data['schema_version'] == 1, 'Unsupported profile schema')
     require(data['id'] == profile_id, 'Profile ID must match its filename')
+    require(type(data.get('test_only', False)) is bool, 'test_only must be a boolean')
     for key in ('game', 'version', 'bundle_id', 'executable'):
         require(isinstance(data[key], str) and data[key] and
                 not any(ord(c) < 32 for c in data[key]), f'Invalid {key}')
@@ -119,7 +120,7 @@ def select_profile(info, profile_id=None):
                 f"App identity/version does not match profile {profile['id']}")
         return profile
     matches = [p for p in (load_profile(path.stem) for path in sorted((ROOT / 'profiles').glob('*.json')))
-               if match_app(p, info)]
+               if not p.get('test_only') and match_app(p, info)]
     identity = f"{info.get('CFBundleIdentifier', '?')} {info.get('CFBundleShortVersionString', '?')}"
     require(matches, f'No matching profile for {identity}; supported builds: ' +
             ', '.join(path.stem for path in sorted((ROOT / 'profiles').glob('*.json'))))
