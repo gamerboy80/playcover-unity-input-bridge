@@ -151,7 +151,16 @@ def check_recoverable(app, state, profile, local):
     for relative, expected in state.get('original', {}).items():
         source = local / 'original' / relative
         require(expected and source.is_file() and digest(source) == expected, 'Original backup changed')
+    original_signatures = {p: value for p, value in state['original'].items() if '_CodeSignature/' in p}
+    backup_signatures = signature_hashes(local / 'original', profile)
+    if original_signatures:
+        require(backup_signatures == original_signatures, 'Original backup signatures changed')
     known_paths = set(state.get('original', {})) | set(state.get('installed', {})) | set(state.get('recovery', {}))
+    # Legacy state predates signature hashes; its backup still defines the allowed filenames.
+    recorded_signatures = {p for p in known_paths if '_CodeSignature/' in p}
+    allowed_signatures = recorded_signatures or set(backup_signatures)
+    require(set(signature_hashes(app, profile)) <= allowed_signatures,
+            'Unrecognized signature files were found. No files were changed.')
     for relative in known_paths | {binary, main, LIBRARY}:
         target = app / relative
         actual = digest(target) if target.is_file() else None
@@ -238,6 +247,13 @@ def check_installed(app, state, profile):
     require(state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256'],
             'Profile does not match the recorded original framework')
     require(state['app'] == str(app), 'Backup belongs to a different app')
+    require((app / profile['executable']).is_file() and os.access(app / profile['executable'], os.X_OK),
+            'The game executable is missing or cannot be run. Cannot confirm a working patch.')
+    allowed_signatures = {p for p in state['installed'] if '_CodeSignature/' in p}
+    if not allowed_signatures:
+        allowed_signatures = set(signature_hashes(local_directory(profile) / 'original', profile))
+    require(set(signature_hashes(app, profile)) <= allowed_signatures,
+            'Unrecognized signature files were found. No files were changed.')
     for relative, expected in state['installed'].items():
         require((app / relative).is_file() and digest(app / relative) == expected,
                 f'A game file changed after patching. It may be from a game update; no files were changed.')
@@ -353,6 +369,18 @@ def install(app, profile, local):
         require((BACKUP / FRAMEWORK / '_CodeSignature').is_dir() and
                 (BACKUP / '_CodeSignature').is_dir(),
                 'The saved app signatures are missing. Keep this backup and inspect it before continuing.')
+        for relative, expected in original.items():
+            require((BACKUP / relative).is_file() and digest(BACKUP / relative) == expected,
+                    f'The saved original file {relative} is missing or has changed.')
+        saved_signatures = {p: value for p, value in original.items()
+                            if p.startswith('_CodeSignature/') or '/_CodeSignature/' in p}
+        backup_signatures = signature_hashes(BACKUP, profile)
+        # Older backups have no signature hashes; compare with the restored app before recording them.
+        require(backup_signatures == (saved_signatures or signature_hashes(app, profile)),
+                'The saved original signatures have changed. No files were changed.')
+        require(signature_hashes(app, profile) == backup_signatures,
+                'The game signatures differ from the saved originals. No files were changed.')
+        original = {**backup_signatures, **original}
     require(digest(app / BINARY) == profile['original_sha256'],
             'These game files do not match the selected profile. Restore the original game files or choose a profile for this exact version.')
     require(not (app / LIBRARY).exists(),
@@ -361,16 +389,23 @@ def install(app, profile, local):
     message = ('Using the saved backup of the original game files...'
                if original else 'Saving a backup of the original game files...')
     print(message, flush=True)
-    local.mkdir(parents=True, exist_ok=True)
     if original is None:
-        BACKUP.mkdir()
-        # Copy originals before any app mutation. Retain them if signing fails.
-        shutil.copytree(app / FRAMEWORK, BACKUP / FRAMEWORK, symlinks=True)
-        shutil.copy2(app / MAIN, BACKUP / MAIN)
-        shutil.copytree(app / '_CodeSignature', BACKUP / '_CodeSignature')
-        original = {p: digest(BACKUP / p) for p in (BINARY, MAIN)}
-    original = dict(original)
-    original.update(signature_hashes(BACKUP, profile))
+        local.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.backup-', dir=local.parent) as tmp:
+            saved = Path(tmp) / 'saved'
+            backup = saved / 'original'
+            backup.mkdir(parents=True)
+            shutil.copytree(app / FRAMEWORK, backup / FRAMEWORK, symlinks=True)
+            shutil.copy2(app / MAIN, backup / MAIN)
+            shutil.copytree(app / '_CodeSignature', backup / '_CodeSignature')
+            original = {p: digest(backup / p) for p in (BINARY, MAIN)}
+            original.update(signature_hashes(backup, profile))
+            save_state({'profile': profile['id'], 'app': str(app), 'original': original,
+                        'installed': {}, 'status': 'restored'}, saved)
+            if local.exists():
+                require(not any(local.iterdir()), 'The backup folder contains unrecognized files. No files were changed.')
+                local.rmdir()
+            saved.rename(local)
     state = {'profile': profile['id'], 'app': str(app), 'original': original, 'installed': {}, 'status': 'restored'}
     save_state(state, local)
     with tempfile.TemporaryDirectory(dir=app.parent) as tmp:

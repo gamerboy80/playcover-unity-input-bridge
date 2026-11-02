@@ -234,15 +234,17 @@ class PatchTests(unittest.TestCase):
                 module.check_installed(Path('/unused'), {'original': {}}, profile)
 
     def test_alias_state_is_preserved_and_duplicate_states_are_rejected(self):
-        profile = load_profile('hsr')
+        profile = copy.deepcopy(load_profile('hsr'))
         with tempfile.TemporaryDirectory() as tmp, patch.object(module, 'ROOT', Path(tmp)):
+            app, _ = self.fake_app(Path(tmp), profile)
             local = Path(tmp) / '.local' / 'hsr'
             local.mkdir(parents=True)
-            state = {'profile': 'hsr', 'app': '/unused', 'installed': {},
+            state = {'profile': 'hsr', 'app': str(app),
+                     'installed': module.signature_hashes(app, profile),
                      'original': {profile['framework_binary']: profile['original_sha256']}}
             (local / 'state.json').write_text(json.dumps(state))
             self.assertEqual(module.local_directory(profile), local)
-            module.check_installed(Path('/unused'), state, profile)
+            module.check_installed(app, state, profile)
             canonical = local.parent / profile['id']
             canonical.mkdir()
             (canonical / 'state.json').write_text(json.dumps(state))

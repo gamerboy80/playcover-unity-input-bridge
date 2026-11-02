@@ -11,3 +11,8 @@ xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation tests/legacy-
 build/test-legacy
 xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit tests/native-wheel.m -o build/test-native-wheel
 build/test-native-wheel
+for backend in 0 1; do
+    xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
+        -DGameLegacyBackend=$backend tests/event-handler.m -o build/test-event-handler-$backend
+    build/test-event-handler-$backend
+done

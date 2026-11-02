@@ -48,6 +48,79 @@ class RecoveryTests(unittest.TestCase):
         self.install()
         self.assertEqual(self.state()['status'], 'installed')
 
+    def test_interrupted_backup_can_retry(self):
+        with patch.object(module.shutil, 'copytree', side_effect=OSError('disk full')):
+            with self.assertRaisesRegex(OSError, 'disk full'):
+                self.install()
+        self.assertFalse(self.local.exists())
+        self.install()
+        self.assertEqual(self.state()['status'], 'installed')
+
+    def test_reapply_rejects_changed_backup_signatures(self):
+        self.install()
+        module.restore(self.app, self.state(), self.profile, self.local)
+        before = self.state()
+        signature = self.local / 'original/_CodeSignature/CodeResources'
+        signature.write_bytes(b'damaged backup')
+        with self.assertRaisesRegex(RuntimeError, 'saved original file.*has changed'):
+            self.install()
+        self.assertEqual(self.state(), before)
+        self.assertFalse((self.app / module.LIBRARY).exists())
+
+    def test_legacy_signature_records_can_be_upgraded(self):
+        self.install()
+        module.restore(self.app, self.state(), self.profile, self.local)
+        state = self.state()
+        state['original'] = {p: value for p, value in state['original'].items()
+                             if '_CodeSignature/' not in p}
+        module.save_state(state, self.local)
+        self.install()
+        self.assertIn('_CodeSignature/CodeResources', self.state()['original'])
+
+    def test_restore_rejects_extra_backup_signature_and_reapply_rejects_live_changes(self):
+        self.install()
+        extra = self.local / 'original/_CodeSignature/extra'
+        extra.write_bytes(b'independent data')
+        with self.assertRaisesRegex(RuntimeError, 'backup signatures changed'):
+            module.restore(self.app, self.state(), self.profile, self.local)
+        extra.unlink()
+        module.restore(self.app, self.state(), self.profile, self.local)
+        live = self.app / '_CodeSignature/CodeResources'
+        live.write_bytes(b'independent change')
+        with self.assertRaisesRegex(RuntimeError, 'game signatures differ'):
+            self.install()
+        self.assertEqual(live.read_bytes(), b'independent change')
+
+    def test_restore_and_update_reject_unrecorded_signature_files(self):
+        self.install()
+        before = module.digest(self.app / self.profile['framework_binary'])
+        _, framework, _ = module.app_paths(self.profile)
+        for directory in ('_CodeSignature', framework + '/_CodeSignature'):
+            with self.subTest(directory=directory):
+                extra = self.app / directory / 'independent-resource'
+                extra.write_bytes(b'independent data')
+                with self.assertRaisesRegex(RuntimeError, 'Unrecognized signature'):
+                    module.restore(self.app, self.state(), self.profile, self.local)
+                with self.assertRaisesRegex(RuntimeError, 'Unrecognized signature'):
+                    module.update(self.app, self.state(), self.profile, self.local)
+                self.assertEqual(extra.read_bytes(), b'independent data')
+                self.assertEqual(module.digest(self.app / self.profile['framework_binary']), before)
+                extra.unlink()
+
+    def test_installed_status_rejects_missing_executable_permission(self):
+        self.install()
+        (self.app / self.profile['executable']).chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError, 'cannot be run'):
+            module.check_installed(self.app, self.state(), self.profile)
+        (self.root / 'profiles').mkdir()
+        (self.root / 'profiles' / (self.profile['id'] + '.json')).write_text('{}')
+        with patch.object(module, 'select_profile', return_value=self.profile), \
+                patch.object(module, 'load_profile', return_value=self.profile), \
+                patch('sys.argv', ['patch.py', 'status', '--app', str(self.app)]), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            module.main()
+        self.assertIn('Needs attention', out.getvalue())
+
     def test_signing_failure_does_not_touch_the_live_app(self):
         before = {str(path.relative_to(self.app)): module.digest(path)
                   for path in self.app.rglob('*') if path.is_file()}

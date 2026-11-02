@@ -19,6 +19,8 @@ Before changing address-dependent behavior, review the [README](README.md),
 - `src/InputState.h`, `src/Scroll.h`, `src/NativeWheel.h` and
   `src/MousePresence.h`: shared event and state handling.
 - `src/EventRouting.h`: game-window and native text-responder filtering.
+- `src/EventHandler.h`: shared event dispatch, input release and modifier handling;
+  tested with fake host events and backend callbacks.
 - `patch.py`, `build.sh`: profile selection, binary editing, Mach-O linking,
   signing, backup, rollback, status and restoration.
 - `patches/`: optional PlayTools source changes, separate from game profiles.

@@ -126,8 +126,10 @@ sh tests/run.sh
 python3 patch.py build --profile com.HoYoverse.Nap-3.3.0
 ~~~
 
-Tests cover profile validation, binary edits, installer rollback, input-state
-handling and AppKit wheel conversion. Window and view checks require WindowServer
+Tests cover profile validation, binary edits, installer recovery, backup integrity,
+and the shared event handler's key releases, capture controls and queued scroll
+delivery using fake host/backend callbacks. AppKit wheel conversion is also
+checked. Window and view checks require WindowServer
 access and are skipped in headless environments. Synthetic checks do not
 validate live game behavior.
 
