@@ -1,104 +1,84 @@
-# Working on this patch
+# Contributor and automation guide
 
-This repository enables a game's existing PC input path and feeds native macOS
-events into its IL2CPP Unity Input System under PlayCover. It is an experimental,
-exact-build patcher. Read `README.md`, `docs/porting.md`, the selected profile, and
-`docs/analysis.md` before changing address-dependent behavior.
+This repository contains version-locked input bridges and patch profiles for
+selected Unity games running under PlayCover. Changes to native addresses,
+object layouts or instruction bytes require evidence from the exact game build.
 
-## Where things live
+Before changing address-dependent behavior, review the [README](README.md),
+[porting guide](docs/porting.md), selected profile and relevant analysis notes.
 
-- `profiles/*.json`: named `<bundle-id>-<version>.json`; one immutable build identity per game/version/binary hash;
-  named instruction edits with expected/replacement bytes; preferred VM addresses;
-  managed-object/static field offsets; mouse payload size; physical-test status.
-  Profiles marked `test_only` require explicit selection and are excluded from app auto-detection.
-- `profiles.py`: validates profiles and generates `build/<id>/Profile.h`.
-  It contains the supported backend contract's required constant names.
+## Repository layout
+
+- `profiles/*.json`: game/build identity, original binary hash, named byte
+  patches, preferred VM addresses, object fields and validation status.
+- `profiles.py`: profile validation and generation of
+  `build/<profile-id>/Profile.h`.
 - `src/NativeInputBridge.m`: shared AppKit event monitoring, Unity device setup,
-  keyboard/mouse state queueing and capture. It consumes named generated constants.
-  `InputState.h`, `Scroll.h`, `NativeWheel.h`, and `MousePresence.h` hold shared handling.
-- `src/LegacyBackend.h`: legacy Unity/InControl input for `hsr`, selected at build
-  time by the profile while retaining the shared AppKit host.
-- `patch.py`: identity/hash guards, byte edits, Mach-O library linking, originals,
-  signing, rollback, status and restore. `build.sh` builds a profile-specific dylib.
-- `patches/`: optional PlayTools source changes, separate from game byte patches.
-- `tests/`: synthetic installer/profile tests and native event self-checks.
+  keyboard/mouse state queueing and cursor capture.
+- `src/LegacyBackend.h`: HSR legacy Unity/InControl input backend.
+- `src/InputState.h`, `src/Scroll.h`, `src/NativeWheel.h` and
+  `src/MousePresence.h`: shared event and state handling.
+- `patch.py`, `build.sh`: profile selection, binary editing, Mach-O linking,
+  signing, backup, rollback, status and restoration.
+- `patches/`: optional PlayTools source changes, separate from game profiles.
+- `tests/`: synthetic installer/profile checks and native event checks.
 
-## Rules for ports and edits
+## Profile and binary invariants
 
-1. Add a new profile for a new binary; never relax a hash check or replace an old
-   profile's hash to make a different build pass. Reuse a JSON profile only when
-   the shared backend's ABI and layouts have actually been established.
-2. Keep game/version addresses, managed field offsets and byte patches in the
-   profile. Put explanations and calling-convention evidence in analysis notes.
-   Do not scatter game-name conditionals or new magic addresses through the bridge.
-   If another game requires a different ABI or processing algorithm, implement and
-   test that backend explicitly; configuration alone does not make it supported.
-3. Patch locations are **file offsets**. Bridge addresses are **preferred VM
-   addresses**, added to the dyld slide. Object/static offsets are a third kind.
-   Convert using Mach-O segments; do not assume VM address equals file offset.
-4. Preserve exact expected bytes, equal replacement lengths, non-overlapping edits,
-   untouched executable sections, entitlements, existing PlayTools load commands,
-   original backups, installed-hash checks, execute permissions and failure rollback.
-   Never delete `.local/` as cleanup. Do not overwrite an independently modified app.
-5. Building and testing this repo does not require reinstalling or restarting the
-   real game. For an installation task, require a closed game and use the installer.
-   Do not run overlapping installers or leave disassembly/symbol jobs running;
-   inspect bounded address ranges instead of unbounded `nm` output.
-6. Do not commit proprietary game binaries, metadata/disassembly dumps, installation
-   backups, build output, account logs, personal paths or credentials. Keep those
-   local and ignored. Preserve the PlayTools license alongside its source patch.
+1. Create a new profile for each new game binary. Never relax the framework hash
+   guard or reuse addresses without verifying the target ABI and layouts.
+2. Keep build-specific addresses, field offsets and byte edits in JSON profiles.
+   Record function mapping, calling conventions and disassembly evidence in the
+   relevant analysis document.
+3. Treat file offsets, preferred VM addresses and object/static offsets as
+   distinct values. Use Mach-O segment mappings; do not assume they are
+   interchangeable.
+4. Every patch must record exact expected and replacement bytes of equal length.
+   Reject overlapping or unaligned edits. Preserve all unpatched executable
+   sections, entitlements, existing PlayTools load commands and executable
+   permissions.
+5. Keep installer hash checks, backup isolation, installed-file checks, rollback
+   and signature verification intact. Do not overwrite an independently changed
+   app. Never remove `.local/` as routine cleanup.
+6. Test-only profiles require explicit selection and must remain excluded from
+   automatic app matching.
+7. Do not commit proprietary binaries, metadata or disassembly dumps, runtime
+   account logs, installation backups, build output, personal paths or
+   credentials. Retain the license notice for the optional PlayTools patch.
 
-## Validation
+## Build and validation
 
-Run `sh tests/run.sh` and `python3 patch.py build --profile <id>` after relevant
-code changes. A sandbox without WindowServer skips native window/view checks;
-report that skip. Signing is real for the built dylib; installer tests mock signing
-and use synthetic bundles, so they do not establish a real-game installation.
+Run the relevant checks after implementation changes:
 
-For a new port, verify the original framework hash and expected bytes, inspect the
-generated header, build with warnings as errors, then perform the staged runtime
-checks in `docs/porting.md`. Record physical hardware tests separately from
-synthetic event tests. Do not infer hardware success from nonzero Unity state.
+~~~sh
+sh tests/run.sh
+python3 patch.py build --profile <profile-id>
+~~~
 
-## Current known state
+Builds use warnings as errors and verify the generated bridge layout. Native
+window/view checks require WindowServer access and are skipped in headless
+environments. Installer tests use synthetic app bundles and mocked signing;
+they do not validate installation into a real game.
 
-ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`com.HoYoverse.hkrpgoversea-4.6.0`, alias `hsr`) uses legacy input
-and PC-layout predicates plus scoped mobile cursor checks. Keyboard movement,
-native capture, mouse look, camera zoom and menu cursor visibility are now
-user-confirmed. Menu scrolling and some buttons
-remain under investigation. The legacy backend hooks key getters directly,
-matches lowercase mouse axis labels, and uses profile-defined scroll units.
-HSR’s UI Process method originally dispatched touches only; the profile now
-redirects it to its existing ProcessMouseEvent. Menu scrolling is user-confirmed but was too fast; UIScrollReturn identifies the
-UI getter caller for notch normalization while gameplay retains wheel units.
-The callback must skip the verified ScrollWrapperReturn frame before checking
-UIScrollReturn; the immediate caller is Unity’s wrapper, not the UI module.
-The user confirmed reasonable menu scroll speed and working camera zoom on
-2026-11-01 after the wrapper-aware normalization fix. Read `docs/hsr.md` for its ABI and provisional camera scale.
-For ZZZ, keyboard, WASD release,
-F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
-with keymapping off; Option+M is an optional capture fallback.
+For a new profile, verify the original framework hash and every expected byte
+range, inspect the generated header and complete the staged runtime checks in
+the [porting guide](docs/porting.md). Record hardware outcomes separately from
+synthetic event results. Nonzero input state alone does not prove gameplay
+behavior.
 
-**Physical trackpad scrolling was confirmed working by the user on 2026-11-01**
-after bridging the legacy `Input.mousePresent` callback. The iOS player returned
-false despite a valid bridge Mouse and nonzero scroll state. StandaloneInputModule
-checks that legacy flag before processing mouse events. Preserve the profile's
-`LegacyMousePresentSlot` hook and its original-callback fallback; the hook is
-installed once after device validation. Earlier threshold/window/view fixes
-through `61cce82` were insufficient. Camera zoom and other hardware are unverified.
-A synthetic wheel event moving a list is separate evidence from physical input.
+Close the target game before installation, update or restoration. Do not run
+overlapping installer operations or leave disassembly jobs running. Keep
+disassembly bounded to relevant address ranges.
 
-Capture entry now checks whether the cursor is inside the content view before
-disassociating mouse movement. Outside pointers are moved into the game with
-CGWarpMouseCursorPosition to prevent freezing outside after Dock activation.
-`Capture.h` tests cover coordinate conversion and content boundaries; physical
-Dock reactivation initially worked but the user reported intermittent cursor
-visibility/capture and first-motion jumps. A follow-up waits for focus to settle,
-re-hides a visible captured cursor and suppresses initial movement; confirmation
-of that follow-up is pending. Preserve the no-warp path for
-an already-inside cursor and the existing focus-loss release behavior.
+## Implemented profiles
 
-The original config-loading failure was a local null Mouse control exception.
-Creating a valid Mouse before enabling the original game's mouse processing
-avoided it. The current game profile patches only the PC selector; do not restore
-the earlier blanket mouse-processing-disable patch as part of a port.
+- ZZZ 3.3.0 uses the Unity Input System backend. Keyboard, mouse capture/look
+  and physical trackpad scrolling have been validated. Its app-level PC/settings
+  profile is experimental.
+- HSR 4.6.0 uses the legacy Unity/InControl backend. Keyboard movement, mouse
+  capture/look, camera zoom, menu cursor visibility and menu scrolling have been
+  validated. Broader button coverage and the PC/settings profile remain
+  experimental.
+
+See [ZZZ analysis](docs/games/zzz.md) and [HSR analysis](docs/games/hsr.md) for
+build-specific details and remaining limitations.

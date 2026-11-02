@@ -1,15 +1,12 @@
 # HSR 4.6.0
 
-Profile: `com.HoYoverse.hkrpgoversea-4.6.0` (alias `hsr`); bundle: `com.HoYoverse.hkrpgoversea`; executable: `hkrpg`.
-The initial physical gameplay test failed: keyboard, mouse capture and scrolling
-did not respond; some buttons also failed. The user then confirmed keyboard
-movement works after hooking GetKey callbacks directly. Native capture and
-mouse look were subsequently confirmed after scoped cursor checks and matching
-HSR’s lowercase axis labels. Camera zoom was then confirmed with 120-unit scroll steps, followed by correct
-menu cursor visibility after force-show/host hide balancing fixes. Menu scrolling, menu cursor visibility and camera zoom are now user-confirmed,
-including reasonable menu speed after wrapper-aware normalization. Broader
-button coverage remains unverified. This profile
-is experimental.
+Profile: `com.HoYoverse.hkrpgoversea-4.6.0` (alias `hsr`); bundle:
+`com.HoYoverse.hkrpgoversea`; executable: `hkrpg`.
+
+This experimental profile uses the legacy Unity/InControl input backend.
+Physical validation confirmed keyboard movement, native mouse capture, mouse
+look, camera zoom, menu cursor visibility and normalized menu scrolling. Broader
+button coverage and other settings screens remain unverified.
 
 ```sh
 python3 patch.py install --profile hsr
@@ -60,9 +57,9 @@ Three additional instruction edits bypass only the mobile checks within
 MouseInputController.ShowCursor (`0x1b04180`), HideCursor (`0x1b04248`), and
 UseCursorMode (`0x1b04520`). The original methods otherwise retain their normal
 PC cursor state and gamepad/forced-cursor logic. Global platform identity stays
-unchanged. The user confirmed capture with these edits installed. Camera motion required
-case-insensitive matching of the actual `mouse x` and `mouse y` axis labels; the
-user then confirmed mouse look works.
+unchanged. Physical validation confirmed capture with these edits installed.
+Camera motion required case-insensitive matching of the actual `mouse x` and
+`mouse y` axis labels; subsequent gameplay checks confirmed mouse look.
 
 Mouse getters tail-call writable callback slots relative to VM `0x15a4f270`:
 
@@ -96,7 +93,9 @@ provider's scroll value and applies that scale (`0xc1d1548` onward). Returning
 one unit per notch reduced a step to 0.05; the revised profile explicitly supplies
 120 units per notch through `bridge.scroll_units_per_step`. Runtime counters
 already confirmed nonzero legacy scroll reads, so this change targets the
-binding's magnitude rather than host event delivery. The user confirmed camera zoom works with this scale. Menu scrolling works after the UI redirect below, but initially ran too fast.
+binding's magnitude rather than host event delivery. Camera zoom worked with this
+scale in physical testing. Menu scrolling works after the UI redirect below; its
+initial rate was too fast and was normalized afterward.
 
 Menu cursor paths also contain mobile early returns in ForceShowCursor
 (`0x1b03e8c`) and ForceShowCursorBySDKUI (`0x1b03fb4`). Their scoped profile edits
@@ -114,8 +113,9 @@ which reads position and scroll through BaseInput's virtual getters and raycasts
 the UI. Locked cursors retain Unity's offscreen pointer behavior. This is scoped
 to menu input; global mobile platform identity remains unchanged.
 
-The user confirmed menu scrolling after the redirect. PointerInputModule expects
-notches, while gameplay uses 120 wheel units. `bridge.addresses.UIScrollReturn`
+Physical testing confirmed menu scrolling after the redirect. PointerInputModule
+expects notches, while gameplay uses 120 wheel units.
+`bridge.addresses.UIScrollReturn`
 records the preferred return PC `0xe8ed8f0` after the UI's virtual scroll-getter
 call at `0xe8ed8ec`. BaseInput.get_mouseScrollDelta tail-branches to Unity's wrapper, but the wrapper
 itself calls the native callback with BLR and saves x29/x30. The initial correction
@@ -126,7 +126,8 @@ read its parent return PC to identify the UI callsite. The legacy callback
 normalizes only that caller by `scroll_units_per_step`; gameplay retains its
 confirmed zoom scale. Synthetic tests verify both callers can read the same
 frame without consuming or rescaling each other's state. Runtime startup now logs that the UI caller was verified and normalization
-is active. The user confirmed reasonable menu speed and working camera zoom on 2026-11-01.
+is active. Physical testing on 2026-11-01 confirmed reasonable menu speed and
+working camera zoom.
 
 ## PC platform with settings compatibility test
 
@@ -152,5 +153,5 @@ profile. It now also clears the touch-only guard and redirects
 keeps the change scoped to settings pointer processing and uses the path already
 confirmed in the mobile profile. In the revised PC build, injected wheel input
 moved the Graphics list in both directions. Physical trackpad scrolling,
-dropdown interaction, and other settings tabs still need user validation. The
+dropdown interaction, and other settings tabs remain unverified. The
 profile remains test-only and excluded from automatic selection.

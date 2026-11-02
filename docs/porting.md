@@ -5,7 +5,7 @@ The profile supplies game identity, binary edits, addresses and field offsets.
 A similar Unity or HoYoverse game is not automatically compatible. This repository
 contains the ZZZ new Input System profile and an experimental HSR legacy/InControl
 profile. Both use one AppKit host; `bridge.backend` selects game-facing code.
-See [HSR's backend contract](hsr.md) for `unity-legacy-v1`. The tables below
+See [HSR's backend contract](games/hsr.md) for `unity-legacy-v1`. The tables below
 describe the ZZZ `unity-input-system-v1` contract.
 
 ## Select and build a profile
@@ -38,10 +38,10 @@ fail the installed-hash guard and must not be overwritten with an old backup.
 ## Profile format
 
 Copy the existing JSON to a **new** filename/ID such as `game-1.2.3-build2.json`.
-Do not create a purported supported profile with guessed addresses. Keep profiles
-for restoration and reproducibility, except test-only profiles explicitly retired
-at the user's request; preserve their `.local` backups in the archive. `profiles.py`
-validates the data; no third-party Python packages are required.
+Do not create a supported profile with guessed addresses. Retain profiles for
+restoration and reproducibility. When retiring an explicitly test-only profile,
+preserve its `.local` backup in the archive. `profiles.py` validates the data;
+no third-party Python packages are required.
 
 | Field | Meaning |
 | --- | --- |
@@ -152,7 +152,7 @@ different static storage, or an engine without this Input System require code.
 4. Determine device layouts and initialization timing. Check null Mouse controls
    before enabling game-specific mouse processing. Document any game-specific hook.
 5. Add the JSON and analysis notes; run the tests and build. Inspect the generated
-   header against your notes. Synthetic tests validate config, conversion and
+   header against the analysis notes. Synthetic tests validate config, conversion and
    rollback; they cannot prove native method addresses are correct.
 6. On an explicitly selected closed app, install with its exact profile. Verify
    signatures, configuration loading and device setup before entering gameplay.

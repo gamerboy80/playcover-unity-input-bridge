@@ -1,8 +1,9 @@
-# Analysis of the supported 3.3.0 build
+# Zenless Zone Zero 3.3.0
 
 The machine-readable source for byte patches, VM addresses and object/static
-offsets is [`profiles/zzz-3.3.0.json`](../profiles/zzz-3.3.0.json). The shared
-bridge consumes a header generated from that profile. See [porting](porting.md)
+offsets is
+[`profiles/com.HoYoverse.Nap-3.3.0.json`](../../profiles/com.HoYoverse.Nap-3.3.0.json).
+The shared bridge consumes a header generated from that profile. See [porting](../porting.md)
 for the ABI contract and the process for adding another build.
 
 The decrypted arm64 UnityFramework exposes an IL2CPP PC layout/input path even
@@ -64,8 +65,8 @@ An earlier workaround made `MouseInputEnhancement.get_EnabledOnPlatform` at
 `0xb0a6274` return false. That restored loading, but also disabled the game's
 scroll accumulation. The final implementation creates a complete Mouse before
 configuration loading and keeps the original enhancement component enabled.
-Its startup log confirms initialization without the original exception. Only
-the eight-byte PC selector remains patched in UnityFramework.
+Its startup log confirms initialization without the original exception. In the
+stable profile, only the eight-byte PC selector remains patched in UnityFramework.
 
 A temporary read-only probe found that GameController reported a keyboard and
 mouse, while Unity had a current keyboard and no current mouse during its 120
@@ -126,18 +127,19 @@ AppKit wheel event, preserving the source location and targeting the game window
 Trackpad gesture metadata is not copied. It is scheduled on the main queue
 after the gesture callback, processed once through the ordinary wheel handler,
 and delivered to the hit-tested native view's scrollWheel handler; the original
-precise event is consumed, avoiding recursive conversion or duplicate delivery. Fractions carry forward; gesture start/cancel and focus loss
-clear the remainders. A scroll event without a window can use the active
+precise event is consumed, avoiding recursive conversion or duplicate delivery.
+Fractions carry forward; gesture start/cancel and focus loss clear the
+remainders. A scroll event without a window can use the active
 application's key window. The original mouse component is enabled after the
 bridge validates its Mouse, rather than waiting for game-asset loading, so the
 login/settings screen has the same mouse processing.
 
-Scrolling the graphics settings list was visually verified with an injected wheel
-event. Physical trackpad verification is tracked separately; a working injected
-wheel alone does not establish trackpad support. Status logging reports the first
-local/precise scroll event and first nonzero Unity scroll state without recording
-scroll values or keystrokes. The unused legacy and direct-reader experiments
-were removed.
+Injected wheel events verified graphics-list scrolling, but that result did not
+establish physical trackpad support. Physical trackpad behavior was confirmed
+after the mouse-presence callback fix described below. Status logging reports the
+first local/precise scroll event and first nonzero Unity scroll state without
+recording scroll values or keystrokes. Unused legacy and direct-reader
+experiments were removed.
 
 AppKit's public CGEvent window-under-pointer fields do not bind `NSEvent.window`.
 A native runtime test found window number 0 on a fresh wheel event.
@@ -154,11 +156,9 @@ the window's content view and invokes the native target's scrollWheel handler.
 The WindowServer-backed regression test verifies that the real target NSView
 receives the correct coarse deltas through this same helper.
 
-The user reported **still no physical trackpad response with `61cce82`**. This
-invalidates any inference that direct native-view dispatch solved the gameplay
-problem. The event conversion and view-dispatch self-checks pass, while the actual
-trackpad-to-game path remained unresolved at that point. The profile refactor changes how these
-constants are supplied; it does not claim to fix scrolling.
+Physical trackpad input remained unresponsive through commit `61cce82`, despite
+passing event-conversion and native-view dispatch checks. This showed that those
+checks alone did not establish the trackpad-to-game path.
 
 ## Confirmed mouse-presence fix
 
@@ -183,18 +183,18 @@ the bridge as its own fallback. No additional framework instruction patch is use
 
 The resulting runtime reported `legacyMousePresent=1`, with the callback called
 throughout UI updates. Physical gestures produced matched nonzero control and
-processed-scroll samples, and the user confirmed: "Wow it works now" on
-2026-11-01. This is physical confirmation of the current scroll fix; camera zoom
-and other mouse hardware have not been independently tested. Diagnostics are
-bounded to 30 aggregate lines, at most one per second, without input coordinates.
+processed-scroll samples. Physical trackpad scrolling was confirmed on
+2026-11-01. Camera zoom and other mouse hardware have not been independently
+tested. Diagnostics are bounded to 30 aggregate lines, at most one per second,
+without input coordinates.
 
 ## Capture after Dock activation
 
-The user reported a frozen pointer after activating the game from the Dock while
-the cursor was outside its window; switching with the pointer inside worked.
-The bridge previously disconnected mouse/cursor association immediately when
-Unity requested capture. An outside cursor could then remain fixed outside the
-window, preventing app-local mouse events from reaching the game.
+Dock activation with the cursor outside the game window exposed a frozen-pointer
+case; switching with the cursor inside worked. The bridge previously
+disconnected mouse/cursor association immediately when Unity requested capture.
+An outside cursor could then remain fixed outside the window, preventing
+app-local mouse events from reaching the game.
 
 On capture entry, the bridge now checks the cursor in content-view coordinates.
 If outside, it converts the content center through window and screen coordinates,
@@ -205,11 +205,12 @@ window/geometry defers capture; a failed warp restores association instead of
 locking outside. Geometry tests cover Dock positions, edges, empty content and
 displays above/left of the primary. Physical Dock reactivation awaits confirmation.
 
-The user confirmed initial Dock capture worked, then reported intermittent visible
-cursor/capture failures and a first-motion camera jump. Capture now waits 150 ms
-after activation while restoring association, allowing native focus handlers to
-settle before recapturing. During capture, a visible Quartz cursor is hidden again
-without blindly incrementing the hide count every frame. The first movement sample
-and samples in the first 100 ms of capture are discarded so cursor repositioning
-cannot become a camera delta. Tests cover delayed first movement and subsequent
-settled samples. Physical confirmation of this follow-up remains pending.
+Initial Dock capture worked, while subsequent physical checks exposed intermittent
+cursor visibility/capture failures and a first-motion camera jump. Capture now
+waits 150 ms after activation while restoring association, allowing native focus
+handlers to settle before recapturing. During capture, a visible Quartz cursor is
+hidden again without incrementing the hide count on every frame. The first
+movement sample and samples in the first 100 ms of capture are discarded so
+cursor repositioning cannot become a camera delta. Tests cover delayed first
+movement and settled samples. Physical validation of this follow-up remains
+pending.
