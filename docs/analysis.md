@@ -11,35 +11,54 @@ The obfuscated layout selector at `0xc22d6b8` returns an enum whose PC value is 
 Changing its entry to `mov w0,#2; ret` makes the game display PC control prompts
 and enables its keyboard path.
 
-## Unity PC-platform test build
+## App-level PC platform and mobile settings test
 
-`com.HoYoverse.Nap-3.3.0-unity-platform-pc-test` is an explicit, test-only
-profile. It retains the working PC input selector and bridge, then changes the
-managed `UnityEngine.Application.get_platform` entry at `0x1381fc04` to return
-`RuntimePlatform.WindowsPlayer` (`2`) instead of the iOS value
-`RuntimePlatform.IPhonePlayer` (`8`). The native player is still an iOS build;
-this only changes the value reported through the managed Unity API. ZZZ's
-`AppUtils.ResetUnityPlatformValues` consumes that getter and uses value `2` for
-its Unity PC-platform flag. The patch therefore tests the broader Unity and
-game PC branches, not only the game's input selector. It can also affect other
-platform-dependent setup and UI paths, so it is excluded from auto-selection.
+`com.HoYoverse.Nap-3.3.0-platform-pc-settings-test` is an explicit test profile.
+It replaces the earlier Unity RuntimePlatform experiment, which stalled config
+loading. The new profile leaves Unity's reported platform and the existing
+stable ZZZ profile unchanged; it changes only app-level platform queries.
 
-The normal profile continues to report the mobile platform. Build and install
-the experiment explicitly, after restoring any current ZZZ profile:
+IL2CPP metadata maps the affected functions to
+`Foundation.AppUtils.GetApplicationPlatform`,
+`Foundation.AppUtils.IsMobilePlatform`, and
+`Foundation.AppUtils.IsPCPlatform`. Their disassembly has a boolean selector:
+the zero/Unity branch tail-calls the Unity platform helpers, while the
+app-platform branch reads app-specific state. The test changes one return
+instruction in each app branch:
 
-```sh
-python3 patch.py build --profile com.HoYoverse.Nap-3.3.0-unity-platform-pc-test
-python3 patch.py install --profile com.HoYoverse.Nap-3.3.0-unity-platform-pc-test
-```
+- `GetApplicationPlatform(true)` returns PC enum `3`. This enum value is
+  confirmed for the shared Hoyo AppUtils platform type by HSR 4.6 analysis; its
+  ZZZ use remains a test assumption.
+- `IsMobilePlatform(true)` returns true, keeping mobile-gated graphics and
+  settings options available.
+- `IsPCPlatform(true)` returns true, enabling app-level PC behavior.
+- Unity platform queries (`false` selector) remain untouched. The existing ZZZ
+  PC input selector and Input System bridge are retained.
+
+The HSR test needed edits to its legacy `InControlInputModule.Process` path.
+ZZZ uses the Input System bridge already tested for keyboard, mouse and physical
+trackpad input, so no HSR-specific UI dispatch edit is included. If PC-mode
+settings still break, the next test should target the affected settings path
+with an additional exact-build predicate or UI edit.
+
+Build and install this experiment explicitly, after restoring any current ZZZ
+profile:
+
+~~~sh
+python3 patch.py build --profile com.HoYoverse.Nap-3.3.0-platform-pc-settings-test
+python3 patch.py install --profile com.HoYoverse.Nap-3.3.0-platform-pc-settings-test
+~~~
 
 Restoring this test profile returns the app to the original unpatched files.
-The stable profile's retained backup remains separate.
+The stable profile's retained backup remains separate. The PC enum and visual
+settings behavior in this ZZZ-specific profile still require runtime validation.
 
-That patch alone stalled configuration loading. Three local launch logs reported
-`NullReferenceException` from `Foundation.MouseInputEnhancement.InitAllState`.
-The throw at `0xb0a4ffc` follows a null position-control check at `0xb0a4aa8`.
-Restoring original files restored loading. This is evidence of a local startup
-failure; the examined logs did not establish server detection or rejection.
+The earlier Unity getter override stalled configuration loading. Three local
+launch logs reported `NullReferenceException` from
+`Foundation.MouseInputEnhancement.InitAllState`. The throw at `0xb0a4ffc`
+follows a null position-control check at `0xb0a4aa8`. Restoring original files
+restored loading. This is evidence of a local startup failure; the examined logs
+did not establish server detection or rejection.
 
 An earlier workaround made `MouseInputEnhancement.get_EnabledOnPlatform` at
 `0xb0a6274` return false. That restored loading, but also disabled the game's

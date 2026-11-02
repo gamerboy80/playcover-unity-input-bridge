@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "com.HoYoverse.Nap-3.3.0-unity-platform-pc-test",
+  "id": "com.HoYoverse.Nap-3.3.0-platform-pc-settings-test",
   "game": "Zenless Zone Zero",
   "version": "3.3.0",
   "bundle_id": "com.HoYoverse.Nap",
@@ -11,17 +11,31 @@
   "patches": [
     {
       "name": "pc-input-selector",
-      "reason": "Return PC enum 2 (mov w0,#2; ret). Create the bridge Mouse before enabling original mouse processing to avoid the startup null-control exception.",
+      "reason": "Return PC input-layout enum 2. This is the existing tested ZZZ selector; the bridge creates a valid Mouse before enabling original mouse processing.",
       "file_offset": "0xc22d6b8",
       "expected": "f44fbea9fd7b01a9",
       "replacement": "40008052c0035fd6"
     },
     {
-      "name": "unity-runtime-platform-windows-player-test",
-      "reason": "Experimental: make UnityEngine.Application.get_platform report RuntimePlatform.WindowsPlayer (2) instead of iPhonePlayer (8), enabling ZZZ Unity PC-platform checks while the native player remains iOS.",
-      "file_offset": "0x1381fc04",
-      "expected": "a873049008813f91",
-      "replacement": "40008052c0035fd6"
+      "name": "app-platform-pc-enum",
+      "reason": "AppUtils.GetApplicationPlatform(app-platform branch): return Hoyo AppUtils PC enum 3. The Unity-platform branch remains unchanged.",
+      "file_offset": "0x105a328",
+      "expected": "00e976b9",
+      "replacement": "60008052"
+    },
+    {
+      "name": "app-mobile-graphics-settings",
+      "reason": "AppUtils.IsMobilePlatform(app-platform branch): keep mobile-gated graphics and settings paths available. The separate Unity-mobile query remains unchanged.",
+      "file_offset": "0x105a4e0",
+      "expected": "00696938",
+      "replacement": "20008052"
+    },
+    {
+      "name": "app-pc-platform-path",
+      "reason": "AppUtils.IsPCPlatform(app-platform branch): select PC-specific app behavior while leaving its Unity-platform query unchanged.",
+      "file_offset": "0x105acfc",
+      "expected": "00010012",
+      "replacement": "20008052"
     }
   ],
   "bridge": {
@@ -59,8 +73,8 @@
     }
   },
   "validation": {
-    "keyboard_mouse": "Experimental; not runtime-tested. The Unity RuntimePlatform.WindowsPlayer override changes broad managed platform checks.",
-    "trackpad": "Experimental; not runtime-tested. The Unity RuntimePlatform.WindowsPlayer override changes broad managed platform checks.",
+    "keyboard_mouse": "The inherited ZZZ bridge and PC input selector are user-tested. The app-level PC and mobile settings overrides are experimental and need runtime validation.",
+    "trackpad": "The stable ZZZ bridge's physical trackpad scroll is user-confirmed. App-level platform overrides are experimental and need settings-list and camera-zoom validation.",
     "evidence": "docs/analysis.md"
   },
   "test_only": true
