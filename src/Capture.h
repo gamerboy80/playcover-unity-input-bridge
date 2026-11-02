@@ -9,6 +9,14 @@ static inline bool captureMotionReady(bool *first, double now, double settleUnti
     return !skip;
 }
 
+// Own only our hide calls; refresh visibility without accumulating AppKit hide depth.
+static inline void balanceCursorHide(unsigned *owned, bool hidden, bool visible,
+                                     void (*hide)(void), void (*unhide)(void)) {
+    if (hidden && *owned && !visible) return;
+    while (*owned) { unhide(); (*owned)--; }
+    if (hidden) { hide(); (*owned)++; }
+}
+
 // AppKit uses a bottom-left origin; Quartz uses the primary display's top-left.
 static inline CGPoint captureScreenPoint(CGPoint appKitPoint, double primaryTop) {
     return CGPointMake(appKitPoint.x, primaryTop-appKitPoint.y);

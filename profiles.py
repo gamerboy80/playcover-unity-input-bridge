@@ -16,7 +16,7 @@ FIELD_NAMES = {
     'StaticInputManager', 'StaticKeyboard', 'StaticMouse', 'DeviceID',
     'StateBlock', 'MousePosition', 'MouseDelta', 'MouseScroll',
 }
-LEGACY_ADDRESSES = {'ScreenWidth','ScreenHeight','CursorLock','CursorVisible','FrameCount',
+LEGACY_ADDRESSES = {'UIScrollReturn','ScreenWidth','ScreenHeight','CursorLock','CursorVisible','FrameCount',
     'KeySlot','KeyDownSlot','KeyUpSlot','AnyKeySlot','AnyKeyDownSlot','MousePositionSlot','MouseScrollSlot','MouseButtonSlot',
     'MouseButtonDownSlot','MouseButtonUpSlot','AxisSlot','AxisRawSlot','LegacyMousePresentSlot'}
 

@@ -63,9 +63,14 @@ synthetic event tests. Do not infer hardware success from nonzero Unity state.
 
 ZZZ 3.3.0 and HSR 4.6.0 have separate profiles. HSR (`com.HoYoverse.hkrpgoversea-4.6.0`, alias `hsr`) uses legacy input
 and PC-layout predicates plus scoped mobile cursor checks. Keyboard movement,
-native capture and mouse look are now user-confirmed. Scrolling and some buttons
+native capture, mouse look, camera zoom and menu cursor visibility are now
+user-confirmed. Menu scrolling and some buttons
 remain under investigation. The legacy backend hooks key getters directly,
-matches lowercase mouse axis labels, and uses profile-defined scroll units. Read `docs/hsr.md` for its ABI and provisional camera scale.
+matches lowercase mouse axis labels, and uses profile-defined scroll units.
+HSR’s UI Process method originally dispatched touches only; the profile now
+redirects it to its existing ProcessMouseEvent. Menu scrolling is user-confirmed but was too fast; UIScrollReturn identifies the
+UI getter caller for notch normalization while gameplay retains wheel units.
+Physical speed validation is pending. Read `docs/hsr.md` for its ABI and provisional camera scale.
 For ZZZ, keyboard, WASD release,
 F1/F2, mouse look and native capture were confirmed earlier. PlayTools is retained
 with keymapping off; Option+M is an optional capture fallback.

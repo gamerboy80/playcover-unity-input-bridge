@@ -14,8 +14,23 @@
 }
 @end
 
+static int cursorDepth=2; // Simulate hide ownership held by another component.
+static void testHide(void) { cursorDepth++; }
+static void testUnhide(void) { cursorDepth--; }
+
 int main(void) {
     @autoreleasepool {
+        unsigned owned=0;
+        balanceCursorHide(&owned,true,true,testHide,testUnhide);
+        assert(owned==1 && cursorDepth==3);
+        for (int i=0;i<100;i++) balanceCursorHide(&owned,true,true,testHide,testUnhide);
+        assert(owned==1 && cursorDepth==3); // Re-hiding must not accumulate a depth of 101.
+        balanceCursorHide(&owned,true,false,testHide,testUnhide);
+        assert(owned==1 && cursorDepth==3);
+        balanceCursorHide(&owned,false,false,testHide,testUnhide);
+        assert(owned==0 && cursorDepth==2); // Release only our own hide claim.
+        balanceCursorHide(&owned,false,true,testHide,testUnhide);
+        assert(cursorDepth==2);
         bool first=true;
         assert(!captureMotionReady(&first,5,1)); // First movement may arrive long after capture.
         assert(captureMotionReady(&first,6,1));

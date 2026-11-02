@@ -43,6 +43,34 @@
       "file_offset": "0x1b04520",
       "expected": "60000036",
       "replacement": "03000014"
+    },
+    {
+      "name": "menu-force-cursor-mobile-gate",
+      "reason": "MouseInputController.ForceShowCursor: allow menu cursor visibility/unlock on mobile while preserving its normal PC/gamepad checks.",
+      "file_offset": "0x1b03e8c",
+      "expected": "40020037",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "sdk-force-cursor-mobile-gate",
+      "reason": "MouseInputController.ForceShowCursorBySDKUI: allow modal UI cursor visibility/unlock on mobile without changing global platform identity.",
+      "file_offset": "0x1b03fb4",
+      "expected": "20030037",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "ui-mouse-input-enabled",
+      "reason": "InControlInputModule.Process: mouse processing must not be gated by the touch-only enable flag.",
+      "file_offset": "0xc1c3398",
+      "expected": "61000054",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "ui-mouse-processing",
+      "reason": "InControlInputModule.Process: call existing ProcessMouseEvent instead of ProcessTouchEvents; enables native pointer hover, buttons and scroll on the active UI module.",
+      "file_offset": "0xc1c33a0",
+      "expected": "1b010094",
+      "replacement": "be060094"
     }
   ],
   "bridge": {
@@ -68,13 +96,14 @@
       "KeyDownSlot": "0x15a4ffd8",
       "KeyUpSlot": "0x15a4ffc0",
       "AnyKeySlot": "0x15a50048",
-      "AnyKeyDownSlot": "0x15a50050"
+      "AnyKeyDownSlot": "0x15a50050",
+      "UIScrollReturn": "0xe8ed8f0"
     },
     "scroll_units_per_step": 120
   },
   "validation": {
-    "keyboard_mouse": "Experimental: user confirmed keyboard movement, native capture and mouse look after direct key getters, cursor mobile-gate edits and lowercase axis matching. Partial button behavior remains unverified.",
-    "trackpad": "Experimental: Unity receives nonzero scroll; the 120-unit wheel scale correction awaits physical testing.",
+    "keyboard_mouse": "User confirmed keyboard movement, native capture, mouse look and menu cursor visibility. UI mouse processing responds; broader button testing remains pending.",
+    "trackpad": "Experimental: user confirmed camera zoom and menu scrolling. Menus scroll too fast with gameplay units; UI-only notch normalization awaits physical testing.",
     "evidence": "docs/hsr.md"
   }
 }

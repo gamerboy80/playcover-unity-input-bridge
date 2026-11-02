@@ -13,6 +13,7 @@ static BOOL anyKey(void) { return NO; }
 static BOOL button(int b) { return b==4; }
 static float axis(void *s) { (void)s; return 7; }
 static void position(float *p) { p[0]=5;p[1]=6;p[2]=0; }
+#define GameUIScrollReturn 0x1000
 #define GameLegacyScrollUnitsPerStep 120
 #define GameFrameCount ((uintptr_t)frameCount)
 #define GameKeySlot ((uintptr_t)&slots[7])
@@ -49,6 +50,10 @@ int main(void) {
     float p[3];legacyPosition(p);assert(p[0]==100 && p[1]==200);
     assert(legacyDown(0) && legacyDown(0) && legacyHeld(0));
     float scroll[2];legacyScroll(scroll);assert(scroll[0]==120 && scroll[1]==-240);
+    legacyScrollForCaller(scroll,GameUIScrollReturn);
+    assert(scroll[0]==1 && scroll[1]==-2);
+    legacyScrollForCaller(scroll,GameUIScrollReturn+4);
+    assert(scroll[0]==120 && scroll[1]==-240);
     legacyScroll(scroll);assert(scroll[1]==-240); // Polling twice must not consume the frame.
     frame++;legacyScroll(scroll);assert(scroll[1]==0 && !legacyDown(0));
     mouseState.buttons=0;sendMouse();frame++;assert(legacyUp(0) && !legacyHeld(0));

@@ -5,8 +5,10 @@ The initial physical gameplay test failed: keyboard, mouse capture and scrolling
 did not respond; some buttons also failed. The user then confirmed keyboard
 movement works after hooking GetKey callbacks directly. Native capture and
 mouse look were subsequently confirmed after scoped cursor checks and matching
-HSR’s lowercase axis labels. Scrolling and partial button behavior remain
-unresolved; the 120-unit scroll correction awaits physical testing. This profile
+HSR’s lowercase axis labels. Camera zoom was then confirmed with 120-unit scroll steps, followed by correct
+menu cursor visibility after force-show/host hide balancing fixes. Menu scrolling
+and partial button behavior remain unresolved; the UI mouse-processing redirect
+awaits physical testing. This profile
 is experimental.
 
 ```sh
@@ -94,4 +96,30 @@ provider's scroll value and applies that scale (`0xc1d1548` onward). Returning
 one unit per notch reduced a step to 0.05; the revised profile explicitly supplies
 120 units per notch through `bridge.scroll_units_per_step`. Runtime counters
 already confirmed nonzero legacy scroll reads, so this change targets the
-binding's magnitude rather than host event delivery. Physical results pending.
+binding's magnitude rather than host event delivery. The user confirmed camera zoom works with this scale. Menu scrolling works after the UI redirect below, but initially ran too fast.
+
+Menu cursor paths also contain mobile early returns in ForceShowCursor
+(`0x1b03e8c`) and ForceShowCursorBySDKUI (`0x1b03fb4`). Their scoped profile edits
+allow the original menu cursor state and unlock calls to run. The host balances
+its own AppKit hide claims before a visibility refresh and on release, preventing
+repeated captured-cursor refreshes from leaving the pointer hidden in menus.
+
+InControlInputModule.Process (`0xc1c32c0`) dispatches navigation/custom processors
+and ends with only ProcessTouchEvents, guarded by its touch-enable byte at +0x6f.
+No call to its existing ProcessMouseEvent appears in that method. The UI profile
+redirects the BL at `0xc1c33a0` to ProcessMouseEvent (`0xc1c4e98`) and removes the
+touch-only guard branch at `0xc1c3398`. Navigation and active-module selection are
+preserved. ProcessMouseEvent uses PointerInputModule.GetMousePointerEventData,
+which reads position and scroll through BaseInput's virtual getters and raycasts
+the UI. Locked cursors retain Unity's offscreen pointer behavior. This is scoped
+to menu input; global mobile platform identity remains unchanged.
+
+The user confirmed menu scrolling after the redirect. PointerInputModule expects
+notches, while gameplay uses 120 wheel units. `bridge.addresses.UIScrollReturn`
+records the preferred return PC `0xe8ed8f0` after the UI's virtual scroll-getter
+call at `0xe8ed8ec`. BaseInput.get_mouseScrollDelta tail-branches through Unity's
+wrapper into the native callback, preserving that return PC. The legacy callback
+normalizes only that caller by `scroll_units_per_step`; gameplay retains its
+confirmed zoom scale. Synthetic tests verify both callers can read the same
+frame without consuming or rescaling each other's state. Physical speed testing
+is pending.

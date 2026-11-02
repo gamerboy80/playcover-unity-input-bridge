@@ -58,6 +58,7 @@ static id monitor;
 static NSTimer *timer;
 static FILE *output;
 static BOOL ready, captured, forcedCapture;
+static unsigned cursorHideClaims;
 static int lastLock = -1, lastVisible = -1;
 static int (*associateCursor)(int);
 static int (*warpCursor)(CGPoint);
@@ -199,11 +200,14 @@ static void sendMouse(void) {
 
 #endif
 
+static void hideHostCursor(void) { [(id)NSClassFromString(@"NSCursor") hide]; }
+static void unhideHostCursor(void) { [(id)NSClassFromString(@"NSCursor") unhide]; }
+
 static void setCapture(BOOL value) {
-    Class cursorClass = NSClassFromString(@"NSCursor");
     if (captured == value) {
         // AppKit/Unity can restore visibility after Dock activation finishes.
-        if (captured && cursorVisible && cursorVisible()) [(id)cursorClass hide];
+        if (captured && cursorVisible && cursorVisible())
+            balanceCursorHide(&cursorHideClaims,true,true,hideHostCursor,unhideHostCursor);
         return;
     }
     if (value) {
@@ -235,7 +239,7 @@ static void setCapture(BOOL value) {
         ignoreMotionUntil=NSProcessInfo.processInfo.systemUptime+.1;
         discardFirstMotion=YES;
     }
-    if (value) [(id)cursorClass hide]; else [(id)cursorClass unhide];
+    balanceCursorHide(&cursorHideClaims,value,cursorVisible && cursorVisible(),hideHostCursor,unhideHostCursor);
     note(value ? "Pointer captured" : "Pointer released");
 }
 
