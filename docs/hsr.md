@@ -159,3 +159,21 @@ lost its normal dim/blur treatment. Restoring the scoped `hsr` profile brought
 back the full graphics list and backdrop. Keep the global platform mobile for
 normal use; the scoped PC-layout, cursor, and UI input edits provide the tested
 desktop input behavior without changing the broader platform-dependent UI paths.
+
+## PC platform with settings compatibility test
+
+`com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test` keeps the app-level
+PC enum patch above and adds one four-byte edit inside `AppUtils.IsMobilePlatform`
+at `0xf2b1c0`: its secondary comparison changes from enum `1` to enum `3`. The
+method's earlier branch still accepts enum `2`; this lets the PC value pass the
+mobile predicate while `AppUtils.IsWindowsPlatform()` continues to recognize
+enum `3` as PC. That PC value is confirmed by the direct `== 3` check in
+`IsWindowsPlatform`, not inferred from the two mobile values. Enum value `0` is
+representable as the default underlying value; the inspected predicate does not
+classify it as mobile.
+
+This is the smallest settings compatibility experiment identified so far. It
+may restore mobile-gated settings entries and the backdrop while keeping the PC
+platform identity, but `IsMobilePlatform` has callers outside Settings too. The
+profile is test-only and excluded from automatic selection; its graphics menu
+and backdrop still need runtime confirmation.
