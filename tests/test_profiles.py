@@ -21,7 +21,8 @@ class ProfileTests(unittest.TestCase):
                     self.assertIn('#define GameFieldMouseScroll ', header)
                 else:
                     self.assertIn('#define GameKeySlot ', header)
-                    self.assertIn('#define GameLegacyScrollUnitsPerStep 120', header)
+                    self.assertIn('#define GameLegacyScrollUnitsPerStep ' +
+                                  str(profile['bridge']['scroll_units_per_step']), header)
                     self.assertIn('#define GameLegacyBackend 1', header)
                 self.assertEqual(header, generate_header(profile))
 
@@ -54,6 +55,59 @@ class ProfileTests(unittest.TestCase):
             profile['bridge']['scroll_units_per_step']=value
             with self.assertRaisesRegex(RuntimeError, 'scroll units'):
                 validate(profile, profile['id'])
+
+    def test_separate_type_statics_require_the_complete_layout(self):
+        profile=copy.deepcopy(load_profile('endfield'))
+        header=generate_header(profile)
+        self.assertIn('#define GameTypeStatics 1', header)
+        self.assertIn('#define GameFieldStaticKeyboard 0x0ULL', header)
+        for group, name in (('addresses','KeyboardType'), ('fields','StaticFields')):
+            incomplete=copy.deepcopy(profile)
+            incomplete['bridge'][group].pop(name)
+            with self.assertRaisesRegex(RuntimeError, 'missing bridge'):
+                validate(incomplete, incomplete['id'])
+        profile['bridge']['static_storage']='unknown'
+        with self.assertRaisesRegex(RuntimeError, 'static storage'):
+            validate(profile, profile['id'])
+
+    def test_legacy_supplement_requires_callbacks_and_scroll_scale(self):
+        profile=copy.deepcopy(load_profile('endfield'))
+        self.assertIn('#define GameLegacySupplement 1', generate_header(profile))
+        self.assertIn('#define GameLegacyButtons 0', generate_header(profile))
+        invalid=copy.deepcopy(profile)
+        invalid['bridge']['legacy_buttons']='false'
+        with self.assertRaisesRegex(RuntimeError, 'legacy_buttons'):
+            validate(invalid, invalid['id'])
+        for group, name in (('addresses','AxisSlot'), ('addresses','FrameCount')):
+            incomplete=copy.deepcopy(profile)
+            incomplete['bridge'][group].pop(name)
+            with self.assertRaisesRegex(RuntimeError, 'missing bridge'):
+                validate(incomplete, incomplete['id'])
+        profile['bridge']['scroll_units_per_step']=0
+        with self.assertRaisesRegex(RuntimeError, 'scroll units'):
+            validate(profile, profile['id'])
+        profile=copy.deepcopy(load_profile('hsr'))
+        profile['bridge']['legacy_input']=True
+        with self.assertRaisesRegex(RuntimeError, 'legacy_input'):
+            validate(profile, profile['id'])
+
+    def test_camera_mapping_must_be_complete(self):
+        profile=copy.deepcopy(load_profile('endfield'))
+        for name in ('CameraManagerType', 'CameraInput', 'CameraStaticOffset'):
+            invalid=copy.deepcopy(profile)
+            invalid['bridge']['addresses'].pop(name)
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'complete verified mapping'):
+                validate(invalid, invalid['id'])
+
+    def test_axis_aliases_reject_ambiguous_or_invalid_labels(self):
+        profile=copy.deepcopy(load_profile('endfield'))
+        self.assertIn('#define GameLegacyAxisXName "MouseAxis1"', generate_header(profile))
+        for axes in ({'z':'MouseAxis1'}, {'x':''}, {'x':'a\nb'}, {'x':12},
+                     {'x':'Mouse Y'}, {'x':'same','scroll':'SAME'}):
+            invalid=copy.deepcopy(profile)
+            invalid['bridge']['legacy_axes']=axes
+            with self.subTest(axes=axes), self.assertRaises(RuntimeError):
+                validate(invalid, invalid['id'])
 
     def test_a_new_profile_changes_generated_runtime_values(self):
         profile = copy.deepcopy(load_profile())

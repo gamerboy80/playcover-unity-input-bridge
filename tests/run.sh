@@ -7,8 +7,16 @@ xcrun clang -Wall -Wextra -Werror tests/scroll.c -o build/test-scroll
 build/test-scroll
 xcrun clang -Wall -Wextra -Werror tests/mouse-presence.c -o build/test-mouse-presence
 build/test-mouse-presence
-xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation tests/legacy-backend.m -o build/test-legacy
-build/test-legacy
+for typed in 0 1; do
+    xcrun clang -Wall -Wextra -Werror -DGameTypeStatics=$typed \
+        tests/input-statics.c -o build/test-input-statics-$typed
+    build/test-input-statics-$typed
+done
+for buttons in 0 1; do
+    xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation \
+        -DGameLegacyButtons=$buttons tests/legacy-backend.m -o build/test-legacy-$buttons
+    build/test-legacy-$buttons
+done
 xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit tests/native-wheel.m -o build/test-native-wheel
 build/test-native-wheel
 for backend in 0 1; do
@@ -16,3 +24,6 @@ for backend in 0 1; do
         -DGameLegacyBackend=$backend tests/event-handler.m -o build/test-event-handler-$backend
     build/test-event-handler-$backend
 done
+xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
+    -DGameNativeMenuButtons=1 tests/event-handler.m -o build/test-event-handler-native-menu
+build/test-event-handler-native-menu

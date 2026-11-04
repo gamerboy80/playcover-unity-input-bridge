@@ -23,6 +23,7 @@ static void updateModifiers(NSUInteger flags) {
 static id handleEvent(ZZZHostEvent *event) {
     if (!ready) return event;
     NSUInteger type=event.type, flags=event.modifierFlags;
+    BOOL motion=type==5 || type==6 || type==7 || type==27;
     id window=event.window;
     if (type==22) {
         if (event.hasPreciseScrollingDeltas) preciseEvents++; else wheelEvents++;
@@ -32,13 +33,17 @@ static id handleEvent(ZZZHostEvent *event) {
         if (event.hasPreciseScrollingDeltas && !sawPreciseScroll) {
             sawPreciseScroll=YES; note("Precise trackpad scroll event received");
         }
-        if (!window) {
-            id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-            if ([app isActive]) window=[app keyWindow];
-        }
+    }
+    if (!window && (type==22 || (captured && motion))) {
+        id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
+        if ([app isActive]) window=[app keyWindow];
     }
     if (!window) return event;
     if (!routeGameEvent(window,gameWindow)) { releaseInput(); return event; }
+    if (type==22 && event.momentumPhase!=0) {
+        scrollRemainderX=scrollRemainderY=0;
+        return nil;
+    }
     id wheelEvent=nil;
     if (type==10 || type==11 || type==12) {
         if (editingGameText()) { releaseInput(); return event; }
@@ -57,6 +62,11 @@ static id handleEvent(ZZZHostEvent *event) {
         sendKeyboard();
         return key ? nil : event;
     }
+#if GameNativeMenuButtons
+    // Let the native UI own the complete down/drag/up sequence in menus.
+    if (!captured && (type==1 || type==2 || type==3 || type==4 ||
+                      type==6 || type==7 || type==25 || type==26 || type==27)) return event;
+#endif
     ZZZHostEvent *view=[window contentView];
     CGRect bounds=view.bounds;
     int width=((int (*)(void))(slide+GameScreenWidth))();
@@ -67,7 +77,7 @@ static id handleEvent(ZZZHostEvent *event) {
     CGPoint point=type==22 ? [window mouseLocationOutsideOfEventStream] : event.locationInWindow;
     mouseState.x=captured ? width*.5f : point.x*scaleX;
     mouseState.y=captured ? height*.5f : point.y*scaleY;
-    if (type==5 || type==6 || type==7 || type==27) {
+    if (motion) {
         // Focus/cursor repositioning can be included in the first relative delta.
         if (captured && !captureMotionReady(&discardFirstMotion,
                 NSProcessInfo.processInfo.systemUptime,ignoreMotionUntil)) return nil;
@@ -80,6 +90,9 @@ static id handleEvent(ZZZHostEvent *event) {
         }
         mouseState.sx=unityScroll(&scrollRemainderX, event.scrollingDeltaX, precise);
         mouseState.sy=unityScroll(&scrollRemainderY, event.scrollingDeltaY, precise);
+        if (precise && (event.phase & (8u | 16u))) {
+            scrollRemainderX=scrollRemainderY=0;
+        }
         if (mouseState.sx==0 && mouseState.sy==0) return nil;
         if (precise) emittedSteps++;
         wheelEvent=nativeWheelEvent(event, window, mouseState.sx, mouseState.sy);

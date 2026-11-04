@@ -16,6 +16,7 @@ not provide or distribute game files.
 | Zenless Zone Zero 3.3.0 | [`com.HoYoverse.Nap-3.3.0-platform-pc-settings-test`](profiles/com.HoYoverse.Nap-3.3.0-platform-pc-settings-test.json) | Unity Input System | Test-only app-platform and settings profile |
 | Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0`](profiles/com.HoYoverse.hkrpgoversea-4.6.0.json) | Unity legacy input / InControl | Keyboard, mouse capture/look, camera zoom and menu scrolling validated |
 | Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test`](profiles/com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test.json) | Unity legacy input / InControl | Test-only PC-platform and mobile-settings profile |
+| Arknights: Endfield 1.6.3 | [`com.gryphline.endfield.ios-1.6.3`](profiles/com.gryphline.endfield.ios-1.6.3.json) | Unity Input System + legacy input | Experimental; WASD, capture, mouse look and menu clicks validated |
 
 Test-only profiles require explicit selection and are excluded from automatic
 app matching. Validation applies only to the listed binary versions. See
@@ -64,7 +65,8 @@ explicitly with `--profile`.
 
 The standard PlayCover app locations are under
 `~/Library/Containers/io.playcover.PlayCover/Applications/`. Short profile names
-are `zzz`, `hsr`, `zzz-test` and `hsr-test`.
+are `zzz`, `hsr`, `zzz-test`, `hsr-test` and `endfield`. Endfield currently requires
+explicit selection with `--profile endfield`; see its [porting notes](docs/games/endfield.md).
 
 ## Inspect, update and restore
 

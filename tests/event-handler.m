@@ -7,7 +7,7 @@
 
 // Fake host and backend boundaries; EventHandler.h is the production handler.
 @interface ZZZHostEvent : NSObject
-@property NSUInteger type, modifierFlags, phase;
+@property NSUInteger type, modifierFlags, phase, momentumPhase;
 @property unsigned short keyCode;
 @property BOOL isARepeat, hasPreciseScrollingDeltas;
 @property NSInteger buttonNumber;
@@ -104,11 +104,42 @@ int main(void) {
         handleEvent(motion); assert(mouseWrites==before+1);
         releaseInput();
 
+#if GameNativeMenuButtons
+        ZZZHostEvent *button=[ZZZHostEvent new];
+        button.window=window;
+        before=mouseWrites;
+        button.type=1;
+        assert(handleEvent(button)==button);
+        button.type=6;
+        assert(handleEvent(button)==button);
+        button.type=2;
+        assert(handleEvent(button)==button && mouseWrites==before);
+        captured=YES;
+        button.type=1;
+        assert(handleEvent(button)==nil && mouseState.buttons==1);
+        button.type=2;
+        assert(handleEvent(button)==nil && mouseState.buttons==0);
+        captured=NO;
+#endif
+
         ZZZHostEvent *scroll=[ZZZHostEvent new];
         scroll.window=window; scroll.type=22; scroll.hasPreciseScrollingDeltas=YES;
         scroll.scrollingDeltaY=8;
         before=mouseWrites;
+        scroll.momentumPhase=1;
+        scroll.scrollingDeltaY=64;
+        scrollRemainderX=scrollRemainderY=10;
         assert(handleEvent(scroll)==nil && mouseWrites==before);
+        assert(scrollRemainderX==0 && scrollRemainderY==0 && emittedSteps==0);
+        scroll.momentumPhase=4;
+        assert(handleEvent(scroll)==nil && mouseWrites==before);
+        scroll.momentumPhase=8;
+        assert(handleEvent(scroll)==nil && mouseWrites==before);
+        scroll.momentumPhase=0; scroll.phase=8; scroll.scrollingDeltaY=7;
+        assert(handleEvent(scroll)==nil && scrollRemainderY==0);
+        scroll.phase=1; scroll.scrollingDeltaY=8;
+        assert(handleEvent(scroll)==nil && mouseWrites==before);
+        scroll.phase=2;
         assert(handleEvent(scroll)==nil && mouseWrites==before);
         assert(emittedSteps==1 && queuedScrolls==0 && nativeDispatches==0);
         dispatch_async(dispatch_get_main_queue(), ^{

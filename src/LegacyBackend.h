@@ -1,10 +1,18 @@
 // unity-legacy-v1 backend. Included by the common host after its state declarations.
+#ifndef GameLegacyButtons
+#define GameLegacyButtons 1
+#endif
+#ifndef GameLegacyAxisXName
+#define GameLegacyAxisXName "Mouse X"
+#define GameLegacyAxisYName "Mouse Y"
+#define GameLegacyAxisScrollName "Mouse ScrollWheel"
+#endif
 static uint8_t legacyKeys[14];
 static uint8_t heldKeys[512], pendingKeyDown[512], pendingKeyUp[512], frameKeyDown[512], frameKeyUp[512];
 static BOOL (*legacyKeyOriginal[3])(int);
 static BOOL (*legacyAnyOriginal[2])(void);
 static unsigned legacyKeyWrites, legacyKeyReads, legacyMouseReads, legacyScrollReads, legacyAxisReads;
-static unsigned legacyPositiveKeys, legacyPositiveScrolls, legacyNamedAxes;
+static unsigned legacyPositiveKeys, legacyPositiveScrolls, legacyNamedAxes, legacyNonzeroAxes;
 static uint16_t legacyButtons, pendingDown, pendingUp, frameDown, frameUp;
 static float pendingX,pendingY,pendingScrollX,pendingScrollY,frameX,frameY,frameScrollX,frameScrollY;
 static int legacyFrame=-1;
@@ -44,7 +52,7 @@ static BOOL legacyButton(int button, unsigned kind) {
     legacyMouseReads++;
     legacyPoll();
     BOOL value=NO;
-    if (button>=0 && button<5) {
+    if (GameLegacyButtons && button>=0 && button<5) {
         uint16_t bits=kind==0 ? legacyButtons : kind==1 ? frameDown : frameUp;
         value=(bits & (1u<<button))!=0;
     }
@@ -95,16 +103,38 @@ static BOOL legacyName(void *string, const char *name) {
     }
     return YES;
 }
-static float legacyAxis(void *name, unsigned raw) {
+static float legacyAxis(void *name, unsigned raw, uintptr_t caller) {
     legacyAxisReads++;
     legacyPoll();
-    if (legacyName(name,"Mouse X")) { legacyNamedAxes++; return frameX*.05f; }
-    if (legacyName(name,"Mouse Y")) { legacyNamedAxes++; return frameY*.05f; }
-    if (legacyName(name,"Mouse ScrollWheel")) return frameScrollY;
+    // Bounded configuration diagnostics; axis labels are not typed input.
+    static char seen[8][65];
+    static unsigned count;
+    if (output && name && count<8) {
+        int length=*(int *)((uint8_t *)name+16);
+        if (length>0 && length<=64) {
+            char label[65]={0};
+            const uint16_t *chars=(void *)((uint8_t *)name+20);
+            for (int i=0;i<length;i++) label[i]=chars[i]<128 ? (char)chars[i] : '?';
+            BOOL known=NO;
+            for (unsigned i=0;i<count;i++) if (!strcmp(seen[i],label)) known=YES;
+            if (!known) {
+                memcpy(seen[count++],label,(size_t)length+1);
+                fprintf(output,"Legacy axis label=%s caller=%llx\n",label,(unsigned long long)(caller-slide)); fflush(output);
+            }
+        }
+    }
+    if (legacyName(name,"Mouse X") || legacyName(name,GameLegacyAxisXName)) {
+        legacyNamedAxes++; legacyNonzeroAxes+=frameX!=0; return frameX*.05f;
+    }
+    if (legacyName(name,"Mouse Y") || legacyName(name,GameLegacyAxisYName)) {
+        legacyNamedAxes++; legacyNonzeroAxes+=frameY!=0; return frameY*.05f;
+    }
+    if (legacyName(name,"Mouse ScrollWheel") || legacyName(name,GameLegacyAxisScrollName))
+        return frameScrollY;
     return legacyAxisOriginal[raw] ? legacyAxisOriginal[raw](name) : 0;
 }
-static float legacyAxisSmooth(void *s) { return legacyAxis(s,0); }
-static float legacyAxisRaw(void *s) { return legacyAxis(s,1); }
+static float legacyAxisSmooth(void *s) { return legacyAxis(s,0,(uintptr_t)__builtin_return_address(0)); }
+static float legacyAxisRaw(void *s) { return legacyAxis(s,1,(uintptr_t)__builtin_return_address(0)); }
 
 static BOOL legacyReadKey(int code, unsigned kind) {
     legacyKeyReads++;
@@ -134,6 +164,29 @@ static BOOL initializeLegacy(void) {
     void *replacements[]={(void *)legacyPosition,(void *)legacyScroll,(void *)legacyHeld,
         (void *)legacyDown,(void *)legacyUp,(void *)legacyAxisSmooth,(void *)legacyAxisRaw,
         (void *)legacyKeyHeld,(void *)legacyKeyDown,(void *)legacyKeyUp,(void *)legacyAnyHeld,(void *)legacyAnyDown};
+#ifdef GameResolveICall
+    if (GameResolveICall) {
+        // A populated wrapper proves Unity registered its internal calls.
+        BOOL registered=NO;
+        for (unsigned i=0;i<12;i++) if (*(void **)(slide+offsets[i])) registered=YES;
+        if (!registered) return NO;
+    }
+    // Some players never initialize unused legacy getters; resolve their verified callbacks explicitly.
+    const char *names[]={
+        "UnityEngine.Input::get_mousePosition_Injected(UnityEngine.Vector3&)",
+        "UnityEngine.Input::get_mouseScrollDelta_Injected(UnityEngine.Vector2&)",
+        "UnityEngine.Input::GetMouseButton(System.Int32)",
+        "UnityEngine.Input::GetMouseButtonDown(System.Int32)",
+        "UnityEngine.Input::GetMouseButtonUp(System.Int32)",
+        "UnityEngine.Input::GetAxis(System.String)","UnityEngine.Input::GetAxisRaw(System.String)",
+        "UnityEngine.Input::GetKeyInt(UnityEngine.KeyCode)",
+        "UnityEngine.Input::GetKeyDownInt(UnityEngine.KeyCode)","UnityEngine.Input::GetKeyUpInt(UnityEngine.KeyCode)",
+        "UnityEngine.Input::get_anyKey()","UnityEngine.Input::get_anyKeyDown()"};
+    if (GameResolveICall) for (unsigned i=0;i<12;i++) {
+        void **slot=(void **)(slide+offsets[i]);
+        if (!*slot) *slot=((void *(*)(const char *))(slide+GameResolveICall))(names[i]);
+    }
+#endif
     for (unsigned i=0;i<12;i++) if (!*(void **)(slide+offsets[i])) return NO;
     legacyPositionOriginal=*(void **)(slide+GameMousePositionSlot);
     for (unsigned i=0;i<3;i++) legacyButtonOriginal[i]=*(void **)(slide+offsets[i+2]);
@@ -143,7 +196,7 @@ static BOOL initializeLegacy(void) {
     for (unsigned i=0;i<12;i++) *(void **)(slide+offsets[i])=replacements[i];
     return YES;
 }
-static void sendKeyboard(void) {
+static void legacySendKeyboard(void) {
     for (unsigned k=1;k<110;k++) {
         unsigned mask=1u<<(k%8), value=keys[k/8]&mask;
         if (value==(legacyKeys[k/8]&mask)) continue;
@@ -156,7 +209,7 @@ static void sendKeyboard(void) {
     }
     memcpy(legacyKeys,keys,sizeof(keys));
 }
-static void sendMouse(void) {
+static void legacySendMouse(void) {
     uint16_t changed=legacyButtons^mouseState.buttons;
     pendingDown|=changed&mouseState.buttons;
     pendingUp|=changed&legacyButtons;

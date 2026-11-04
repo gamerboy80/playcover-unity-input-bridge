@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "id": "com.gryphline.endfield.ios-1.6.3",
+  "game": "Arknights: Endfield",
+  "version": "1.6.3",
+  "bundle_id": "com.gryphline.endfield.ios",
+  "executable": "Endfield",
+  "architecture": "arm64",
+  "test_only": true,
+  "framework_binary": "Frameworks/UnityFramework.framework/UnityFramework",
+  "original_sha256": "767616ee9093e7ce8a588f30ed4beef3929d4adb0fcfb8ca100e7b8a77d4cb13",
+  "patches": [
+    {
+      "name": "initial-keyboard-input",
+      "reason": "LocalDeviceInfoProvider.get_initialInputType returns keyboard enum 0; DeviceInfo.get_usingKeyboard independently compares inputType to zero. Leave platform identity unchanged.",
+      "file_offset": "0x2c5b010",
+      "expected": "48600af008610f91",
+      "replacement": "00008052c0035fd6"
+    },
+    {
+      "name": "provider-keyboard-support",
+      "reason": "Only SupportsInputType(0) keyboard branch returns true instead of requiring PC/console platform. Preserve touch, controller, invalid-value and hotfix branches.",
+      "file_offset": "0x2c5b094",
+      "expected": "000080d2fd7bc1a815000014",
+      "replacement": "20008052fd7bc1a8c0035fd6"
+    },
+    {
+      "name": "inlined-initial-keyboard-input",
+      "reason": "DeviceInfo.Init inlines LocalDeviceInfoProvider.get_initialInputType and otherwise retains touch enum 1 even when the getter is patched. Select verified keyboard enum 0 in that local-provider branch.",
+      "file_offset": "0x2c5c560",
+      "expected": "33008052",
+      "replacement": "13008052"
+    }
+  ],
+  "bridge": {
+    "backend": "unity-input-system-v1",
+    "static_storage": "il2cpp-types",
+    "image_suffix": "/UnityFramework.framework/UnityFramework",
+    "mouse_state_bytes": 49,
+    "addresses": {
+      "InputSystemType": "0x16e46670",
+      "KeyboardType": "0x16e477a0",
+      "MouseType": "0x16e4a608",
+      "NewString": "0x110f8c8c",
+      "AddDevice": "0x1039e4a0",
+      "MouseMakeCurrent": "0x103b1800",
+      "NativeTime": "0x1072a904",
+      "QueueInputEvent": "0x1072a9a0",
+      "ScreenWidth": "0x1069a904",
+      "ScreenHeight": "0x1069a938",
+      "CursorLock": "0x1064db48",
+      "CursorVisible": "0x1064dad4",
+      "ReadVector2": "0x0",
+      "EnableMouseProcessing": "0x0",
+      "LegacyMousePresent": "0x10728fbc",
+      "LegacyMousePresentSlot": "0x176e9598",
+      "KeySlot": "0x176e94c0",
+      "KeyDownSlot": "0x176e94e0",
+      "KeyUpSlot": "0x176e94d0",
+      "AnyKeySlot": "0x176e9550",
+      "AnyKeyDownSlot": "0x176e9558",
+      "MousePositionSlot": "0x176e9640",
+      "MouseScrollSlot": "0x176e9648",
+      "MouseButtonSlot": "0x176e9518",
+      "MouseButtonDownSlot": "0x176e9520",
+      "MouseButtonUpSlot": "0x176e9528",
+      "AxisSlot": "0x176e94f0",
+      "AxisRawSlot": "0x176e94f8",
+      "FrameCount": "0x10669ffc",
+      "UIScrollReturn": "0x0",
+      "ScrollWrapperReturn": "0x0",
+      "ResolveICall": "0x1113bdf8",
+      "CameraManagerType": "0x16e42248",
+      "CameraStaticOffset": "0x30",
+      "CameraInput": "0x35187a8"
+    },
+    "fields": {
+      "StaticFields": "0xb8",
+      "StaticInputManager": "0x8",
+      "StaticKeyboard": "0x0",
+      "StaticMouse": "0x0",
+      "DeviceID": "0xe0",
+      "StateBlock": "0x10",
+      "MousePosition": "0x188",
+      "MouseDelta": "0x190",
+      "MouseScroll": "0x1b8"
+    },
+    "legacy_input": true,
+    "scroll_units_per_step": 1,
+    "legacy_buttons": false,
+    "legacy_axes": {
+      "x": "MouseAxis1",
+      "y": "MouseAxis2",
+      "scroll": "MouseAxis3"
+    },
+    "native_menu_buttons": true
+  },
+  "validation": {
+    "keyboard_mouse": "Physical WASD, mouse capture, menu clicks and camera look confirmed working. Direct CameraManager.OnInput forwarding and its speed confirmed on 2026-11-03. Broader buttons, focus transitions and extended gameplay remain unvalidated.",
+    "trackpad": "Physical scrolling responds; reported inertial scrolling after finger release. Shared event routing now discards AppKit momentum phases and clears gesture remainders on end/cancel. Physical stop behavior awaits validation.",
+    "evidence": "docs/games/endfield.md"
+  }
+}

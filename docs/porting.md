@@ -123,6 +123,31 @@ return rules against the new binary; a matching managed method name is insuffici
 If a game's method does not fit a contract, implement the required backend change
 explicitly rather than putting an incompatible address in this table.
 
+`bridge.static_storage` defaults to `flat`. With `il2cpp-types`, replace the
+`Statics` address with `InputSystemType`, `KeyboardType` and `MouseType`: addresses
+of resolved IL2CPP class pointers. Add `fields.StaticFields` for the class's
+static-storage pointer; `StaticInputManager`, `StaticKeyboard` and `StaticMouse`
+then index their respective static-storage objects. Zero offsets for the current
+Keyboard/Mouse are valid in this layout. Verify class pointers and storage
+against both getters and live memory; never use unresolved metadata tokens as
+class pointers. The bridge waits for the manager and current Keyboard before
+creating devices. `ReadVector2` is an optional scroll diagnostic, defaulting to
+zero when no matching generic-method ABI has been verified.
+
+An Input System profile can set `bridge.legacy_input: true` to also install the
+legacy callback backend. This requires the complete legacy callback addresses,
+frame counter and `scroll_units_per_step`. Both backends receive the same host
+event snapshot before transient motion/scroll values are cleared. Legacy hooks
+initialize once after the registry is ready; waiting for them must not create
+duplicate Input System devices. Use this only when verified game readers need
+both APIs, and test for duplicate menu clicks, key actions and scrolling.
+Set `legacy_buttons: false` when the native touch/UI path already handles menu
+clicks; legacy button getters then preserve only the original callback result.
+`legacy_axes` can map `x`, `y` and `scroll` to game-specific axis names. Verify
+the role against the game's InputManager asset or equivalent configuration;
+similar-looking labels alone are insufficient. Canonical Unity names continue
+to work. Aliases are case-insensitive and must not conflict across roles.
+
 | `fields` name | Offset relative to |
 | --- | --- |
 | `StaticInputManager`, `StaticKeyboard`, `StaticMouse` | The dereferenced `Statics` region. |
@@ -166,3 +191,8 @@ different static storage, or an engine without this Input System require code.
    alone had been insufficient. Do not inherit a success claim for a new port.
 8. Exercise restore and retain the original backup. Commit authored profiles,
    source and notes only; never game binaries, metadata dumps or account logs.
+
+Trackpad momentum phases are consumed by the shared event handler so a lifted
+finger ends scrolling. Fractional conversion remainders are cleared at gesture
+end/cancellation and before ignoring momentum. Ordinary physical wheel events
+retain their existing conversion.

@@ -15,7 +15,10 @@ Before changing address-dependent behavior, review the [README](README.md),
   `build/<profile-id>/Profile.h`.
 - `src/NativeInputBridge.m`: shared AppKit event monitoring, Unity device setup,
   keyboard/mouse state queueing and cursor capture.
-- `src/LegacyBackend.h`: HSR legacy Unity/InControl input backend.
+- `src/LegacyBackend.h`: legacy Unity input backend used by HSR and the
+  initial Endfield research builds.
+- `src/InputSystemStatics.h`: flat or per-class static storage for Input System
+  devices. Endfield uses separate IL2CPP class storage; ZZZ uses flat storage.
 - `src/InputState.h`, `src/Scroll.h`, `src/NativeWheel.h` and
   `src/MousePresence.h`: shared event and state handling.
 - `src/EventRouting.h`: game-window and native text-responder filtering.
@@ -87,5 +90,11 @@ disassembly bounded to relevant address ranges.
   validated. Broader button coverage and the PC/settings profile remain
   experimental.
 
-See [ZZZ analysis](docs/games/zzz.md) and [HSR analysis](docs/games/hsr.md) for
+- Endfield 1.6.3 has an experimental Input System profile with keyboard-selection
+  and capability patches. Legacy-only builds failed physical gameplay tests;
+  the revised combined backend, inlined initialization fix and direct camera
+  forwarding have validated WASD, capture, mouse look and menu clicks.
+
+See [ZZZ analysis](docs/games/zzz.md), [HSR analysis](docs/games/hsr.md) and
+[Endfield analysis](docs/games/endfield.md) for
 build-specific details and remaining limitations.

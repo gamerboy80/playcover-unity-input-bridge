@@ -29,11 +29,13 @@
 @property(readonly) double scrollingDeltaY;
 @property(readonly) BOOL hasPreciseScrollingDeltas;
 @property(readonly) NSUInteger phase;
+@property(readonly) NSUInteger momentumPhase;
 @property(readonly) void *CGEvent;
 + (id)eventWithCGEvent:(void *)event;
 @property(readonly) CGPoint locationInWindow;
 @property(readonly) CGPoint mouseLocationOutsideOfEventStream;
 @property(readonly) NSInteger windowNumber;
+@property BOOL acceptsMouseMovedEvents;
 @property(readonly) id window;
 @property(readonly) id contentView;
 @property(readonly) CGRect bounds;
@@ -103,10 +105,10 @@ static bool bridgeMousePresent(void) {
 }
 
 #if !GameLegacyBackend
+#include "InputSystemStatics.h"
 static void traceScroll(void) {
     if (!output || !tracePending || traceLines>=30) return;
-    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
-    uintptr_t current=statics ? *(uintptr_t *)(statics+GameFieldStaticMouse) : 0;
+    uintptr_t current=inputStatic(GameMouseType,GameFieldStaticMouse);
     BOOL enabled=NO;
     if (GameGetMouseProcessing!=0 && GameMouseProcessingEnabled!=0 && GameReadProcessedScroll!=0) {
         uintptr_t processing=((uintptr_t (*)(void))(slide+GameGetMouseProcessing))();
@@ -117,7 +119,7 @@ static void traceScroll(void) {
         }
     }
     uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
-    if (scroll) {
+    if (scroll && GameReadVector2!=0) {
         Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+GameReadVector2))(scroll,NULL);
         if (value.x!=0 || value.y!=0) controlSamples++;
     }
@@ -174,8 +176,12 @@ static unsigned unityKey(unsigned code) {
     return code < sizeof(map) ? map[code] : 0;
 }
 
-#if GameLegacyBackend
+#if GameLegacyBackend || GameLegacySupplement
 #include "LegacyBackend.h"
+#endif
+#if GameLegacyBackend
+static void sendKeyboard(void) { legacySendKeyboard(); }
+static void sendMouse(void) { legacySendMouse(); }
 #else
 static void queueState(uintptr_t device, uint32_t format, const void *state, size_t size) {
     if (!ready || !device) return;
@@ -189,8 +195,34 @@ static void queueState(uintptr_t device, uint32_t format, const void *state, siz
     ((void (*)(void *))(slide+GameQueueInputEvent))(bytes);
 }
 
-static void sendKeyboard(void) { queueState(keyboard, 0x4b455953, keys, sizeof(keys)); }
+static void sendKeyboard(void) {
+    queueState(keyboard, 0x4b455953, keys, sizeof(keys));
+#if GameLegacySupplement
+    legacySendKeyboard();
+#endif
+}
 static void sendMouse(void) {
+    if (GameCameraInput!=0 && captured && (mouseState.dx!=0 || mouseState.dy!=0) &&
+        ((int (*)(void))(slide+GameCursorLock))()==1) {
+        uintptr_t camera=inputStatic(GameCameraManagerType,GameCameraStaticOffset);
+        int width=((int (*)(void))(slide+GameScreenWidth))();
+        int height=((int (*)(void))(slide+GameScreenHeight))();
+        if (camera && width>0 && height>0) {
+            ((void (*)(uintptr_t,float,float,void *))(slide+GameCameraInput))(
+                camera,mouseState.dx/width,mouseState.dy/height,NULL);
+            static BOOL reported;
+            if (!reported) { reported=YES; note("Captured motion delivered to the active camera input method"); }
+        }
+    }
+    static BOOL sawMotion;
+    if (!sawMotion && (mouseState.dx!=0 || mouseState.dy!=0)) {
+        sawMotion=YES; note("Native mouse motion forwarded to Unity");
+    }
+#if GameLegacySupplement
+    MouseState saved=mouseState;
+    legacySendMouse();
+    mouseState=saved;
+#endif
     // FastMouse appends pressure/radius controls beyond the standard 30-byte state.
     uint8_t state[MaxDeviceStateBytes];
     size_t size=packMouseState(state, &mouseState, mouseStateBytes);
@@ -221,6 +253,7 @@ static void setCapture(BOOL value) {
         CGRect bounds=view.bounds;
         CGPoint cursor=[view convertPoint:window.mouseLocationOutsideOfEventStream fromView:nil];
         if (!window || !view || bounds.size.width<=0 || bounds.size.height<=0) return;
+        window.acceptsMouseMovedEvents=YES;
         if (!cursorInsideContent(cursor,bounds)) {
             NSArray *screens=[(id)NSClassFromString(@"NSScreen") screens];
             ZZZHostEvent *primary=(id)screens.firstObject;
@@ -239,6 +272,13 @@ static void setCapture(BOOL value) {
     }
     if (!value && associateCursor) associateCursor(1);
     captured = value;
+#if GameNativeMenuButtons
+    if (!captured && mouseState.buttons) {
+        mouseState.buttons=0;
+        mouseState.clicks=0;
+        sendMouse();
+    }
+#endif
     if (value) {
         ignoreMotionUntil=NSProcessInfo.processInfo.systemUptime+.1;
         discardFirstMotion=YES;
@@ -265,7 +305,7 @@ static BOOL editingGameText(void) {
 
 #include "EventHandler.h"
 
-#if GameLegacyBackend
+#if GameLegacyBackend || GameLegacySupplement
 static void traceLegacy(void) {
     static double previous;
     static unsigned lines;
@@ -280,10 +320,10 @@ static void traceLegacy(void) {
         (void *)legacyDown,(void *)legacyUp,(void *)legacyAxisSmooth,(void *)legacyAxisRaw,
         (void *)legacyKeyHeld,(void *)legacyKeyDown,(void *)legacyKeyUp,(void *)legacyAnyHeld,(void *)legacyAnyDown};
     for (unsigned i=0;i<12;i++) intact+=*(void **)(slide+offsets[i])==callbacks[i];
-    fprintf(output,"Legacy input: keyWrites=%u keyReads=%u mouseReads=%u scrollReads=%u axisReads=%u presenceReads=%u hooks=%u/12 wheel=%u queued=%u frame=%d positiveKeys=%u positiveScrolls=%u namedAxes=%u\n",
+    fprintf(output,"Legacy input: keyWrites=%u keyReads=%u mouseReads=%u scrollReads=%u axisReads=%u presenceReads=%u hooks=%u/12 wheel=%u queued=%u frame=%d positiveKeys=%u positiveScrolls=%u namedAxes=%u nonzeroAxes=%u\n",
         legacyKeyWrites,legacyKeyReads,legacyMouseReads,legacyScrollReads,legacyAxisReads,
         mousePresentCalls,intact,wheelEvents,queuedScrolls,legacyFrame,
-        legacyPositiveKeys,legacyPositiveScrolls,legacyNamedAxes);
+        legacyPositiveKeys,legacyPositiveScrolls,legacyNamedAxes,legacyNonzeroAxes);
     fflush(output);
 }
 #endif
@@ -305,8 +345,15 @@ static void initializeDevices(void) {
         if (!initializeLegacy()) return;
         Class eventClass=NSClassFromString(@"NSEvent");
 #else
-        uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
-        if (!statics || !*(uintptr_t *)(statics+GameFieldStaticInputManager) || !*(uintptr_t *)(statics+GameFieldStaticKeyboard)) return;
+        if (!inputStatic(GameInputSystemType,GameFieldStaticInputManager) ||
+            !inputStatic(GameKeyboardType,GameFieldStaticKeyboard)) return;
+#if GameLegacySupplement
+        static BOOL legacyReady;
+        if (!legacyReady) {
+            if (!initializeLegacy()) return;
+            legacyReady=YES;
+        }
+#endif
         Class eventClass=NSClassFromString(@"NSEvent");
         if (!eventClass) { note("AppKit event class unavailable"); [timer invalidate]; return; }
         void *(*newString)(const char *,int)=(void *)(slide+GameNewString);
@@ -319,6 +366,7 @@ static void initializeDevices(void) {
         uint32_t *mouseBlock=(uint32_t *)(mouse+GameFieldStateBlock);
         mouseStateBytes=(mouseBlock[3]+7u)/8u;
         if (mouseBlock[0]!=0x4d4f5553 || mouseStateBytes!=GameMouseStateBytes) {
+            if (output) { fprintf(output,"Mouse layout: format=%08x bytes=%zu expected=%u\n",mouseBlock[0],mouseStateBytes,GameMouseStateBytes); fflush(output); }
             note("Unexpected Mouse state layout; bridge disabled"); [timer invalidate]; return;
         }
 #endif
@@ -357,7 +405,7 @@ static void initializeDevices(void) {
 #endif
     }
 #if !GameLegacyBackend
-    if (sawScroll && !sawScrollState) {
+    if (sawScroll && !sawScrollState && GameReadVector2!=0) {
         uintptr_t scroll=*(uintptr_t *)(mouse+GameFieldMouseScroll);
         if (scroll) {
             Vector2 value=((Vector2 (*)(uintptr_t,void *))(slide+GameReadVector2))(scroll,NULL);
@@ -365,13 +413,12 @@ static void initializeDevices(void) {
         }
     }
     traceScroll();
-    uintptr_t statics=*(uintptr_t *)(slide+GameStatics);
-    uintptr_t currentMouse=*(uintptr_t *)(statics+GameFieldStaticMouse);
+    uintptr_t currentMouse=inputStatic(GameMouseType,GameFieldStaticMouse);
     if (!currentMouse || !*(uintptr_t *)(currentMouse+GameFieldMousePosition) || !*(uintptr_t *)(currentMouse+GameFieldMouseDelta)) {
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
     }
 #endif
-#if GameLegacyBackend
+#if GameLegacyBackend || GameLegacySupplement
     traceLegacy();
 #endif
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];

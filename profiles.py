@@ -10,13 +10,14 @@ PROFILE_ALIASES = {
     'zzz': DEFAULT_PROFILE,
     'zzz-3.3.0': DEFAULT_PROFILE,
     'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0',
+    'endfield': 'com.gryphline.endfield.ios-1.6.3',
     'zzz-test': 'com.HoYoverse.Nap-3.3.0-platform-pc-settings-test',
     'hsr-test': 'com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test',
 }
 ADDRESS_NAMES = {
     'Statics', 'NewString', 'AddDevice', 'MouseMakeCurrent', 'NativeTime',
     'QueueInputEvent', 'ScreenWidth', 'ScreenHeight', 'CursorLock', 'CursorVisible',
-    'ReadVector2', 'EnableMouseProcessing',
+    'EnableMouseProcessing',
 }
 FIELD_NAMES = {
     'StaticInputManager', 'StaticKeyboard', 'StaticMouse', 'DeviceID',
@@ -27,7 +28,8 @@ LEGACY_ADDRESSES = {'ScrollWrapperReturn','UIScrollReturn','ScreenWidth','Screen
     'MouseButtonDownSlot','MouseButtonUpSlot','AxisSlot','AxisRawSlot','LegacyMousePresentSlot'}
 
 OPTIONAL_ADDRESSES = {'GetMouseProcessing', 'MouseProcessingEnabled', 'ReadProcessedScroll',
-                      'LegacyMousePresent', 'LegacyMousePresentSlot'}
+                      'LegacyMousePresent', 'LegacyMousePresentSlot', 'ResolveICall', 'ReadVector2',
+                      'CameraManagerType', 'CameraInput', 'CameraStaticOffset'}
 
 
 def require(condition, message):
@@ -80,20 +82,47 @@ def validate(data, profile_id):
     bridge = data['bridge']
     require(bridge['backend'] in ('unity-input-system-v1','unity-legacy-v1'), 'Unsupported bridge backend')
     legacy = bridge['backend'] == 'unity-legacy-v1'
-    if legacy:
+    supplement = bridge.get('legacy_input', False)
+    require(type(supplement) is bool and not (legacy and supplement),
+            'legacy_input must enable the legacy supplement on an Input System backend')
+    require(type(bridge.get('legacy_buttons', True)) is bool, 'legacy_buttons must be a boolean')
+    require(type(bridge.get('native_menu_buttons', False)) is bool, 'native_menu_buttons must be a boolean')
+    axes = bridge.get('legacy_axes', {})
+    require(isinstance(axes, dict) and axes.keys() <= {'x', 'y', 'scroll'}, 'Invalid legacy_axes roles')
+    require(all(isinstance(v, str) and re.fullmatch(r'[\x20-\x7e]{1,64}', v)
+                for v in axes.values()), 'Invalid legacy axis label')
+    canonical = {'x': 'mouse x', 'y': 'mouse y', 'scroll': 'mouse scrollwheel'}
+    labels = {}
+    for role, name in {**canonical, **axes}.items():
+        for label in (canonical[role], name.lower()):
+            require(label not in labels or labels[label] == role, 'Ambiguous legacy axis label')
+            labels[label] = role
+    storage = bridge.get('static_storage', 'flat')
+    require(storage in ('flat', 'il2cpp-types') and (not legacy or storage == 'flat'),
+            'Unsupported static storage layout')
+    typed = storage == 'il2cpp-types'
+    if legacy or supplement:
         require(type(bridge.get('scroll_units_per_step')) is int and
                 1 <= bridge['scroll_units_per_step'] <= 1200, 'Invalid legacy scroll units per step')
     require(bridge['image_suffix'] == '/' + '/'.join(binary.parts[1:]), 'Image suffix mismatch')
     require(type(bridge['mouse_state_bytes']) is int and 30 <= bridge['mouse_state_bytes'] <= 64,
             'Mouse payload must fit the supported layout')
-    for group, expected_names in (('addresses', LEGACY_ADDRESSES if legacy else ADDRESS_NAMES),
-                                  ('fields', set() if legacy else FIELD_NAMES)):
+    addresses = LEGACY_ADDRESSES if legacy else ADDRESS_NAMES
+    fields = set() if legacy else FIELD_NAMES
+    if typed:
+        addresses = (addresses - {'Statics'}) | {'InputSystemType', 'KeyboardType', 'MouseType'}
+        fields = fields | {'StaticFields'}
+    if supplement:
+        addresses = addresses | LEGACY_ADDRESSES
+    for group, expected_names in (('addresses', addresses), ('fields', fields)):
         names = set(bridge[group])
         allowed = expected_names | (OPTIONAL_ADDRESSES if group == 'addresses' else set())
         require(expected_names <= names <= allowed, f'Unexpected/missing bridge {group}')
         for name, value in bridge[group].items():
             number = hex_number(value)
-            require(number > 0 or name == 'EnableMouseProcessing' or name in OPTIONAL_ADDRESSES, f'Zero {name}')
+            require(number > 0 or name == 'EnableMouseProcessing' or name in OPTIONAL_ADDRESSES or
+                    ((legacy or supplement) and name in ('UIScrollReturn', 'ScrollWrapperReturn')) or
+                    (typed and name in ('StaticKeyboard', 'StaticMouse')), f'Zero {name}')
             if group == 'addresses':
                 require(number % 4 == 0, f'Unaligned address: {name}')
                 if name.endswith('Slot'):
@@ -104,6 +133,10 @@ def validate(data, profile_id):
     require(not evidence.is_absolute() and '..' not in evidence.parts and
             (Path(__file__).resolve().parent / evidence).is_file(),
             'Profile evidence must point to an existing repository document')
+    camera_names = ('CameraManagerType', 'CameraInput', 'CameraStaticOffset')
+    camera_values = [int(bridge['addresses'].get(name, '0x0'), 16) for name in camera_names]
+    require(all(camera_values) or not any(camera_values), 'Camera input requires the complete verified mapping')
+    require(not any(camera_values) or typed, 'Camera input requires per-class static storage')
     return data
 
 
@@ -156,9 +189,19 @@ def generate_header(profile):
                         ('Version', profile['version']), ('ImageSuffix', bridge['image_suffix'])):
         lines.append(f'#define Game{name} {json.dumps(value)}')
     lines.append(f'#define GameLegacyBackend {int(bridge["backend"] == "unity-legacy-v1")}')
+    lines.append(f'#define GameLegacySupplement {int(bridge.get("legacy_input", False))}')
+    lines.append(f'#define GameNativeMenuButtons {int(bridge.get("native_menu_buttons", False))}')
+    lines.append(f'#define GameLegacyButtons {int(bridge.get("legacy_buttons", True))}')
+    lines.append(f'#define GameTypeStatics {int(bridge.get("static_storage") == "il2cpp-types")}')
+    if bridge['backend'] != 'unity-legacy-v1' and bridge.get('static_storage', 'flat') == 'flat':
+        for name in ('InputSystemType', 'KeyboardType', 'MouseType'):
+            lines.append(f'#define Game{name} GameStatics')
     lines.append(f'#define GameMouseStateBytes {bridge["mouse_state_bytes"]}')
-    if bridge['backend'] == 'unity-legacy-v1':
+    if bridge['backend'] == 'unity-legacy-v1' or bridge.get('legacy_input', False):
         lines.append(f'#define GameLegacyScrollUnitsPerStep {bridge["scroll_units_per_step"]}')
+        for role, default in (('x', 'Mouse X'), ('y', 'Mouse Y'), ('scroll', 'Mouse ScrollWheel')):
+            label=bridge.get('legacy_axes', {}).get(role, default)
+            lines.append(f'#define GameLegacyAxis{role.title()}Name {json.dumps(label)}')
     for group, prefix in (('addresses', 'Game'), ('fields', 'GameField')):
         values = dict(bridge[group])
         if group == 'addresses':
