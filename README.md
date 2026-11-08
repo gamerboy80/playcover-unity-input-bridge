@@ -5,8 +5,8 @@ builds running under PlayCover. A native bridge forwards macOS keyboard, mouse
 and trackpad events to Unity. Exact-build profiles describe the game patches,
 binary identity and native input ABI.
 
-The project is experimental. Reviewed profiles cover the builds below. ZZZ also
-has automatic mapping detection for compatible updates. Game files are not
+The project is experimental. Reviewed profiles cover the builds below. ZZZ and HSR also
+have automatic mapping detection for compatible updates. Game files are not
 included or distributed.
 
 ## Supported builds
@@ -66,9 +66,10 @@ python3 patch.py apply --profile hsr --app '/path/to/Honkai: Star Rail.app'
 The app's bundle ID, version, executable and original framework must match the
 selected profile. Test profiles require explicit selection with `--profile`.
 
-For a ZZZ update without a reviewed profile, `apply --profile zzz` tries to find
-the required methods and object layouts automatically. It combines managed
-method identities, native signatures and independent layout checks. An ambiguous
+For a ZZZ or HSR update without a reviewed profile, `apply --profile zzz` or
+`apply --profile hsr` tries to find the required methods and input mappings
+automatically. ZZZ combines managed method identities with native signatures;
+HSR uses native signatures, decoded callback slots and independent cross-checks. An ambiguous
 or missing match stops installation. Successful detection saves an exact-build
 profile under `.local/profiles/`, so status, update and restore keep working.
 Detection verifies the supported input ABI; gameplay on a new build still needs
@@ -79,10 +80,12 @@ To check detection and save its report without changing game files:
 ~~~sh
 python3 patch.py resolve --app '/path/to/Zenless Zone Zero.app'
 python3 patch.py resolve --profile zzz-test --app '/path/to/Zenless Zone Zero.app'
+python3 patch.py resolve --profile hsr --app '/path/to/Honkai Star Rail.app'
 ~~~
 
-Automatic detection currently covers the examined ZZZ metadata layout. A new
-metadata format or input backend needs a resolver update. See
+Automatic detection covers the examined ZZZ metadata layout and HSR native
+signature contract. A changed metadata format, native code shape or input backend
+can require a resolver update. See
 [signature detection](docs/signatures.md) for the checks and limitations.
 
 The standard PlayCover app locations are under

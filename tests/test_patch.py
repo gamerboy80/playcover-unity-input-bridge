@@ -42,26 +42,27 @@ class PatchTests(unittest.TestCase):
             install.assert_called_once_with(app.resolve(), profile, local)
 
     def test_unknown_version_resolution_keeps_explicit_version_selection_strict(self):
-        source = load_profile('zzz')
-        detected = copy.deepcopy(source)
-        detected.update(id=source['bundle_id'] + '-9.9.9-auto', version='9.9.9')
-        with tempfile.TemporaryDirectory() as tmp:
-            app, _ = self.fake_app(Path(tmp), copy.deepcopy(detected))
-            for alias, automatic in [('zzz', True), ('zzz-3.3.1', False)]:
-                with self.subTest(alias=alias), \
-                        patch.object(module, 'select_profile', side_effect=RuntimeError('This app does not match')), \
-                        patch.object(module, 'resolve_app_profile', return_value=detected) as resolve, \
-                        patch.object(module, 'install') as install, \
-                        patch('sys.argv', ['patch.py', 'apply', '--profile', alias, '--app', str(app)]):
-                    if automatic:
-                        module.main()
-                        resolve.assert_called_once_with(app.resolve(), module.read_app_info(app), source)
-                        self.assertEqual(install.call_args.args[1], detected)
-                    else:
-                        with self.assertRaisesRegex(RuntimeError, 'does not match'):
+        for game in ('zzz', 'hsr', 'hsr-test'):
+            source = load_profile(game)
+            detected = copy.deepcopy(source)
+            detected.update(id=source['bundle_id'] + '-9.9.9-auto', version='9.9.9')
+            with tempfile.TemporaryDirectory() as tmp:
+                app, _ = self.fake_app(Path(tmp), copy.deepcopy(detected))
+                for alias, automatic in [(game, True), (source['id'], False)]:
+                    with self.subTest(alias=alias), \
+                            patch.object(module, 'select_profile', side_effect=RuntimeError('This app does not match')), \
+                            patch.object(module, 'resolve_app_profile', return_value=detected) as resolve, \
+                            patch.object(module, 'install') as install, \
+                            patch('sys.argv', ['patch.py', 'apply', '--profile', alias, '--app', str(app)]):
+                        if automatic:
                             module.main()
-                        resolve.assert_not_called()
-                        install.assert_not_called()
+                            resolve.assert_called_once_with(app.resolve(), module.read_app_info(app), source)
+                            self.assertEqual(install.call_args.args[1], detected)
+                        else:
+                            with self.assertRaisesRegex(RuntimeError, 'does not match'):
+                                module.main()
+                            resolve.assert_not_called()
+                            install.assert_not_called()
 
     def test_restore_with_app_uses_detected_active_profile(self):
         profile = copy.deepcopy(load_profile('hsr'))

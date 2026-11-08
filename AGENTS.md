@@ -103,7 +103,8 @@ disassembly bounded to relevant address ranges.
 - HSR 4.6.0 uses the legacy Unity/InControl backend. Keyboard movement, mouse
   capture/look, camera zoom, menu cursor visibility and menu scrolling have been
   validated. Broader button coverage and the PC/settings profile remain
-  experimental.
+  experimental. The HSR native signature contract reconstructs both 4.6.0
+  profiles; future builds require runtime verification.
 
 - Endfield 1.6.3 has an experimental Input System profile with keyboard-selection
   and capability patches. Legacy-only builds failed physical gameplay tests;

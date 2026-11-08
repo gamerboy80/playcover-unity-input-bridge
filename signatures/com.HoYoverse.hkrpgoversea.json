@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "id": "hsr-legacy-arm64-v1",
+  "bundle_id": "com.HoYoverse.hkrpgoversea",
+  "metadata": "none",
+  "functions": {
+    "ScreenWidth": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6f44fbea9fd7b01a9fd030091f30300aa",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffffffffff"
+    },
+    "ScreenHeight": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6f44fbea9fd7b01a9fd030091f30300aa0800009008010091a9a281522900a072",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ffffffffffffffffff"
+    },
+    "CursorLock": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091010140f920001fd6000080d2c0035fd6ffc300d1f44f01a9fd7b02a9fd030091f30300aa010040f9",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ff"
+    },
+    "CursorVisible": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091010140f920001fd6000080d2c0035fd6ffc300d1f44f01a9fd7b02a9fd030091f30300aa010040f9200040b900008836280040f9020140f900009836e00313aa010080d2fd7b42a9",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ffff03c0ff1f00f8ffff03c0ffff03c0ff1f00f8ffffffffffffffffffffffffff"
+    },
+    "FrameCount": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ff0301d1e923016df44f02a9fd7b03a9fd0300911300009073020091680240f900013fd60820201e0100005400008052",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffffffffffff03c0ff1f00009fff03c0ffff03c0ffffffffffffffffff1f0000ffffffffff"
+    },
+    "MousePositionSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd6ff8300d1fd7b01a9fd030091ff0300f90800009008010091080140f9e003009100013fd6e007412dfd7b41a9ff030091c0035fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f9",
+      "mask": "1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ff"
+    },
+    "MouseScrollSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ff8300d1fd7b01a9fd030091ff0300f90800009008010091080140f9e003009100013fd6e007412dfd7b41a9ff030091",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffffff03c0ff"
+    },
+    "MouseButtonSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091f30308aaff0300b900e4004fe00301ade00300ad0800009008010091080140f9",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ffffffffffffffffffffffffff1f00009fff03c0ffff03c0ff"
+    },
+    "MouseButtonDownSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091f30308aaff0300b900e4004fe00301ade00300ad0800009008010091080140f9e103009100013fd6e00741ad600601ad",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ffffffffffffffffffffffffff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffff"
+    },
+    "MouseButtonUpSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ff"
+    },
+    "AxisSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091f30308aaff0300b900e4004fe00301ade00300ad0800009008010091080140f9e103009100013fd6e00741ad600601ade80340b9680200b9e10340ad610200adfd7b46a9f44f45a9ff030091c0035fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ffffffffffffffffffffffffff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffff"
+    },
+    "AxisRawSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff"
+    },
+    "LegacyMousePresentSlotGetter": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ff8300d1fd7b01a9fd030091ff0300b9ff0300f90800009008010091080140f9e003009100013fd6e007402de20340bdfd7b41a9ff030091c0035fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091010140f920001fd608000090",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ffff03c0ff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffff03c0ffffffffffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009f"
+    },
+    "KeySlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091020140f940001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff"
+    },
+    "KeySlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091020140f940001fd60800009008010091020140f92100805240001fd60800009008010091020140f90100805240001fd60800009008010091010140f920001fd60800009008010091",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffff1f00009fff03c0ffff03c0ffffffffffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ff"
+    },
+    "KeyDownSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091f30308aaff0300b900e4004fe00301ade00300ad0800009008010091080140f9e103009100013fd6e00741ad600601ad",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffffff03c0ffffffffffffffffffffffffff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffff"
+    },
+    "KeyDownSlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091010140f920001fd6c0035fd6ff8300d1fd7b01a9fd030091e30302aae20301aae007012d08000090",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ffffffffffffffffffffffffff1f00009f"
+    },
+    "KeyUpSlotGetter": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091020140f940001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ffc301d1f44f05a9fd7b06a9fd030091",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffffff03c0ff"
+    },
+    "KeyUpSlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd60800009008010091020140f940001fd60800009008010091020140f92100805240001fd60800009008010091020140f90100805240001fd60800009008010091010140f920001fd60800009008010091010140f920001fd60800009008010091010140f920001fd6c0035fd6ff8300d1",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffff1f00009fff03c0ffff03c0ffffffffffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffff"
+    },
+    "AnyKeySlotGetter": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd60800009008010091000140f900001fd6ff8300d1fd7b01a9fd030091ff0300b9",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ff"
+    },
+    "AnyKeyDownSlotGetter": {
+      "pattern": "0800009008010091000140f900001fd60800009008010091000140f900001fd6ff8300d1fd7b01a9fd030091ff0300b9ff0300f90800009008010091080140f9e003009100013fd6e007402de20340bdfd7b41a9ff030091c0035fd60800009008010091010140f920001fd6ff8300d1fd7b01a9fd030091ff0300f908000090",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ffff03c0ff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffff03c0ffffffffffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffff03c0ff1f00009f"
+    },
+    "UIScrollReturnFunction": {
+      "pattern": "ffc302d1e923076df65708a9f44f09a9fd7b0aa9fd030091f30300aabf831cf800e4004fe00301ade00302adff0300f9ff7f01a9a2e300d10100801223008052",
+      "mask": "ffffffffffffffffffffffffffffffffffffffffff03c0ffffffffffffffffffffffffffffffffffffffffffff03c0ffffffffffffffffffffffffffffffffff"
+    },
+    "ScrollWrapperReturnFunction": {
+      "pattern": "ff8300d1fd7b01a9fd030091ff0300f90800009008010091080140f9e003009100013fd6e007412dfd7b41a9ff030091c0035fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091010140f920001fd60800009008010091000140f900001fd60800009008010091000140f9",
+      "mask": "ffffffffffffffffff03c0ffff03c0ff1f00009fff03c0ffff03c0ffff03c0ffffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ffffffffff1f00009fff03c0ffff03c0ff"
+    },
+    "pc-layoutFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091408885520001a07200000094000000351300009073020091600240f908004039080000340000009400000037600240f908004039",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ffff03c0ff"
+    },
+    "pc-uiFunction": {
+      "pattern": "f44fbea9fd7b01a9fd03009140f181524001a07200000094000000351300009073020091600240f9080040390800003400000094e80300aa600240f909004039",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fcffffffffff03c0ffff03c0ff"
+    },
+    "cursor-show-mobile-gateFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091f30300aae03390520001a07200000094000000351400009094020091800240f908004039080000340000009400000037800240f9",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff"
+    },
+    "cursor-hide-mobile-gateFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091f30300aa003490520001a07200000094000000351400009094020091800240f908004039080000340000009400000037800240f9",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff"
+    },
+    "cursor-mode-mobile-gateFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091f30300aac03490520001a07200000094000000351400009094020091800240f908004039080000340000009400000037800240f9",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff"
+    },
+    "menu-force-cursor-mobile-gateFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091f30300aa403390520001a07200000094000000351400009094020091800240f908004039080000340000009400000037800240f9",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff"
+    },
+    "sdk-force-cursor-mobile-gateFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091f30300aa603390520001a07200000094000000351400009094020091800240f908004039080000340000009400000037800240f9",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff"
+    },
+    "ui-mouse-input-enabledFunction": {
+      "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fd030091f30300aa00000094e0030039680240f9080000b4080140b91405007104000054e803403908000037750240f9",
+      "mask": "ffffffffffffffffffffffffffffffffff03c0ffffffffff000000fcff03c0ffff03c0ff1f0000ffff03c0ffffffffff1f0000ffff03c0ff1f00f8ffff03c0ff"
+    },
+    "ui-mouse-processingFunction": {
+      "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fd030091f30300aa00000094e0030039680240f9080000b4080140b91405007104000054e803403908000037750240f9",
+      "mask": "ffffffffffffffffffffffffffffffffff03c0ffffffffff000000fcff03c0ffff03c0ff1f0000ffff03c0ffffffffff1f0000ffff03c0ff1f00f8ffff03c0ff"
+    },
+    "global-platform-pcFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091c08685520001a07200000094000000351400009094020091800240f908004039080000340000009400000034080f86524800a072",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff000000fc1f0000ffffffffffffffffff"
+    },
+    "mobile-settings-gate-for-pc-platformFunction": {
+      "pattern": "f44fbea9fd7b01a9fd030091208585520001a07200000094000000351400009094020091800240f90800403908000034130000907302009188648b52686a68b8",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009fff03c0ffff03c0ffff03c0ff1f0000ff1f00009fff03c0ffffffffffffffffff"
+    },
+    "ProcessMouseEvent": {
+      "pattern": "0100805200000014ff8301d1fa6701a9f85f02a9f65703a9f44f04a9fd7b05a9fd030091f30301aaf40300aa080000900801009129e68a520869693808000036",
+      "mask": "ffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffff03c0ffffffffffffffffff1f00009fff03c0ffffffffffffffffff1f00f8ff"
+    }
+  },
+  "extract": {
+    "MousePositionSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "MousePositionSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "MouseScrollSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "MouseScrollSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "MouseButtonSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "MouseButtonSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "MouseButtonDownSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "MouseButtonDownSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "MouseButtonUpSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "MouseButtonUpSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "AxisSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "AxisSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "AxisRawSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "AxisRawSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "LegacyMousePresentSlot": {
+      "pattern": "0800009008010091000140f900001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "LegacyMousePresentSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeySlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeySlotCrosscheck0",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeySlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeySlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeyDownSlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeyDownSlotCrosscheck0",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeyDownSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeyDownSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeyUpSlotCrosscheck0": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeyUpSlotCrosscheck0",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "KeyUpSlot": {
+      "pattern": "0800009008010091010140f920001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "KeyUpSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "AnyKeySlot": {
+      "pattern": "0800009008010091000140f900001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "AnyKeySlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "AnyKeyDownSlot": {
+      "pattern": "0800009008010091000140f900001fd6",
+      "mask": "1f00009fff03c0ffff03c0ffffffffff",
+      "function": "AnyKeyDownSlotGetter",
+      "kind": "adrp-add-load",
+      "alignment": 8
+    },
+    "UIScrollReturn": {
+      "pattern": "c0023fd6150000b4a00200bda10200bda1835cf8010000b43f0000b9",
+      "mask": "ffffffff1f0000ffff03c0ffff03c0ffffffffff1f0000ffff03c0ff",
+      "function": "UIScrollReturnFunction",
+      "offset": 4,
+      "kind": "return-pc",
+      "alignment": 4
+    },
+    "ScrollWrapperReturn": {
+      "pattern": "00013fd6e007412dfd7b41a9ff030091c0035fd6",
+      "mask": "ffffffffffffffffffffffffff03c0ffffffffff",
+      "function": "ScrollWrapperReturnFunction",
+      "offset": 4,
+      "kind": "return-pc",
+      "alignment": 4
+    }
+  },
+  "equal": [
+    [
+      "KeySlot",
+      "KeySlotCrosscheck0"
+    ],
+    [
+      "KeyDownSlot",
+      "KeyDownSlotCrosscheck0"
+    ],
+    [
+      "KeyUpSlot",
+      "KeyUpSlotCrosscheck0"
+    ]
+  ],
+  "addresses": {
+    "ScreenWidth": "ScreenWidth",
+    "ScreenHeight": "ScreenHeight",
+    "CursorLock": "CursorLock",
+    "CursorVisible": "CursorVisible",
+    "FrameCount": "FrameCount",
+    "MousePositionSlot": "MousePositionSlot",
+    "MouseScrollSlot": "MouseScrollSlot",
+    "MouseButtonSlot": "MouseButtonSlot",
+    "MouseButtonDownSlot": "MouseButtonDownSlot",
+    "MouseButtonUpSlot": "MouseButtonUpSlot",
+    "AxisSlot": "AxisSlot",
+    "AxisRawSlot": "AxisRawSlot",
+    "LegacyMousePresentSlot": "LegacyMousePresentSlot",
+    "KeySlot": "KeySlot",
+    "KeyDownSlot": "KeyDownSlot",
+    "KeyUpSlot": "KeyUpSlot",
+    "AnyKeySlot": "AnyKeySlot",
+    "AnyKeyDownSlot": "AnyKeyDownSlot",
+    "UIScrollReturn": "UIScrollReturn",
+    "ScrollWrapperReturn": "ScrollWrapperReturn"
+  },
+  "fields": {},
+  "patches": {
+    "pc-layout": {
+      "pattern": "f44fbea9fd7b01a9fd030091408885520001a072000000940000003513000090",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009f",
+      "function": "pc-layoutFunction",
+      "offset": 0,
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "20008052c0035fd6",
+      "expected_mask": "ffffffffffffffff"
+    },
+    "pc-ui": {
+      "pattern": "f44fbea9fd7b01a9fd03009140f181524001a072000000940000003513000090",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff000000fc1f0000ff1f00009f",
+      "function": "pc-uiFunction",
+      "offset": 0,
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "20008052c0035fd6",
+      "expected_mask": "ffffffffffffffff"
+    },
+    "cursor-show-mobile-gate": {
+      "pattern": "08004039080000340000009400000037800240f908004039080000340000009400000034800240f9080040390800003400000094000000376802403908000037",
+      "mask": "ff03c0ff1f0000ff000000fc1f00f8ffff03c0ffff03c0ff1f0000ff000000fc1f0000ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff1f00f8ff",
+      "function": "cursor-show-mobile-gateFunction",
+      "offset": 12,
+      "expected": "20020037",
+      "replacement": "1f2003d5",
+      "expected_mask": "1f00f8ff"
+    },
+    "cursor-hide-mobile-gate": {
+      "pattern": "08004039080000340000009400000037680240390800003708079252806a68f8",
+      "mask": "ff03c0ff1f0000ff000000fc1f00f8ffff03c0ff1f00f8ffffffffffffffffff",
+      "function": "cursor-hide-mobile-gateFunction",
+      "offset": 12,
+      "expected": "60050037",
+      "replacement": "1f2003d5",
+      "expected_mask": "1f00f8ff"
+    },
+    "cursor-mode-mobile-gate": {
+      "pattern": "0800403908000034000000940000003608008052000000146802403900010012",
+      "mask": "ff03c0ff1f0000ff000000fc1f00f8ffffffffff000000fcff03c0ffffffffff",
+      "function": "cursor-mode-mobile-gateFunction",
+      "offset": 12,
+      "expected": "60000036",
+      "replacement": "03000014",
+      "expected_mask": "1f00f8ff",
+      "branch_to": {
+        "pattern": "6802403900010012fd7b41a9f44fc2a8c0035fd6c0349052",
+        "mask": "ff03c0ffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "menu-force-cursor-mobile-gate": {
+      "pattern": "08004039080000340000009400000037800240f908004039080000340000009400000034800240f9080040390800003400000094000000376802403908000037",
+      "mask": "ff03c0ff1f0000ff000000fc1f00f8ffff03c0ffff03c0ff1f0000ff000000fc1f0000ffff03c0ffff03c0ff1f0000ff000000fc1f00f8ffff03c0ff1f00f8ff",
+      "function": "menu-force-cursor-mobile-gateFunction",
+      "offset": 12,
+      "expected": "40020037",
+      "replacement": "1f2003d5",
+      "expected_mask": "1f00f8ff"
+    },
+    "sdk-force-cursor-mobile-gate": {
+      "pattern": "08004039080000340000009400000037800240f908004039080000340000009400000034088699522800a072806a68f808004039080000340000009400000037",
+      "mask": "ff03c0ff1f0000ff000000fc1f00f8ffff03c0ffff03c0ff1f0000ff000000fc1f0000ffffffffffffffffffffffffffff03c0ff1f0000ff000000fc1f00f8ff",
+      "function": "sdk-force-cursor-mobile-gateFunction",
+      "offset": 12,
+      "expected": "20030037",
+      "replacement": "1f2003d5",
+      "expected_mask": "1f00f8ff"
+    },
+    "ui-mouse-input-enabled": {
+      "pattern": "00000094680240391f05007101000054e00313aa00000094fd7b43a9f44f42a9",
+      "mask": "000000fcff03c0ffffffffff1f0000ffffffffff000000fcffffffffffffffff",
+      "function": "ui-mouse-input-enabledFunction",
+      "offset": 12,
+      "expected": "61000054",
+      "replacement": "1f2003d5",
+      "expected_mask": "1f0000ff"
+    },
+    "ui-mouse-processing": {
+      "pattern": "1f05007101000054e00313aa00000094fd7b43a9f44f42a9f65741a9ff030091",
+      "mask": "ffffffff1f0000ffffffffff000000fcffffffffffffffffffffffffff03c0ff",
+      "function": "ui-mouse-processingFunction",
+      "offset": 12,
+      "expected": "1b010094",
+      "replacement": "be060094",
+      "expected_mask": "000000fc",
+      "call_to": "ProcessMouseEvent"
+    },
+    "global-platform-pc": {
+      "pattern": "080000900801009189648b522a008052000000141f210071000000541f250071",
+      "mask": "1f00009fff03c0ffffffffffffffffff000000fcffffffff1f0000ffffffffff",
+      "function": "global-platform-pcFunction",
+      "offset": 12,
+      "expected": "2a008052",
+      "replacement": "6a008052",
+      "expected_mask": "ffffffff"
+    },
+    "mobile-settings-gate-for-pc-platform": {
+      "pattern": "0800003488648b52686a68b81f050071e0179f1afd7b41a9f44fc2a8c0035fd6",
+      "mask": "1f0000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "function": "mobile-settings-gate-for-pc-platformFunction",
+      "offset": 12,
+      "expected": "1f050071",
+      "replacement": "1f0d0071",
+      "expected_mask": "ffffffff"
+    }
+  }
+}

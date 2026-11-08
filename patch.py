@@ -714,7 +714,7 @@ def main():
         profile = (select_profile(app_info, args.profile)
                    if app_info else load_profile(args.profile or DEFAULT_PROFILE))
     except RuntimeError as error:
-        if (args.command != 'install' or app_info is None or args.profile not in (None, 'zzz', 'zzz-test') or
+        if (args.command != 'install' or app_info is None or args.profile not in (None, 'zzz', 'zzz-test', 'hsr', 'hsr-test') or
                 (args.profile is None and 'No matching profile' not in str(error))):
             raise
         profile = resolve_app_profile(app, app_info, app_template(app_info, args.profile))
@@ -726,7 +726,7 @@ def main():
         try:
             select_profile(app_info, profile['id'])
         except RuntimeError:
-            if args.command != 'install' or args.profile not in (None, 'zzz', 'zzz-test'):
+            if args.command != 'install' or args.profile not in (None, 'zzz', 'zzz-test', 'hsr', 'hsr-test'):
                 raise
             profile = resolve_app_profile(app, app_info, profile)
     detected = None

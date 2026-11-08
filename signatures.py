@@ -177,6 +177,7 @@ def resolve_functions(image, metadata, rules):
     resolved, modules = {}, {}
     for name, rule in rules.items():
         if 'method' in rule:
+            require(metadata is not None, 'Managed method resolution requires supported metadata')
             modules.setdefault(rule['module'], []).append((name, rule, metadata.method(rule)))
         else:
             pattern, mask = rule_bytes(rule)
@@ -223,6 +224,10 @@ def signed(value, bits):
 
 
 def decode(image, address, kind):
+    if kind == 'return-pc':
+        previous = struct.unpack_from('<I', image.data, image.file(address - 4, 4))[0]
+        require(previous & 0xfffffc1f == 0xd63f0000, 'Expected BLR before input return address')
+        return address
     pos = image.file(address, 16)
     a, b, c, d = struct.unpack_from('<4I', image.data, pos)
     if kind in ('adrp-add', 'adrp-add-load'):
@@ -255,7 +260,8 @@ def decode(image, address, kind):
 def resolve_profile(binary, metadata_bytes, template, contract, version):
     require(contract['schema_version'] == 1 and contract['bundle_id'] == template['bundle_id'], 'Invalid signature contract')
     image = Image(binary)
-    metadata = Metadata(metadata_bytes)
+    require(contract.get('metadata', 'zzz') in ('zzz', 'none'), 'Unsupported metadata resolution mode')
+    metadata = Metadata(metadata_bytes) if contract.get('metadata', 'zzz') == 'zzz' else None
     functions = resolve_functions(image, metadata, contract['functions'])
     values, evidence = {}, {}
     for name, rule in contract['extract'].items():
@@ -276,7 +282,7 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
                   original_sha256=hashlib.sha256(binary).hexdigest())
     for name, source in contract['addresses'].items():
         value = functions[source] if source in functions else values[source]
-        if name in ('Statics', 'LegacyMousePresentSlot'):
+        if name == 'Statics' or name.endswith('Slot'):
             require(any(segment == '__DATA' and vm <= value and value + 8 <= vm + size
                         for segment, vm, size, _, _ in image.segments), f'{name} is outside writable data')
         else:
@@ -295,6 +301,11 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
         require(matches(actual, expected, bytes.fromhex(rule.get('expected_mask', 'ff' * len(expected)))),
                 f'{patch["name"]}: replacement ABI changed')
         replacement = bytes.fromhex(rule['replacement'])
+        if 'call_to' in rule:
+            require(len(actual) == 4 and struct.unpack('<I', actual)[0] & 0xfc000000 == 0x94000000, 'Expected direct BL for redirected call')
+            delta = functions[rule['call_to']] - image.vm(offset)
+            require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Redirected call is out of range')
+            replacement = struct.pack('<I', 0x94000000 | ((delta // 4) & 0x3ffffff))
         if 'branch_to' in rule:
             target_pattern, target_mask = rule_bytes(rule['branch_to'])
             target = unique(scan(body, target_pattern, target_mask), patch['name'] + ' return path')
@@ -302,12 +313,13 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
             require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Patch branch target is out of range')
             replacement = replacement[:-4] + struct.pack('<I', 0x14000000 | ((delta // 4) & 0x3ffffff))
         patch.update(file_offset=hex(offset), expected=actual.hex(), replacement=replacement.hex())
-    result['bridge']['addresses']['ReadVector2'] = '0x0'
+    if template['bridge']['backend'] == 'unity-input-system-v1':
+        result['bridge']['addresses']['ReadVector2'] = '0x0'
     result['resolution'] = {'contract': contract['id'],
                             'contract_sha256': hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest(),
                             'metadata_sha256': hashlib.sha256(metadata_bytes).hexdigest(),
                             'functions': {k: hex(v) for k, v in functions.items()}, 'extractions': evidence,
                             'runtime_validated': False}
-    result['validation']['keyboard_mouse'] = 'Resolved from metadata, native signatures and layout checks. Physical gameplay verification pending.'
+    result['validation']['keyboard_mouse'] = 'Resolved from verified native signatures and backend layout checks. Physical gameplay verification pending.'
     result['validation']['trackpad'] = 'Shared trackpad conversion retained. Physical verification pending on this build.'
     return validate(result, result['id'])

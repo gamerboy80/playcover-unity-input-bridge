@@ -1,10 +1,10 @@
 # Automatic version detection
 
 `patch.py apply --profile zzz` selects a reviewed profile when one matches. For an
-unknown version it tries the ZZZ signature contract before building. An explicitly
+unknown version it tries the selected game’s signature contract before building. An explicitly
 versioned profile never silently changes its target version. `resolve --app APP`
-performs detection without changing the app. `--profile zzz-test` selects the
-experimental platform/settings variant.
+performs detection without changing the app. `--profile zzz-test` and `--profile hsr-test` select the
+experimental platform/settings variants.
 
 ## Checks
 
@@ -54,7 +54,7 @@ unexpected Mouse format or size. Static resolution does not prove gameplay or
 menu behavior. A generated profile records `runtime_validated: false`.
 
 New metadata formats, renamed obfuscated selectors or a different backend require
-research and a contract update. HSR and Endfield still use reviewed exact-build
+research and a contract update. Endfield still uses reviewed exact-build
 profiles. Automatic detection is not a promise that arbitrary updates or games
 will work.
 
@@ -66,3 +66,31 @@ chains and VM/file mappings. The optional local fixture test reconstructs both
 reviewed ZZZ 3.3.1 profiles and compares every address, field, edit and framework
 hash. Set `ZZZ_ORIGINAL_FRAMEWORK` and `ZZZ_METADATA` to run it with local game
 files. These files must never be committed.
+
+## HSR native contract
+
+`signatures/com.HoYoverse.hkrpgoversea.json` covers both HSR 4.6.0 variants.
+Use `resolve --profile hsr --app APP` or `resolve --profile hsr-test --app APP`
+for read-only detection. The unversioned `hsr` and `hsr-test` aliases also attempt
+resolution when applying to an unknown version; explicit versioned IDs stay strict.
+
+HSR has a different, encoded metadata layout. Its contract uses unique masked
+native instruction contexts rather than the ZZZ metadata parser. Each context
+must resolve to a function entry. Some tiny wrappers need neighboring instruction
+context for uniqueness; changes to their arrangement can require contract review.
+
+Callback slots are decoded from verified ADRP/ADD/LDR register chains and must
+land in writable data. Independent key wrappers must agree on the corresponding
+slot. UI scroll return PCs must follow BLR inside their matched functions. The
+mouse-processing call is encoded against the resolved ProcessMouseEvent function;
+the cursor-mode branch is encoded against its matched destination. No old call
+or branch displacement is carried into the new profile.
+
+The legacy ABI and scroll scale remain the reviewed backend contract. Detection
+must stop on missing, ambiguous or changed instruction shapes; it does not prove
+future gameplay compatibility. The metadata file is retained only as an evidence
+hash in native-only mode. No game installation or launch is needed for resolution.
+
+Set `HSR_ORIGINAL_FRAMEWORK` to run the optional local fixture check. It must
+reproduce every bridge address, byte patch and framework hash in both reviewed
+HSR profiles. Game files remain local and untracked.

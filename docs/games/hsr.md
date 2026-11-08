@@ -155,3 +155,17 @@ confirmed in the mobile profile. In the revised PC build, injected wheel input
 moved the Graphics list in both directions. Physical trackpad scrolling,
 dropdown interaction, and other settings tabs remain unverified. The
 profile remains test-only and excluded from automatic selection.
+
+## Automatic signature resolution
+
+The native contract `signatures/com.HoYoverse.hkrpgoversea.json` resolves both
+regular and PC/settings profiles. It verifies native function contexts, decodes
+writable callback slots, cross-checks duplicate key getters and identifies the
+BLR return sites used for UI scroll normalization. Replacement calls and branches
+are calculated from independently matched destinations.
+
+Run `python3 patch.py resolve --profile hsr --app APP` to save an exact-build
+profile without modifying the app. Use `hsr-test` for the experimental variant.
+Resolution reproduces the reviewed 4.6.0 address and patch tables. New builds still
+need physical validation; encoded HSR metadata is not parsed using ZZZ's format.
+See [automatic detection](../signatures.md) for limits and fixture checks.

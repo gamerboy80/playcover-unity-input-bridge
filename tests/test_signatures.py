@@ -116,6 +116,51 @@ class SignatureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'register chain'):
             decode(Image(data), 0x10000220, 'adrp-add')
 
+    def test_native_contract_decodes_slots_return_sites_and_relocated_calls(self):
+        data = fixture_image()
+        struct.pack_into('<4I', data, 0x220, 0x90080008, 0x91000108, 0xf9401101, 0xd61f0020)
+        struct.pack_into('<3I', data, 0x240, 0xd63f0100, 0x94000000, 0xd65f03c0)
+        profile = load_profile('hsr')
+        profile['patches'] = [dict(name='redirect', reason='Synthetic call', file_offset='0x244',
+                                   expected='00000094', replacement='00000094')]
+        contract = dict(schema_version=1, id='synthetic-native', metadata='none',
+                        bundle_id=profile['bundle_id'],
+                        functions={'Getter': {'pattern': data[0x220:0x230].hex()},
+                                   'Caller': {'pattern': data[0x240:0x24c].hex()}},
+                        extract={'Slot': dict(function='Getter', pattern=data[0x220:0x230].hex(),
+                                              kind='adrp-add-load', alignment=8),
+                                 'Return': dict(function='Caller', pattern=data[0x240:0x248].hex(),
+                                                offset=4, kind='return-pc')}, equal=[], fields={},
+                        addresses={name: 'Slot' if name.endswith('Slot') else 'Return' if name.endswith('Return')
+                                   else 'Caller' for name in profile['bridge']['addresses']},
+                        patches={'redirect': dict(function='Caller', pattern=data[0x240:0x24c].hex(),
+                                                  offset=4, expected='00000094', replacement='00000094',
+                                                  call_to='Getter')})
+        result = resolve_profile(data, b'', profile, contract, '4.6.0')
+        self.assertEqual(result['bridge']['addresses']['KeySlot'], '0x20000020')
+        self.assertEqual(result['bridge']['addresses']['UIScrollReturn'], '0x10000244')
+        self.assertNotIn('ReadVector2', result['bridge']['addresses'])
+        self.assertEqual(result['patches'][0]['replacement'], 'f7ffff97')
+        contract['addresses']['KeySlot'] = 'Return'
+        with self.assertRaisesRegex(RuntimeError, 'outside writable data'):
+            resolve_profile(data, b'', profile, contract, '4.6.0')
+        contract['addresses']['KeySlot'] = 'Slot'
+        # A return address must follow BLR.
+        struct.pack_into('<I', data, 0x240, 0xd65f03c0)
+        with self.assertRaisesRegex(RuntimeError, 'Expected BLR'):
+            decode(Image(data), 0x10000244, 'return-pc')
+
+    @unittest.skipUnless(os.environ.get('HSR_ORIGINAL_FRAMEWORK'), 'Optional local HSR fixture')
+    def test_hsr_binary_reconstructs_regular_and_test_profiles(self):
+        binary = Path(os.environ['HSR_ORIGINAL_FRAMEWORK']).read_bytes()
+        contract = json.loads((ROOT / 'signatures/com.HoYoverse.hkrpgoversea.json').read_text())
+        for alias in ('hsr', 'hsr-test'):
+            expected = load_profile(alias)
+            result = resolve_profile(binary, b'', expected, contract, expected['version'])
+            self.assertEqual(result['bridge'], expected['bridge'])
+            self.assertEqual(result['patches'], expected['patches'])
+            self.assertEqual(result['original_sha256'], expected['original_sha256'])
+
     @unittest.skipUnless(os.environ.get('ZZZ_ORIGINAL_FRAMEWORK'), 'Optional local game fixture')
     def test_local_binary_reconstructs_both_reviewed_profiles(self):
         binary = Path(os.environ['ZZZ_ORIGINAL_FRAMEWORK']).read_bytes()
