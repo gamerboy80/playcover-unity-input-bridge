@@ -5,15 +5,16 @@ builds running under PlayCover. A native bridge forwards macOS keyboard, mouse
 and trackpad events to Unity. Exact-build profiles describe the game patches,
 binary identity and native input ABI.
 
-The project is experimental and supports only the listed game versions. It does
-not provide or distribute game files.
+The project is experimental. Reviewed profiles cover the builds below. ZZZ also
+has automatic mapping detection for compatible updates. Game files are not
+included or distributed.
 
 ## Supported builds
 
 | Game | Profile | Backend | Status |
 | --- | --- | --- | --- |
-| Zenless Zone Zero 3.3.0 | [`com.HoYoverse.Nap-3.3.0`](profiles/com.HoYoverse.Nap-3.3.0.json) | Unity Input System | Keyboard, mouse capture/look and physical trackpad scrolling validated |
-| Zenless Zone Zero 3.3.0 | [`com.HoYoverse.Nap-3.3.0-platform-pc-settings-test`](profiles/com.HoYoverse.Nap-3.3.0-platform-pc-settings-test.json) | Unity Input System | Test-only app-platform and settings profile |
+| Zenless Zone Zero 3.3.1 | [`zzz`](profiles/com.HoYoverse.Nap-3.3.1.json) | Unity Input System | Updated methods and object layouts verified; launch and device initialization checked |
+| Zenless Zone Zero 3.3.1 | [`zzz-test`](profiles/com.HoYoverse.Nap-3.3.1-platform-pc-settings-test.json) | Unity Input System | Experimental app-platform and mobile-settings profile |
 | Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0`](profiles/com.HoYoverse.hkrpgoversea-4.6.0.json) | Unity legacy input / InControl | Keyboard, mouse capture/look, camera zoom and menu scrolling validated |
 | Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test`](profiles/com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test.json) | Unity legacy input / InControl | Test-only PC-platform and mobile-settings profile |
 | Arknights: Endfield 1.6.3 | [`com.gryphline.endfield.ios-1.6.3`](profiles/com.gryphline.endfield.ios-1.6.3.json) | Unity Input System + legacy input | Experimental; WASD, capture, mouse look and menu clicks validated |
@@ -22,6 +23,9 @@ Test-only profiles require explicit selection and are excluded from automatic
 app matching. Validation applies only to the listed binary versions. See
 [ZZZ analysis](docs/games/zzz.md) and [HSR analysis](docs/games/hsr.md) for details and
 remaining limitations.
+
+The 3.3.0 ZZZ profiles remain available by their full IDs for older installations
+and restoration. `zzz` and `zzz-test` select 3.3.1.
 
 ## Requirements
 
@@ -59,9 +63,27 @@ For a game stored outside PlayCover's standard location, pass the app path:
 python3 patch.py apply --profile hsr --app '/path/to/Honkai: Star Rail.app'
 ~~~
 
-The app's bundle ID, version and executable must match the selected profile.
-Unknown versions and mismatches are rejected. Test profiles must be selected
-explicitly with `--profile`.
+The app's bundle ID, version, executable and original framework must match the
+selected profile. Test profiles require explicit selection with `--profile`.
+
+For a ZZZ update without a reviewed profile, `apply --profile zzz` tries to find
+the required methods and object layouts automatically. It combines managed
+method identities, native signatures and independent layout checks. An ambiguous
+or missing match stops installation. Successful detection saves an exact-build
+profile under `.local/profiles/`, so status, update and restore keep working.
+Detection verifies the supported input ABI; gameplay on a new build still needs
+checking.
+
+To check detection and save its report without changing game files:
+
+~~~sh
+python3 patch.py resolve --app '/path/to/Zenless Zone Zero.app'
+python3 patch.py resolve --profile zzz-test --app '/path/to/Zenless Zone Zero.app'
+~~~
+
+Automatic detection currently covers the examined ZZZ metadata layout. A new
+metadata format or input backend needs a resolver update. See
+[signature detection](docs/signatures.md) for the checks and limitations.
 
 The standard PlayCover app locations are under
 `~/Library/Containers/io.playcover.PlayCover/Applications/`. Short profile names
@@ -94,6 +116,13 @@ The installer stores original binaries and signature resources under
 the same profile to the same exact binary; it does not port patches to a newer
 game release. Restore before updating the game. The installer rejects files that
 changed after installation rather than overwriting them.
+
+The desktop-input patch and the separate ZZMI Metal bridge can be installed in
+either order. Each installer manages only its own load command and bridge file.
+Restoring this patch removes `NativeInputBridge.dylib` and restores its Unity
+framework edits while preserving `ZZMIMetal.dylib` if it is installed. Use
+`zzmi uninstall` to remove the model bridge independently. Both tools keep their
+shared ownership record in `.PlayCoverPatchRegistry` beside the app bundle.
 
 Only one install, update or restore operation should run at a time. Builds are
 stored under `build/<profile-id>/`.

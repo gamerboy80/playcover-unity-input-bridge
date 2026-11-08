@@ -77,6 +77,40 @@ class RecoveryTests(unittest.TestCase):
         self.install()
         self.assertIn('_CodeSignature/CodeResources', self.state()['original'])
 
+    def test_legacy_partial_signature_backup_can_be_reapplied(self):
+        extra = 'Frameworks/Other.framework/_CodeSignature/CodeResources'
+        (self.app / extra).parent.mkdir(parents=True)
+        (self.app / extra).write_bytes(b'other framework signature')
+        self.install()
+        module.restore(self.app, self.state(), self.profile, self.local)
+        state = self.state()
+        state['original'] = {p: value for p, value in state['original'].items()
+                             if '_CodeSignature/' not in p}
+        module.save_state(state, self.local)
+        fixtures.shutil.rmtree(self.local / 'original/Frameworks/Other.framework')
+        self.install()
+        self.assertEqual((self.local / 'original' / extra).read_bytes(), b'other framework signature')
+        self.assertEqual(self.state()['original'][extra], module.digest(self.app / extra))
+
+    def test_legacy_reapply_accepts_only_registered_resigning_of_the_same_code(self):
+        main = self.app / self.profile['executable']
+        main.write_bytes(fixtures.PatchTests().signed_executable(b'old signature'))
+        self.install()
+        module.restore(self.app, self.state(), self.profile, self.local)
+        state = self.state()
+        state['original'] = {p: value for p, value in state['original'].items() if '_CodeSignature/' not in p}
+        module.save_state(state, self.local)
+        registry = module.bridge_registry.load(self.app, self.profile['bundle_id'], self.profile['version'], self.profile['executable'])
+        staged = self.root / 'resigned.app'
+        fixtures.shutil.copytree(self.app, staged)
+        (staged / self.profile['executable']).write_bytes(fixtures.PatchTests().signed_executable(b'new longer signature'))
+        module.bridge_registry.begin(registry, {}, staged)
+        fixtures.shutil.copy2(staged / self.profile['executable'], main)
+        module.bridge_registry.finish(registry, self.app)
+        self.install()
+        self.assertEqual(self.state()['status'], 'installed')
+        self.assertEqual(self.state()['original'][self.profile['executable']], state['original'][self.profile['executable']])
+
     def test_restore_rejects_extra_backup_signature_and_reapply_rejects_live_changes(self):
         self.install()
         extra = self.local / 'original/_CodeSignature/extra'

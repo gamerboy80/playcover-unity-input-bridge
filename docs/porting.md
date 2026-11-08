@@ -12,18 +12,20 @@ describe the ZZZ `unity-input-system-v1` contract.
 
 ```sh
 python3 patch.py profiles
-python3 patch.py build --profile zzz-3.3.0
-python3 patch.py install --profile zzz-3.3.0 --app '/path/to/Game.app'
-python3 patch.py status --profile zzz-3.3.0 --app '/path/to/Game.app'
-python3 patch.py update --profile zzz-3.3.0 --app '/path/to/Game.app'
-python3 patch.py restore --profile zzz-3.3.0 --app '/path/to/Game.app'
+python3 patch.py build --profile zzz
+python3 patch.py install --profile zzz --app '/path/to/Game.app'
+python3 patch.py status --profile zzz --app '/path/to/Game.app'
+python3 patch.py update --profile zzz --app '/path/to/Game.app'
+python3 patch.py restore --profile zzz --app '/path/to/Game.app'
 ```
 
-`com.HoYoverse.Nap-3.3.0` remains the default without `--app`.
+`zzz` selects the reviewed ZZZ 3.3.1 profile by default.
 Profiles use `<bundle-id>-<version>.json`. With `--app`, bundle ID, version and
-executable select an exact profile automatically. Unknown versions and explicit
-profile mismatches are rejected; ambiguous matches require `--profile`. The
-original framework SHA-256 must still match before installation.
+executable select an exact profile automatically. For an unknown ZZZ version,
+`apply` attempts [metadata and signature resolution](signatures.md), including
+field extraction and independent native checks. Missing or ambiguous evidence
+stops installation. Explicit versioned profile mismatches are rejected. The
+resolved original framework SHA-256 must still match before installation.
 Old `zzz-3.3.0` and `hsr` names remain aliases; existing backups stay in place. Without `--app`, the bundle
 ID selects PlayCover's application path. `update` rebuilds/reapplies the **same
 exact game build's** patch; it does not port a patch to a game update.
@@ -61,7 +63,7 @@ The loader rejects unequal lengths, overlaps and unaligned arm64 edits. The
 installer first verifies the whole original hash, then every expected byte range.
 Only the explicit replacement ranges may change before signing.
 
-For the existing ZZZ profile the one edit is:
+For the historical ZZZ 3.3.0 profile, the input selector edit is:
 
 ```json
 {

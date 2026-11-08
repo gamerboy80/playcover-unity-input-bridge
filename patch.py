@@ -8,15 +8,17 @@ from pathlib import Path
 import plistlib
 import shlex
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
 
-from profiles import DEFAULT_PROFILE, PROFILE_ALIASES, instruction_patches, load_profile, match_app, require, select_profile
+from profiles import DEFAULT_PROFILE, PROFILE_ALIASES, instruction_patches, load_profile, match_app, require, select_profile, profile_paths
+import bridge_registry
+from macho import add_dylib, has_dylib, executable_content
 
 ROOT = Path(__file__).resolve().parent
 LIBRARY = 'Frameworks/NativeInputBridge.dylib'
+LOAD_PATH = '@executable_path/' + LIBRARY
 
 
 def app_paths(profile):
@@ -100,17 +102,46 @@ def replace_signature(source, target):
             file.unlink()
 
 
+def replace_all_signatures(source_app, target_app):
+    source_dirs = {path.relative_to(source_app) for path in source_app.rglob('_CodeSignature')
+                   if path.is_dir() and not path.is_symlink()}
+    target_dirs = {path.relative_to(target_app) for path in target_app.rglob('_CodeSignature')
+                   if path.is_dir() and not path.is_symlink()}
+    for relative in sorted(source_dirs):
+        replace_signature(source_app / relative, target_app / relative)
+    for relative in sorted(target_dirs - source_dirs):
+        shutil.rmtree(target_app / relative)
+
+
 def signature_hashes(app, profile):
-    _, framework, _ = app_paths(profile)
     result = {}
-    for relative in ('_CodeSignature', framework + '/_CodeSignature'):
-        directory = app / relative
-        require(directory.is_dir(), f'Missing signature resources: {relative}')
+    directories = [path for path in app.rglob('_CodeSignature') if path.is_dir() and not path.is_symlink()]
+    require(app / '_CodeSignature' in directories, 'Missing app signature resources: _CodeSignature')
+    for directory in directories:
         for path in directory.rglob('*'):
             require(path.is_file() and not path.is_symlink(),
                     f'Unexpected signature resource: {path}')
             result[str(path.relative_to(app))] = digest(path)
     return result
+
+
+def copy_all_signatures(source_app, target_app):
+    for directory in source_app.rglob('_CodeSignature'):
+        if not directory.is_dir() or directory.is_symlink():
+            continue
+        relative = directory.relative_to(source_app)
+        target = target_app / relative
+        if target.is_dir():
+            require(signature_hashes_for_directory(directory) ==
+                    signature_hashes_for_directory(target),
+                    f'Conflicting signature resources: {relative}')
+        else:
+            shutil.copytree(directory, target)
+
+
+def signature_hashes_for_directory(directory):
+    return {str(path.relative_to(directory)): digest(path)
+            for path in directory.rglob('*') if path.is_file() and not path.is_symlink()}
 
 
 def clone_app(app, destination):
@@ -156,12 +187,15 @@ def check_recoverable(app, state, profile, local):
     if original_signatures:
         require(backup_signatures == original_signatures, 'Original backup signatures changed')
     known_paths = set(state.get('original', {})) | set(state.get('installed', {})) | set(state.get('recovery', {}))
-    # Legacy state predates signature hashes; its backup still defines the allowed filenames.
-    recorded_signatures = {p for p in known_paths if '_CodeSignature/' in p}
-    allowed_signatures = recorded_signatures or set(backup_signatures)
-    require(set(signature_hashes(app, profile)) <= allowed_signatures,
-            'Unrecognized signature files were found. No files were changed.')
+    try:
+        registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], main)
+    except RuntimeError as error:
+        if 'Unrecognized signature' in str(error):
+            raise
+        raise RuntimeError('Cannot recover: a game file does not match a recorded original or patched file. No files were changed.') from error
     for relative in known_paths | {binary, main, LIBRARY}:
+        if relative == main or relative.startswith('_CodeSignature/') or '/_CodeSignature/' in relative:
+            continue
         target = app / relative
         actual = digest(target) if target.is_file() else None
         known = list(state.get('recovery', {}).get(relative, []))
@@ -197,48 +231,43 @@ def patch_instructions(binary, profile):
 
 
 def link_library(binary):
-    require(len(binary) >= 32 and struct.unpack_from('<I', binary)[0] == 0xfeedfacf,
-            'Expected a thin 64-bit Mach-O executable')
-    require(struct.unpack_from('<I', binary, 4)[0] == 0x100000c, 'Expected an arm64 executable')
-    count, size = struct.unpack_from('<II', binary, 16)
-    require(32 + size <= len(binary), 'Invalid Mach-O header size')
-    pos, first_section = 32, len(binary)
-    for _ in range(count):
-        require(pos + 8 <= 32 + size, 'Truncated load command')
-        cmd, length = struct.unpack_from('<II', binary, pos)
-        require(length >= 8 and length % 8 == 0 and pos + length <= 32 + size,
-                'Invalid load command size')
-        if cmd == 0x19:
-            require(length >= 72, 'Truncated segment')
-            sections = struct.unpack_from('<I', binary, pos + 64)[0]
-            require(72 + sections * 80 <= length, 'Truncated section table')
-            for j in range(sections):
-                offset = struct.unpack_from('<I', binary, pos + 72 + j * 80 + 48)[0]
-                if offset:
-                    first_section = min(first_section, offset)
-        pos += length
-    require(pos == 32 + size, 'Load command count mismatch')
-    name = ('@executable_path/' + LIBRARY).encode() + b'\0'
-    cmdsize = (24 + len(name) + 7) & ~7
-    require(pos + cmdsize < first_section <= len(binary) and
-            not any(binary[pos:pos + cmdsize]), 'Not enough unused header padding')
-    before = bytes(binary)
-    command = struct.pack('<6I', 0xc, cmdsize, 24, 0, 0, 0) + name
-    binary[pos:pos + cmdsize] = command + bytes(cmdsize - len(command))
-    struct.pack_into('<II', binary, 16, count + 1, size + cmdsize)
-    require(len(binary) == len(before) and binary[first_section:] == before[first_section:],
-            'Executable section changed')
-    return binary
+    return add_dylib(binary, LOAD_PATH)
 
 
 def restore_files(app, profile, local):
     BINARY, FRAMEWORK, MAIN = app_paths(profile)
     BACKUP = local / 'original'
-    for relative in (BINARY, MAIN):
-        replace_file(BACKUP / relative, app / relative)
-    for relative in (FRAMEWORK + '/_CodeSignature', '_CodeSignature'):
-        replace_signature(BACKUP / relative, app / relative)
-    (app / LIBRARY).unlink(missing_ok=True)
+    registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], MAIN)
+    if registry.get('pending'):
+        bridge_registry.recover(registry, app)
+    owners = bridge_registry.owners_in((app / MAIN).read_bytes())
+    owners.pop('native-input', None)
+    backup_main = bytearray((BACKUP / MAIN).read_bytes())
+    backup_signature_paths = set(signature_hashes(BACKUP, profile))
+    restore_exact = (not owners and not bridge_registry.owners_in(backup_main) and
+                     backup_signature_paths == set(registry['current']['signatures']))
+    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
+        staged = Path(tmp) / app.name
+        clone_app(app, staged)
+        replace_file(BACKUP / BINARY, staged / BINARY)
+        staged_main = staged / MAIN
+        staged_main.write_bytes(backup_main if restore_exact else bridge_registry.compose(registry, owners))
+        shutil.copystat(app / MAIN, staged_main)
+        (staged / LIBRARY).unlink(missing_ok=True)
+        if restore_exact:
+            replace_all_signatures(BACKUP, staged)
+        else:
+            replace_signature(BACKUP / FRAMEWORK / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
+            replace_signature(BACKUP / '_CodeSignature', staged / '_CodeSignature')
+        if not restore_exact:
+            run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
+        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
+        bridge_registry.begin(registry, owners, staged)
+        replace_file(staged / BINARY, app / BINARY)
+        replace_file(staged / MAIN, app / MAIN)
+        (app / LIBRARY).unlink(missing_ok=True)
+        replace_all_signatures(staged, app)
+        bridge_registry.finish(registry, app)
 
 
 def check_installed(app, state, profile):
@@ -249,12 +278,24 @@ def check_installed(app, state, profile):
     require(state['app'] == str(app), 'Backup belongs to a different app')
     require((app / profile['executable']).is_file() and os.access(app / profile['executable'], os.X_OK),
             'The game executable is missing or cannot be run. Cannot confirm a working patch.')
-    allowed_signatures = {p for p in state['installed'] if '_CodeSignature/' in p}
-    if not allowed_signatures:
-        allowed_signatures = set(signature_hashes(local_directory(profile) / 'original', profile))
-    require(set(signature_hashes(app, profile)) <= allowed_signatures,
-            'Unrecognized signature files were found. No files were changed.')
+    _, _, main = app_paths(profile)
+    try:
+        existing_registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], main, create=False)
+        if existing_registry is None:
+            for relative, expected in state.get('installed', {}).items():
+                require((app / relative).is_file() and digest(app / relative) == expected,
+                        'A game file changed after patching. It may be from a game update; no files were changed.')
+        registry = existing_registry or bridge_registry.load(app, profile['bundle_id'], profile['version'], main)
+    except RuntimeError as error:
+        if 'Unrecognized signature' in str(error):
+            raise
+        raise RuntimeError('A game file changed after patching. It may be from a game update; no files were changed.') from error
+    require(not registry.get('pending'), 'A bridge install was interrupted; run restore to finish recovery.')
+    require('native-input' in registry.get('owners', {}), 'The input bridge is not registered as installed.')
+    require(has_dylib((app / main).read_bytes(), LOAD_PATH), 'The input bridge load command is missing.')
     for relative, expected in state['installed'].items():
+        if relative == main or relative.startswith('_CodeSignature/') or '/_CodeSignature/' in relative:
+            continue
         require((app / relative).is_file() and digest(app / relative) == expected,
                 f'A game file changed after patching. It may be from a game update; no files were changed.')
 
@@ -262,7 +303,7 @@ def check_installed(app, state, profile):
 def applied_profile(app, info):
     applied = []
     changed = []
-    for path in sorted((ROOT / 'profiles').glob('*.json')):
+    for path in profile_paths(ROOT):
         profile = load_profile(path.stem)
         if not match_app(profile, info):
             continue
@@ -300,6 +341,61 @@ def applied_profile(app, info):
 def build(profile):
     print(f'Building the input bridge for {profile["game"]} {profile["version"]}...', flush=True)
     run('/bin/sh', str(ROOT / 'build.sh'), profile['id'])
+
+
+def resolve_app_profile(app, info, source):
+    """Resolve a new exact-build profile, retaining its evidence for update/restore."""
+    from signatures import resolve_profile
+    import re
+    require(info.get('CFBundleIdentifier') == source['bundle_id'] and
+            info.get('CFBundleExecutable') == source['executable'], 'The signature template belongs to a different game.')
+    version = info.get('CFBundleShortVersionString', '')
+    require(isinstance(version, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}', version), 'The game has an invalid version identifier.')
+    contract_path = ROOT / 'signatures' / (source['bundle_id'] + '.json')
+    require(contract_path.is_file(), 'Automatic version detection is not available for this game yet. Use a profile for its exact version.')
+    framework = app / source['framework_binary']
+    active = applied_profile(app, info)
+    if active:
+        installed, state, local, status = active
+        require(status == 'installed', 'Restore or repair the active patch before resolving a version.')
+        check_installed(app, state, installed)
+        framework = local / 'original' / source['framework_binary']
+        require(digest(framework) == installed['original_sha256'], 'The original framework backup changed.')
+    else:
+        require(not has_dylib((app / source['executable']).read_bytes(), LOAD_PATH) and not (app / LIBRARY).exists(),
+                'An input bridge is present without a verified active profile. Run status --verbose before resolving this app.')
+    metadata = app / 'Data/Managed/Metadata/global-metadata.dat'
+    require(metadata.is_file() and metadata.stat().st_size <= 512 * 1024 * 1024, 'Game metadata is missing or too large.')
+    print('Finding input methods and checking their signatures and object layouts...', flush=True)
+    profile = resolve_profile(framework.read_bytes(), metadata.read_bytes(), source,
+                              json.loads(contract_path.read_text()), version)
+    revision = profile['resolution']['contract_sha256'][:12]
+    suffix = f'-platform-pc-settings-auto-{revision}-test' if source.get('test_only') else f'-auto-{revision}'
+    profile['id'] = f'{source["bundle_id"]}-{version}{suffix}'
+    directory = ROOT / '.local' / 'profiles'
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / (profile['id'] + '.json')
+    if path.exists():
+        require(json.loads(path.read_text()) == profile, 'The saved automatic profile differs from this resolution. Keep it and its backups for inspection.')
+    else:
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(profile, indent=2) + '\n')
+        temporary.replace(path)
+    print(f'Found and verified the required input mappings for {source["game"]} {version}.')
+    print('This build still needs a physical keyboard, mouse and menu check.')
+    print(f'Saved profile: {profile["id"]}')
+    return profile
+
+
+def app_template(info, requested=None):
+    if requested:
+        return load_profile(requested)
+    import re
+    candidates = [load_profile(path.stem) for path in profile_paths(ROOT)]
+    candidates = [p for p in candidates if not p.get('test_only') and not p.get('resolution') and
+                  p['bundle_id'] == info.get('CFBundleIdentifier') and p['executable'] == info.get('CFBundleExecutable')]
+    require(candidates, 'No input signature template is available for this game.')
+    return max(candidates, key=lambda p: tuple(int(v) for v in re.findall(r'\d+', p['version'])))
 
 
 def stage_framework(directory, profile, local):
@@ -344,6 +440,16 @@ def install(app, profile, local):
             f'`python3 patch.py restore {app_option}`, then '
             f'`python3 patch.py apply --profile {profile_name(profile)} {app_option}`.')
 
+    try:
+        registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], MAIN)
+    except RuntimeError as error:
+        raise RuntimeError('The game signatures differ or the main executable changed outside a registered bridge install. No files were changed.') from error
+    require(not registry.get('pending'),
+            'A bridge install was interrupted. Run restore or status before installing another patch.')
+
+    require('native-input' not in bridge_registry.owners_in((app / MAIN).read_bytes()),
+            'The input bridge is already present but has no active profile record. Run status --verbose before changing the game.')
+
     original = None
     if STATE.exists() or BACKUP.exists():
         require(STATE.is_file() and BACKUP.is_dir(),
@@ -364,8 +470,12 @@ def install(app, profile, local):
             expected = original.get(relative)
             require(expected and (BACKUP / relative).is_file() and digest(BACKUP / relative) == expected,
                     f'The saved original file {relative} is missing or has changed.')
-            require((app / relative).is_file() and digest(app / relative) == expected,
-                    'The game is not fully restored to its original files. Run status --verbose before trying again.')
+            if relative == MAIN:
+                require(not bridge_registry.owners_in((app / MAIN).read_bytes()).get('native-input'),
+                        'The input bridge is still present. Run restore before trying again.')
+            else:
+                require((app / relative).is_file() and digest(app / relative) == expected,
+                        'The game is not fully restored to its original files. Run status --verbose before trying again.')
         require((BACKUP / FRAMEWORK / '_CodeSignature').is_dir() and
                 (BACKUP / '_CodeSignature').is_dir(),
                 'The saved app signatures are missing. Keep this backup and inspect it before continuing.')
@@ -375,16 +485,29 @@ def install(app, profile, local):
         saved_signatures = {p: value for p, value in original.items()
                             if p.startswith('_CodeSignature/') or '/_CodeSignature/' in p}
         backup_signatures = signature_hashes(BACKUP, profile)
-        # Older backups have no signature hashes; compare with the restored app before recording them.
-        require(backup_signatures == (saved_signatures or signature_hashes(app, profile)),
-                'The saved original signatures have changed. No files were changed.')
-        require(signature_hashes(app, profile) == backup_signatures,
-                'The game signatures differ from the saved originals. No files were changed.')
+        if saved_signatures:
+            require(backup_signatures == saved_signatures,
+                    'The saved original signatures have changed. No files were changed.')
+        else:
+            # Legacy backups saved only the root and Unity signatures. Validate those
+            # against the restored app before extending the backup to nested bundles.
+            live_signatures = signature_hashes(app, profile)
+            require(all(live_signatures.get(p) == value for p, value in backup_signatures.items()),
+                    'The saved original signatures have changed. No files were changed.')
+            require(executable_content((app / MAIN).read_bytes()) ==
+                    executable_content((BACKUP / MAIN).read_bytes()),
+                    'The restored executable differs from the legacy backup. No files were changed.')
+            copy_all_signatures(app, BACKUP)
+            backup_signatures = signature_hashes(BACKUP, profile)
+        require(set(signature_hashes(app, profile)) == set(registry['current']['signatures']),
+                'The game signatures differ from the registered app state. No files were changed.')
         original = {**backup_signatures, **original}
     require(digest(app / BINARY) == profile['original_sha256'],
             'These game files do not match the selected profile. Restore the original game files or choose a profile for this exact version.')
     require(not (app / LIBRARY).exists(),
             'An input bridge is already present in this app. Run status or restore before installing again.')
+    owners = dict(registry.get('owners', {}))
+    owners['native-input'] = LOAD_PATH
     build(profile)
     message = ('Using the saved backup of the original game files...'
                if original else 'Saving a backup of the original game files...')
@@ -397,7 +520,7 @@ def install(app, profile, local):
             backup.mkdir(parents=True)
             shutil.copytree(app / FRAMEWORK, backup / FRAMEWORK, symlinks=True)
             shutil.copy2(app / MAIN, backup / MAIN)
-            shutil.copytree(app / '_CodeSignature', backup / '_CodeSignature')
+            copy_all_signatures(app, backup)
             original = {p: digest(backup / p) for p in (BINARY, MAIN)}
             original.update(signature_hashes(backup, profile))
             save_state({'profile': profile['id'], 'app': str(app), 'original': original,
@@ -415,7 +538,7 @@ def install(app, profile, local):
         replace_file(framework / Path(BINARY).name, staged / BINARY)
         replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
         main = staged / MAIN
-        main.write_bytes(link_library(bytearray((app / MAIN).read_bytes())))
+        main.write_bytes(bridge_registry.compose(registry, owners))
         shutil.copystat(app / MAIN, main)
         replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
         run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
@@ -423,18 +546,19 @@ def install(app, profile, local):
         planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
                    LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
         begin_change(state, profile, local, planned)
+        bridge_registry.begin(registry, owners, staged)
         try:
             print('Installing the bridge and checking the app signature...', flush=True)
             replace_file(staged / BINARY, app / BINARY)
             replace_file(staged / MAIN, app / MAIN)
             replace_file(staged / LIBRARY, app / LIBRARY)
-            replace_signature(staged / '_CodeSignature', app / '_CodeSignature')
-            replace_signature(staged / FRAMEWORK / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
+            replace_all_signatures(staged, app)
             state['profile'] = profile['id']
             state['installed'] = {p: digest(app / p) for p in planned}
             state['status'] = 'installed'
             state.pop('recovery', None)
             save_state(state, local)
+            bridge_registry.finish(registry, app)
         except BaseException:
             restore(app, state, profile, local)
             raise
@@ -455,7 +579,14 @@ def restore(app, state, profile, local):
     state['status'] = 'restored'
     state.pop('recovery', None)
     save_state(state, local)
-    print('Done. The original game files are restored. The backup is kept for future installs.')
+    remaining = bridge_registry.owners_in((app / app_paths(profile)[2]).read_bytes())
+    if remaining:
+        names = {'zzmi-metal': 'ZZMI Metal'}
+        preserved = ', '.join(names.get(owner, owner) for owner in sorted(remaining))
+        print(f'Done. The desktop-input patch is removed. {preserved} remains installed.')
+        print('The original backup is kept for future installs.')
+    else:
+        print('Done. The original game files are restored. The backup is kept for future installs.')
 
 
 def update(app, state, profile, local):
@@ -464,6 +595,10 @@ def update(app, state, profile, local):
     require(state.get('status') == 'installed',
             f'{profile_name(profile)} is not currently patched, so there is nothing to update. Run status to check the active profile.')
     check_installed(app, state, profile)
+    registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], MAIN)
+    require(not registry.get('pending'), 'A bridge install was interrupted. Run restore before updating.')
+    owners = bridge_registry.owners_in((app / MAIN).read_bytes())
+    require('native-input' in owners, 'The input bridge load command is missing. Run restore before updating.')
     build(profile)
     print('Updating the bridge and checking the app signature...', flush=True)
     with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
@@ -472,23 +607,27 @@ def update(app, state, profile, local):
         framework = stage_framework(Path(tmp), profile, local)
         replace_file(framework / Path(BINARY).name, staged / BINARY)
         replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
+        staged_main = staged / MAIN
+        staged_main.write_bytes(bridge_registry.compose(registry, owners))
+        shutil.copystat(app / MAIN, staged_main)
         replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
         run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
         run('/usr/bin/codesign', '--verify', '--strict', str(staged))
         planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
                    LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
         begin_change(state, profile, local, planned)
+        bridge_registry.begin(registry, owners, staged)
         try:
             replace_file(staged / BINARY, app / BINARY)
             replace_file(staged / MAIN, app / MAIN)
             replace_file(staged / LIBRARY, app / LIBRARY)
-            replace_signature(staged / '_CodeSignature', app / '_CodeSignature')
-            replace_signature(staged / FRAMEWORK / '_CodeSignature', app / FRAMEWORK / '_CodeSignature')
+            replace_all_signatures(staged, app)
             state['profile'] = profile['id']
             state['installed'] = {p: digest(app / p) for p in planned}
             state['status'] = 'installed'
             state.pop('recovery', None)
             save_state(state, local)
+            bridge_registry.finish(registry, app)
         except BaseException:
             restore(app, state, profile, local)
             raise
@@ -531,8 +670,8 @@ def main():
                "  python3 patch.py restore --app '/path/to/Honkai: Star Rail.app'",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        'command', choices=['profiles', 'build', 'apply', 'install', 'update', 'restore', 'status'],
-        help='profiles: list games; build: compile; apply/install: install a profile; update: rebuild and reapply it; restore: undo it; status: check it')
+        'command', choices=['profiles', 'resolve', 'build', 'apply', 'install', 'update', 'restore', 'status'],
+        help='profiles: list games; resolve: detect mappings without changing the app; build: compile; apply/install: install a profile; update: rebuild and reapply it; restore: undo it; status: check it')
     parser.add_argument(
         '--profile',
         help='Profile name or ID (see profiles). Defaults to ZZZ; --app selects a matching regular profile automatically. Choose test profiles explicitly.')
@@ -552,7 +691,7 @@ def main():
         parser.error('--json can only be used with the status command')
     if args.command == 'profiles':
         print('Available profiles and apply commands:')
-        profiles = [load_profile(path.stem) for path in (ROOT / 'profiles').glob('*.json')]
+        profiles = [load_profile(path.stem) for path in profile_paths(ROOT)]
         profiles.sort(key=lambda item: (item['bundle_id'], item['version'], item.get('test_only', False)))
         for profile in profiles:
             label = ' (test profile — experimental)' if profile.get('test_only') else ' (regular profile)'
@@ -566,14 +705,30 @@ def main():
         return
     app = args.app.expanduser().resolve() if args.app else None
     app_info = read_app_info(app) if app else None
-    profile = (select_profile(app_info, args.profile)
-               if app_info else load_profile(args.profile or DEFAULT_PROFILE))
+    if args.command == 'resolve':
+        require(app is not None, "Include --app '/path/to/Game.app' to detect its input mappings.")
+        source = app_template(app_info, args.profile)
+        resolve_app_profile(app, app_info, source)
+        return
+    try:
+        profile = (select_profile(app_info, args.profile)
+                   if app_info else load_profile(args.profile or DEFAULT_PROFILE))
+    except RuntimeError as error:
+        if (args.command != 'install' or app_info is None or args.profile not in (None, 'zzz', 'zzz-test') or
+                (args.profile is None and 'No matching profile' not in str(error))):
+            raise
+        profile = resolve_app_profile(app, app_info, app_template(app_info, args.profile))
     local = None
     app = (app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' /
            (profile['bundle_id'] + '.app')).expanduser().resolve()
     if args.command != 'build' and app_info is None:
         app_info = read_app_info(app)
-        select_profile(app_info, profile['id'])
+        try:
+            select_profile(app_info, profile['id'])
+        except RuntimeError:
+            if args.command != 'install' or args.profile not in (None, 'zzz', 'zzz-test'):
+                raise
+            profile = resolve_app_profile(app, app_info, profile)
     detected = None
     detected_status = None
     if args.command in ('status', 'restore', 'update'):
@@ -610,7 +765,7 @@ def main():
         else:
             require((app / profile['executable']).is_file() and os.access(app / profile['executable'], os.X_OK),
                     'The game executable is missing or cannot be run. Cannot confirm an unpatched app.')
-            candidates = [profile] + [load_profile(path.stem) for path in (ROOT / 'profiles').glob('*.json')
+            candidates = [profile] + [load_profile(path.stem) for path in profile_paths(ROOT)
                                       if path.stem != profile['id']]
             for candidate in candidates:
                 if not match_app(candidate, app_info):
@@ -620,8 +775,18 @@ def main():
                     saved = json.loads(record.read_text())
                     if saved.get('app') == str(app):
                         expected = saved.get('original', {}).get(profile['executable'])
-                        require(expected and digest(app / profile['executable']) == expected,
-                                'The game executable differs from its saved original. Cannot confirm an unpatched app.')
+                        if not expected or digest(app / profile['executable']) != expected:
+                            try:
+                                registry = bridge_registry.load(app, profile['bundle_id'], profile['version'],
+                                                                profile['executable'], create=False)
+                            except RuntimeError as error:
+                                raise RuntimeError('The game executable differs from its saved original. Cannot confirm an unpatched app.') from error
+                            backup_main = record.parent / 'original' / profile['executable']
+                            require(registry and not registry.get('pending') and backup_main.is_file() and
+                                    digest(backup_main) == expected and
+                                    executable_content((app / profile['executable']).read_bytes()) ==
+                                    executable_content(backup_main.read_bytes()),
+                                    'The game executable differs from its saved original. Cannot confirm an unpatched app.')
             require(digest(app / profile['framework_binary']) == profile['original_sha256']
                     and not (app / LIBRARY).exists(),
                     'The game has modified files but no saved patch information. Cannot determine patch status safely.')

@@ -13,7 +13,7 @@ on_error() {
 trap on_error EXIT
 
 cd "$(dirname "$0")"
-profile=${1:-zzz-3.3.0}
+profile=${1:-zzz}
 printf 'Preparing the input bridge for profile %s...\n' "$profile"
 
 step='finding the macOS build tools'

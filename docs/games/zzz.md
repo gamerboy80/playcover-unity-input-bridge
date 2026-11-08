@@ -1,16 +1,57 @@
 # Zenless Zone Zero 3.3.0
 
-The machine-readable source for byte patches, VM addresses and object/static
-offsets is
-[`profiles/com.HoYoverse.Nap-3.3.0.json`](../../profiles/com.HoYoverse.Nap-3.3.0.json).
-The shared bridge consumes a header generated from that profile. See [porting](../porting.md)
-for the ABI contract and the process for adding another build.
+## ZZZ 3.3.1
 
-The decrypted arm64 UnityFramework exposes an IL2CPP PC layout/input path even
-though the packaged player is an iOS build converted for Catalyst by PlayCover.
-The obfuscated layout selector at `0xc22d6b8` returns an enum whose PC value is 2.
-Changing its entry to `mov w0,#2; ret` makes the game display PC control prompts
-and enables its keyboard path.
+The regular and experimental PC/settings profiles target bundle version 3.3.1
+(build 4), with original framework SHA-256
+`657b2def5d3f7f687965bcc2764252ee579dc2701cf0a999ebea7da824c24d94`.
+Historical 3.3.0 profiles remain available for restoration.
+
+The input selector moved to `0xbcc4f78`. Managed metadata identities, native
+method registration and masked instruction checks establish the new addresses;
+field offsets are extracted from verified getters. See the profiles for the
+complete address tables and [automatic detection](../signatures.md) for the
+resolver contract. Mouse state remains 49 bytes and keyboard state 14 bytes.
+
+| Field | 3.3.1 offset |
+| --- | --- |
+| StaticInputManager | `0x2aea8` |
+| StaticKeyboard | `0x2b2f0` |
+| StaticMouse | `0x2b4f0` |
+| DeviceID | `0x154` |
+| StateBlock | `0x90` |
+| MousePosition | `0x178` |
+| MouseDelta | `0x168` |
+| MouseScroll | `0x1b0` |
+
+Both variants use native menu buttons. Uncaptured menu down/drag/up events have
+one native route; captured gameplay buttons still use the bridge. This resolved
+the reported purchase quantity slider snapping back. Live launch, world entry,
+Mouse/Keyboard creation and graphics/sound settings were checked. Dedicated
+physical trackpad and broader gameplay regression checks remain pending.
+
+### Keyboard binding settings
+
+The PC input layout showed keyboard rows, but the settings registry excluded
+category 8 for mobile settings-platform values 2 and 3. Registry lookup for
+binding ID 71 therefore returned null and left the prefab label `DTEXT`.
+
+The fix changes the category filter `CHODNEDHGJE.ABNLJBEDBOM` at `0xcbf5dc0`:
+branch `0xcbf5e40` changes from `81010054` to `0c000014`. This retains category 8
+on the two mobile paths and continues the existing remaining filters. It changes
+neither the global platform nor Unity's reported platform. Both 3.3.1 profiles
+include the correction, with metadata/signature resolution for future builds.
+
+The active new configuration path (`0xd9a8cc0`) calls this filter before passing
+category records to the registry. Live checks confirmed category 8 is retained
+on values 2 and 3, the checked other filters remain intact, and the test-profile
+bindings page renders Interact, WASD and camera labels with their controls.
+Clicking a binding enters the game's key-change monitoring mode. Saving and
+persisting a changed binding has not yet been tested.
+
+Earlier attempts to register version-zero records and bypass initializer hotfixes
+did not help and were removed. A direct call of the compiled initializer left
+its count at 132, which led upstream to the category exclusion.
 
 ## App-level PC platform and mobile settings test
 

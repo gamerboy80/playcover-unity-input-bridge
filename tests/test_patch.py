@@ -41,6 +41,28 @@ class PatchTests(unittest.TestCase):
                 module.main()
             install.assert_called_once_with(app.resolve(), profile, local)
 
+    def test_unknown_version_resolution_keeps_explicit_version_selection_strict(self):
+        source = load_profile('zzz')
+        detected = copy.deepcopy(source)
+        detected.update(id=source['bundle_id'] + '-9.9.9-auto', version='9.9.9')
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _ = self.fake_app(Path(tmp), copy.deepcopy(detected))
+            for alias, automatic in [('zzz', True), ('zzz-3.3.1', False)]:
+                with self.subTest(alias=alias), \
+                        patch.object(module, 'select_profile', side_effect=RuntimeError('This app does not match')), \
+                        patch.object(module, 'resolve_app_profile', return_value=detected) as resolve, \
+                        patch.object(module, 'install') as install, \
+                        patch('sys.argv', ['patch.py', 'apply', '--profile', alias, '--app', str(app)]):
+                    if automatic:
+                        module.main()
+                        resolve.assert_called_once_with(app.resolve(), module.read_app_info(app), source)
+                        self.assertEqual(install.call_args.args[1], detected)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'does not match'):
+                            module.main()
+                        resolve.assert_not_called()
+                        install.assert_not_called()
+
     def test_restore_with_app_uses_detected_active_profile(self):
         profile = copy.deepcopy(load_profile('hsr'))
         test_profile = copy.deepcopy(load_profile('hsr-test'))
@@ -83,6 +105,63 @@ class PatchTests(unittest.TestCase):
             self.assertEqual({p: state['original'][p] for p in module.signature_hashes(backup, profile)},
                              module.signature_hashes(backup, profile))
             self.assertEqual(module.digest(backup / binary), backup_hash)
+
+    def test_input_restore_preserves_zzmi_installed_before_it(self):
+        profile = copy.deepcopy(load_profile())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, _ = self.fake_app(root, profile)
+            _, _, main = module.app_paths(profile)
+            metal_path = module.bridge_registry.OWNERS['zzmi-metal']
+            (app / main).write_bytes(module.add_dylib(bytearray((app / main).read_bytes()), metal_path))
+            (app / 'Frameworks/ZZMIMetal.dylib').write_bytes(b'metal bridge')
+            module.bridge_registry.load(app, profile['bundle_id'], profile['version'], main)
+            local = root / '.local' / profile['id']
+            with patch.object(module, 'ROOT', root), patch.object(module, 'closed'), \
+                    patch.object(module, 'build'), patch.object(module, 'run'), \
+                    patch.object(module, 'clone_app', side_effect=lambda source, target: shutil.copytree(source, target, symlinks=True)):
+                module.install(app, profile, local)
+                state = json.loads((local / 'state.json').read_text())
+                self.assertTrue(module.has_dylib((app / main).read_bytes(), module.LOAD_PATH))
+                module.restore(app, state, profile, local)
+            final = (app / main).read_bytes()
+            self.assertFalse(module.has_dylib(final, module.LOAD_PATH))
+            self.assertTrue(module.has_dylib(final, metal_path))
+            self.assertTrue((app / 'Frameworks/ZZMIMetal.dylib').is_file())
+
+    def test_input_restore_preserves_zzmi_installed_after_it(self):
+        profile = copy.deepcopy(load_profile())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, _ = self.fake_app(root, profile)
+            _, _, main = module.app_paths(profile)
+            local = root / '.local' / profile['id']
+            with patch.object(module, 'ROOT', root), patch.object(module, 'closed'), \
+                    patch.object(module, 'build'), patch.object(module, 'run'), \
+                    patch.object(module, 'clone_app', side_effect=lambda source, target: shutil.copytree(source, target, symlinks=True)):
+                module.install(app, profile, local)
+                state = json.loads((local / 'state.json').read_text())
+                registry = module.bridge_registry.load(app, profile['bundle_id'], profile['version'], main)
+                owners = module.bridge_registry.owners_in((app / main).read_bytes())
+                metal_path = module.bridge_registry.OWNERS['zzmi-metal']
+                owners['zzmi-metal'] = metal_path
+                with tempfile.TemporaryDirectory() as stage_dir:
+                    staged = Path(stage_dir) / app.name
+                    shutil.copytree(app, staged, symlinks=True)
+                    staged_main = staged / main
+                    staged_main.write_bytes(module.bridge_registry.compose(registry, owners))
+                    shutil.copystat(app / main, staged_main)
+                    (staged / 'Frameworks/ZZMIMetal.dylib').write_bytes(b'metal bridge')
+                    module.bridge_registry.begin(registry, owners, staged)
+                    module.replace_file(staged / main, app / main)
+                    module.replace_file(staged / 'Frameworks/ZZMIMetal.dylib', app / 'Frameworks/ZZMIMetal.dylib')
+                    module.bridge_registry.finish(registry, app)
+                module.check_installed(app, state, profile)
+                module.restore(app, state, profile, local)
+            final = (app / main).read_bytes()
+            self.assertFalse(module.has_dylib(final, module.LOAD_PATH))
+            self.assertTrue(module.has_dylib(final, metal_path))
+            self.assertTrue((app / 'Frameworks/ZZMIMetal.dylib').is_file())
 
     def test_status_labels(self):
         for name in ('zzz', 'hsr', 'zzz-test', 'hsr-test'):
@@ -144,6 +223,23 @@ class PatchTests(unittest.TestCase):
         self.assertEqual(size, 152 + length)
         self.assertEqual(length % 8, 0)
         self.assertIn(b'@executable_path/Frameworks/NativeInputBridge.dylib\0', result[184:512])
+
+    def signed_executable(self, signature):
+        binary = self.executable()
+        struct.pack_into('<II', binary, 16, 3, 240)
+        struct.pack_into('<II16s4Q4I', binary, 184, 0x19, 72, b'__LINKEDIT',
+                         4096, 4096, 1024, len(signature), 1, 1, 0, 0)
+        struct.pack_into('<4I', binary, 256, 0x1d, 16, 1024, len(signature))
+        return binary + signature
+
+    def test_registered_resigning_comparison_preserves_code_checks(self):
+        a = self.signed_executable(b'a' * 32)
+        b = self.signed_executable(b'b' * 64)
+        self.assertEqual(module.executable_content(a), module.executable_content(b))
+        b[600] ^= 1
+        self.assertNotEqual(module.executable_content(a), module.executable_content(b))
+        with self.assertRaisesRegex(RuntimeError, 'end of the file'):
+            module.executable_content(a + b'unsigned appended data')
 
     def test_rejects_nonzero_padding_truncated_commands_and_no_space(self):
         source = self.executable()
@@ -237,10 +333,16 @@ class PatchTests(unittest.TestCase):
         profile = copy.deepcopy(load_profile('hsr'))
         with tempfile.TemporaryDirectory() as tmp, patch.object(module, 'ROOT', Path(tmp)):
             app, _ = self.fake_app(Path(tmp), profile)
+            _, _, main = module.app_paths(profile)
+            (app / main).write_bytes(module.link_library(bytearray((app / main).read_bytes())))
+            (app / module.LIBRARY).write_bytes(b'input bridge')
+            module.bridge_registry.load(app, profile['bundle_id'], profile['version'], main)
             local = Path(tmp) / '.local' / 'hsr'
             local.mkdir(parents=True)
             state = {'profile': 'hsr', 'app': str(app),
-                     'installed': module.signature_hashes(app, profile),
+                     'installed': {**module.signature_hashes(app, profile),
+                                   main: module.digest(app / main),
+                                   module.LIBRARY: module.digest(app / module.LIBRARY)},
                      'original': {profile['framework_binary']: profile['original_sha256']}}
             (local / 'state.json').write_text(json.dumps(state))
             self.assertEqual(module.local_directory(profile), local)

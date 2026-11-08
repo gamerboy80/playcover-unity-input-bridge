@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "id": "com.HoYoverse.Nap-3.3.1-platform-pc-settings-test",
+  "game": "Zenless Zone Zero",
+  "version": "3.3.1",
+  "bundle_id": "com.HoYoverse.Nap",
+  "executable": "ZenlessZoneZero",
+  "architecture": "arm64",
+  "framework_binary": "Frameworks/UnityFramework.framework/UnityFramework",
+  "original_sha256": "657b2def5d3f7f687965bcc2764252ee579dc2701cf0a999ebea7da824c24d94",
+  "patches": [
+    {
+      "name": "pc-input-selector",
+      "reason": "Return PC input-layout enum 2. This is the existing tested ZZZ selector; the bridge creates a valid Mouse before enabling original mouse processing.",
+      "file_offset": "0xbcc4f78",
+      "expected": "f44fbea9fd7b01a9",
+      "replacement": "40008052c0035fd6"
+    },
+    {
+      "name": "app-platform-pc-enum",
+      "reason": "AppUtils.GetApplicationPlatform(app-platform branch): return Hoyo AppUtils PC enum 3. The Unity-platform branch remains unchanged.",
+      "file_offset": "0x1012090",
+      "expected": "00e176b9",
+      "replacement": "60008052"
+    },
+    {
+      "name": "app-mobile-graphics-settings",
+      "reason": "AppUtils.IsMobilePlatform(app-platform branch): keep mobile-gated graphics and settings paths available. The separate Unity-mobile query remains unchanged.",
+      "file_offset": "0x1012248",
+      "expected": "00696938",
+      "replacement": "20008052"
+    },
+    {
+      "name": "app-pc-platform-path",
+      "reason": "AppUtils.IsPCPlatform(app-platform branch): select PC-specific app behavior while leaving its Unity-platform query unchanged.",
+      "file_offset": "0x1012a20",
+      "expected": "29db86520f000014",
+      "replacement": "2000805211000014"
+    },
+    {
+      "name": "keyboard-settings-category",
+      "reason": "Retain keyboard binding category 8 in the mobile settings registry while preserving all other platform filters.",
+      "file_offset": "0xcbf5e40",
+      "expected": "81010054",
+      "replacement": "0c000014"
+    }
+  ],
+  "bridge": {
+    "backend": "unity-input-system-v1",
+    "image_suffix": "/UnityFramework.framework/UnityFramework",
+    "mouse_state_bytes": 49,
+    "addresses": {
+      "Statics": "0x1b6248b8",
+      "NewString": "0x130abf0c",
+      "AddDevice": "0x12a497c4",
+      "MouseMakeCurrent": "0x12a00418",
+      "NativeTime": "0x12f03ec4",
+      "QueueInputEvent": "0x12f03f00",
+      "ScreenWidth": "0x12ebecd8",
+      "ScreenHeight": "0x12ebece8",
+      "CursorLock": "0x12e3eb48",
+      "CursorVisible": "0x12e3eb28",
+      "ReadVector2": "0x0",
+      "EnableMouseProcessing": "0xac07b14",
+      "GetMouseProcessing": "0xac07a24",
+      "MouseProcessingEnabled": "0xac078b0",
+      "ReadProcessedScroll": "0xac07580",
+      "LegacyMousePresent": "0x12f02600",
+      "LegacyMousePresentSlot": "0x1b621538"
+    },
+    "fields": {
+      "StaticInputManager": "0x2aea8",
+      "StaticKeyboard": "0x2b2f0",
+      "StaticMouse": "0x2b4f0",
+      "DeviceID": "0x154",
+      "StateBlock": "0x90",
+      "MousePosition": "0x178",
+      "MouseDelta": "0x168",
+      "MouseScroll": "0x1b0"
+    },
+    "native_menu_buttons": true
+  },
+  "validation": {
+    "keyboard_mouse": "3.3.1 methods, fields and live device initialization verified. Native menu button routing fixes the reported purchase quantity-slider snap-back. Category-filter correction restores binding labels and controls; the editor opens in a live test-profile launch. Saving and persisting a changed binding has not been tested.",
+    "trackpad": "Shared wheel conversion and momentum filter retained. Dedicated physical 3.3.1 trackpad regression check pending.",
+    "evidence": "docs/games/zzz.md"
+  },
+  "test_only": true
+}

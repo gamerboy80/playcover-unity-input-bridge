@@ -1,17 +1,19 @@
 """Load reviewed game profiles and generate constants for the shared bridge."""
 import json
+import hashlib
 from pathlib import Path, PurePosixPath
 import re
 import sys
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_PROFILE = 'com.HoYoverse.Nap-3.3.0'
+DEFAULT_PROFILE = 'com.HoYoverse.Nap-3.3.1'
 PROFILE_ALIASES = {
     'zzz': DEFAULT_PROFILE,
-    'zzz-3.3.0': DEFAULT_PROFILE,
+    'zzz-3.3.0': 'com.HoYoverse.Nap-3.3.0',
+    'zzz-3.3.1': DEFAULT_PROFILE,
     'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0',
     'endfield': 'com.gryphline.endfield.ios-1.6.3',
-    'zzz-test': 'com.HoYoverse.Nap-3.3.0-platform-pc-settings-test',
+    'zzz-test': 'com.HoYoverse.Nap-3.3.1-platform-pc-settings-test',
     'hsr-test': 'com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test',
 }
 ADDRESS_NAMES = {
@@ -145,6 +147,8 @@ def load_profile(profile_id=DEFAULT_PROFILE):
     require(isinstance(profile_id, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', profile_id),
             'Invalid profile ID. Use only letters, numbers, periods, underscores or hyphens.')
     path = ROOT / 'profiles' / (profile_id + '.json')
+    if not path.exists():
+        path = ROOT / '.local' / 'profiles' / (profile_id + '.json')
     try:
         data = json.loads(path.read_text())
     except FileNotFoundError as error:
@@ -169,12 +173,26 @@ def select_profile(info, profile_id=None):
         require(match_app(profile, info),
                 f"This app does not match profile {profile['id']}. Check the game version or choose another profile.")
         return profile
-    matches = [p for p in (load_profile(path.stem) for path in sorted((ROOT / 'profiles').glob('*.json')))
+    matches = [p for p in (load_profile(path.stem) for path in profile_paths())
                if not p.get('test_only') and match_app(p, info)]
+    reviewed = [p for p in matches if not p.get('resolution')]
+    matches = reviewed or matches
+    if not reviewed and len(matches) > 1:
+        contract = ROOT / 'signatures' / (info.get('CFBundleIdentifier', '') + '.json')
+        if contract.is_file():
+            expected = hashlib.sha256(json.dumps(json.loads(contract.read_text()), sort_keys=True).encode()).hexdigest()
+            matches = [p for p in matches if p.get('resolution', {}).get('contract_sha256') == expected]
     identity = f"{info.get('CFBundleIdentifier', '?')} {info.get('CFBundleShortVersionString', '?')}"
     require(matches, f"No matching profile for {identity}. Run `python3 patch.py profiles` to see supported game versions.")
     require(len(matches) == 1, f'Ambiguous profiles for {identity}; select --profile explicitly')
     return matches[0]
+
+
+def profile_paths(root=None):
+    root = ROOT if root is None else root
+    paths = list((root / 'profiles').glob('*.json')) + list((root / '.local' / 'profiles').glob('*.json'))
+    require(len({p.stem for p in paths}) == len(paths), 'A generated profile conflicts with a repository profile. Keep the saved backup and inspect .local/profiles.')
+    return sorted(paths)
 
 
 def instruction_patches(profile):
