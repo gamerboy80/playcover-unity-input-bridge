@@ -1,6 +1,29 @@
-# HSR 4.6.0
+# Honkai: Star Rail
 
-Profile: `com.HoYoverse.hkrpgoversea-4.6.0` (alias `hsr`); bundle:
+## 4.7.0
+
+`hsr` and `hsr-test` select 4.7.0. Both profiles were reconstructed from the
+local framework (SHA-256
+`43fced3fe4baeac769ce981ec09d49bdb02555c9ca5a1746160cae7d3e67e114`).
+The legacy input backend and 120-unit gameplay scroll scale carry over from
+4.6.0. Physical gameplay and settings verification are pending.
+
+The resolver found `AppUtils.get_IsPCLayout` at `0x111195c` and
+`UIUtils.get_IsPCMode` at `0x2543abc` by managed name. Each cursor patch
+matches a branch that tests the return of `AppUtils.get_IsMobilePlatform`
+at `0x1110d44`. `get_UseCursorMode` branches directly to the existing cursor
+state read. `InControlInputModule.Process` calls `ProcessTouchEvents` at
+`0xc9d1424`. The replacement calls the short `ProcessMouseEvent` wrapper at
+`0xc9d2ffc`, which supplies its own argument and tail calls the other overload.
+The UI and Unity scroll return PCs are `0xf1bcb78` and `0xf16d008`.
+
+The test profile writes enum 3 at `0x1111178` and changes the secondary
+mobile predicate comparison at `0x1110da0`. Both profiles apply the same
+menu input edits.
+
+## 4.6.0
+
+Profile: `com.HoYoverse.hkrpgoversea-4.6.0`; bundle:
 `com.HoYoverse.hkrpgoversea`; executable: `hkrpg`.
 
 This experimental profile uses the legacy Unity/InControl input backend.
@@ -158,14 +181,13 @@ profile remains test-only and excluded from automatic selection.
 
 ## Automatic signature resolution
 
-The native contract `signatures/com.HoYoverse.hkrpgoversea.json` resolves both
-regular and PC/settings profiles. It verifies native function contexts, decodes
-writable callback slots, cross-checks duplicate key getters and identifies the
-BLR return sites used for UI scroll normalization. Replacement calls and branches
-are calculated from independently matched destinations.
+The contract `signatures/com.HoYoverse.hkrpgoversea.json` resolves both regular
+and PC/settings profiles. It uses managed names for 4.7.0 and retains the
+native rules for the verified 4.6.0 binary. Both paths decode writable callback
+slots and verify the return sites for UI scroll normalization.
 
 Run `python3 patch.py resolve --profile hsr --app APP` to save an exact-build
 profile without modifying the app. Use `hsr-test` for the experimental variant.
-Resolution reproduces the reviewed 4.6.0 address and patch tables. New builds still
-need physical validation; encoded HSR metadata is not parsed using ZZZ's format.
+Resolution reproduces both sets of address and patch tables. New builds still
+need physical validation.
 See [automatic detection](../signatures.md) for limits and fixture checks.

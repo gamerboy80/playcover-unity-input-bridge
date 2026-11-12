@@ -36,6 +36,10 @@ experimental platform/settings variants.
 The contract lives in `signatures/com.HoYoverse.Nap.json`. It contains authored
 method identities and instruction signatures, not game binaries or metadata
 dumps. The same resolver produces the regular and experimental profile edits.
+The regular profile resolves only the methods it needs, so changes to the
+experimental platform queries do not block regular detection. The resolver
+extracts the state block offset from the verified getter and checks its range
+and alignment. It also checks the input selector edit at the function entry.
 Local profile IDs include the game version, variant and a signature-contract digest
 (`-auto-<digest>` or `-platform-pc-settings-auto-<digest>-test`). This keeps
 contract revisions separate without overwriting previously resolved profiles.
@@ -67,17 +71,19 @@ reviewed ZZZ 3.3.1 profiles and compares every address, field, edit and framewor
 hash. Set `ZZZ_ORIGINAL_FRAMEWORK` and `ZZZ_METADATA` to run it with local game
 files. These files must never be committed.
 
-## HSR native contract
+## HSR contract
 
-`signatures/com.HoYoverse.hkrpgoversea.json` covers both HSR 4.6.0 variants.
+`signatures/com.HoYoverse.hkrpgoversea.json` covers both HSR 4.6.0 and 4.7.0 variants.
 Use `resolve --profile hsr --app APP` or `resolve --profile hsr-test --app APP`
 for read-only detection. The unversioned `hsr` and `hsr-test` aliases also attempt
 resolution when applying to an unknown version; explicit versioned IDs stay strict.
 
-HSR has a different, encoded metadata layout. Its contract uses unique masked
-native instruction contexts rather than the ZZZ metadata parser. Each context
-must resolve to a function entry. Some tiny wrappers need neighboring instruction
-context for uniqueness; changes to their arrangement can require contract review.
+For 4.7.0 and later candidates, the resolver locates the HSR metadata accessors
+with masked ARM64 signatures, follows their table references and decodes class
+and method names from the MHY records. It follows the native method index to
+executable function entries, rejecting missing or ambiguous matches. The cursor
+and menu rules check the actual destination of the original call. The verified
+4.6.0 framework hash selects the earlier native-only rules.
 
 Callback slots are decoded from verified ADRP/ADD/LDR register chains and must
 land in writable data. Independent key wrappers must agree on the corresponding
@@ -88,9 +94,10 @@ or branch displacement is carried into the new profile.
 
 The legacy ABI and scroll scale remain the reviewed backend contract. Detection
 must stop on missing, ambiguous or changed instruction shapes; it does not prove
-future gameplay compatibility. The metadata file is retained only as an evidence
-hash in native-only mode. No game installation or launch is needed for resolution.
+future gameplay compatibility. A change to the metadata encoding, table accessors,
+managed names or input ABI can require updating the contract. No game installation
+or launch is needed for resolution.
 
-Set `HSR_ORIGINAL_FRAMEWORK` to run the optional local fixture check. It must
-reproduce every bridge address, byte patch and framework hash in both reviewed
-HSR profiles. Game files remain local and untracked.
+Set `HSR_ORIGINAL_FRAMEWORK` to the 4.6.0 framework and `HSR_47_APP` to the
+unpatched 4.7.0 app to run the optional local fixture checks. They compare
+every bridge address, byte patch and framework hash for both variants.

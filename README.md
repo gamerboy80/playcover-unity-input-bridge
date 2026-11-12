@@ -15,8 +15,8 @@ included or distributed.
 | --- | --- | --- | --- |
 | Zenless Zone Zero 3.3.1 | [`zzz`](profiles/com.HoYoverse.Nap-3.3.1.json) | Unity Input System | Updated methods and object layouts verified; launch and device initialization checked |
 | Zenless Zone Zero 3.3.1 | [`zzz-test`](profiles/com.HoYoverse.Nap-3.3.1-platform-pc-settings-test.json) | Unity Input System | Experimental app-platform and mobile-settings profile |
-| Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0`](profiles/com.HoYoverse.hkrpgoversea-4.6.0.json) | Unity legacy input / InControl | Keyboard, mouse capture/look, camera zoom and menu scrolling validated |
-| Honkai: Star Rail 4.6.0 | [`com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test`](profiles/com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test.json) | Unity legacy input / InControl | Test-only PC-platform and mobile-settings profile |
+| Honkai: Star Rail 4.7.0 | [`hsr`](profiles/com.HoYoverse.hkrpgoversea-4.7.0.json) | Unity legacy input / InControl | Static verification complete, gameplay verification pending |
+| Honkai: Star Rail 4.7.0 | [`hsr-test`](profiles/com.HoYoverse.hkrpgoversea-4.7.0-platform-pc-settings-test.json) | Unity legacy input / InControl | Experimental app-platform and mobile-settings profile |
 | Arknights: Endfield 1.6.3 | [`com.gryphline.endfield.ios-1.6.3`](profiles/com.gryphline.endfield.ios-1.6.3.json) | Unity Input System + legacy input | Experimental; WASD, capture, mouse look and menu clicks validated |
 
 Test-only profiles require explicit selection and are excluded from automatic
@@ -24,8 +24,8 @@ app matching. Validation applies only to the listed binary versions. See
 [ZZZ analysis](docs/games/zzz.md) and [HSR analysis](docs/games/hsr.md) for details and
 remaining limitations.
 
-The 3.3.0 ZZZ profiles remain available by their full IDs for older installations
-and restoration. `zzz` and `zzz-test` select 3.3.1.
+The ZZZ 3.3.0 and HSR 4.6.0 profiles remain available by their full IDs for older
+installations and restoration.
 
 ## Requirements
 
@@ -68,8 +68,8 @@ selected profile. Test profiles require explicit selection with `--profile`.
 
 For a ZZZ or HSR update without a reviewed profile, `apply --profile zzz` or
 `apply --profile hsr` tries to find the required methods and input mappings
-automatically. ZZZ combines managed method identities with native signatures;
-HSR uses native signatures, decoded callback slots and independent cross-checks. An ambiguous
+automatically. ZZZ and HSR combine managed method lookup with native signatures.
+HSR also verifies the targets of calls before editing cursor and menu behavior. An ambiguous
 or missing match stops installation. Successful detection saves an exact-build
 profile under `.local/profiles/`, so status, update and restore keep working.
 Detection verifies the supported input ABI; gameplay on a new build still needs

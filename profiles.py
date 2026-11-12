@@ -11,10 +11,10 @@ PROFILE_ALIASES = {
     'zzz': DEFAULT_PROFILE,
     'zzz-3.3.0': 'com.HoYoverse.Nap-3.3.0',
     'zzz-3.3.1': DEFAULT_PROFILE,
-    'hsr': 'com.HoYoverse.hkrpgoversea-4.6.0',
+    'hsr': 'com.HoYoverse.hkrpgoversea-4.7.0',
     'endfield': 'com.gryphline.endfield.ios-1.6.3',
     'zzz-test': 'com.HoYoverse.Nap-3.3.1-platform-pc-settings-test',
-    'hsr-test': 'com.HoYoverse.hkrpgoversea-4.6.0-platform-pc-settings-test',
+    'hsr-test': 'com.HoYoverse.hkrpgoversea-4.7.0-platform-pc-settings-test',
 }
 ADDRESS_NAMES = {
     'Statics', 'NewString', 'AddDevice', 'MouseMakeCurrent', 'NativeTime',

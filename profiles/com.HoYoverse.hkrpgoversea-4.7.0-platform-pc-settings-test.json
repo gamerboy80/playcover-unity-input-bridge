@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "id": "com.HoYoverse.hkrpgoversea-4.7.0-platform-pc-settings-test",
+  "game": "Honkai: Star Rail",
+  "version": "4.7.0",
+  "bundle_id": "com.HoYoverse.hkrpgoversea",
+  "executable": "hkrpg",
+  "architecture": "arm64",
+  "framework_binary": "Frameworks/UnityFramework.framework/UnityFramework",
+  "original_sha256": "43fced3fe4baeac769ce981ec09d49bdb02555c9ca5a1746160cae7d3e67e114",
+  "patches": [
+    {
+      "name": "global-platform-pc",
+      "reason": "AppUtils.InitPlatformType: map the iOS/macOS runtime branch to app platform enum 3 (PC/Windows); Unity RuntimePlatform itself remains iOS.",
+      "file_offset": "0x1111178",
+      "expected": "29008052",
+      "replacement": "69008052"
+    },
+    {
+      "name": "mobile-settings-gate-for-pc-platform",
+      "reason": "Experimental: AppUtils.IsMobilePlatform keeps its enum-2 branch and compares the other platform value against PC enum 3, allowing mobile-gated settings/UI paths while the app platform remains PC.",
+      "file_offset": "0x1110da0",
+      "expected": "1f050071",
+      "replacement": "1f0d0071"
+    },
+    {
+      "name": "ui-mouse-input-enabled",
+      "reason": "InControlInputModule.Process: allow the native mouse-processing path to run when the touch-only enable flag is clear.",
+      "file_offset": "0xc9d141c",
+      "expected": "61000054",
+      "replacement": "1f2003d5"
+    },
+    {
+      "name": "ui-mouse-processing",
+      "reason": "InControlInputModule.Process: route settings UI through its existing ProcessMouseEvent path so pointer and scroll data reach menu controls.",
+      "file_offset": "0xc9d1424",
+      "expected": "20010094",
+      "replacement": "f6060094"
+    }
+  ],
+  "bridge": {
+    "backend": "unity-legacy-v1",
+    "image_suffix": "/UnityFramework.framework/UnityFramework",
+    "mouse_state_bytes": 30,
+    "fields": {},
+    "addresses": {
+      "ScreenWidth": "0xf13aa5c",
+      "ScreenHeight": "0xf13aa6c",
+      "CursorLock": "0xf0fb710",
+      "CursorVisible": "0xf0fb6f0",
+      "FrameCount": "0xf144a78",
+      "MousePositionSlot": "0x1664cde0",
+      "MouseScrollSlot": "0x1664cde8",
+      "MouseButtonSlot": "0x1664ccc8",
+      "MouseButtonDownSlot": "0x1664ccd0",
+      "MouseButtonUpSlot": "0x1664ccd8",
+      "AxisSlot": "0x1664cca0",
+      "AxisRawSlot": "0x1664cca8",
+      "LegacyMousePresentSlot": "0x1664cd48",
+      "KeySlot": "0x1664cc68",
+      "KeyDownSlot": "0x1664cc90",
+      "KeyUpSlot": "0x1664cc78",
+      "AnyKeySlot": "0x1664cd00",
+      "AnyKeyDownSlot": "0x1664cd08",
+      "UIScrollReturn": "0xf1bcb78",
+      "ScrollWrapperReturn": "0xf16d008"
+    },
+    "scroll_units_per_step": 120
+  },
+  "validation": {
+    "keyboard_mouse": "Method addresses and patch sites verified on the 4.7.0 framework. Gameplay verification pending.",
+    "trackpad": "Callback slots and scroll return sites verified statically. Physical trackpad verification pending.",
+    "evidence": "docs/games/hsr.md"
+  },
+  "test_only": true
+}

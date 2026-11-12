@@ -95,6 +95,15 @@ class SignatureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'method records.*found 2'):
             Metadata(data)
 
+    def test_reports_all_missing_native_function_signatures(self):
+        absent = {'pattern': 'f0f0f0f0f0f0f0f0'}
+        with self.assertRaises(RuntimeError) as raised:
+            resolve_functions(Image(fixture_image()), None,
+                              {'FirstMissing': absent, 'SecondMissing': absent})
+        message = str(raised.exception)
+        self.assertIn('FirstMissing: expected one verified match, found 0', message)
+        self.assertIn('SecondMissing: expected one verified match, found 0', message)
+
     def test_scanner_rejects_ambiguity_alignment_and_overrun(self):
         pattern = bytes.fromhex('20008052c0035fd6')
         mask = b'\xff' * len(pattern)
@@ -154,9 +163,22 @@ class SignatureTests(unittest.TestCase):
     def test_hsr_binary_reconstructs_regular_and_test_profiles(self):
         binary = Path(os.environ['HSR_ORIGINAL_FRAMEWORK']).read_bytes()
         contract = json.loads((ROOT / 'signatures/com.HoYoverse.hkrpgoversea.json').read_text())
-        for alias in ('hsr', 'hsr-test'):
-            expected = load_profile(alias)
+        for suffix in ('', '-platform-pc-settings-test'):
+            expected = load_profile('com.HoYoverse.hkrpgoversea-4.6.0' + suffix)
             result = resolve_profile(binary, b'', expected, contract, expected['version'])
+            self.assertEqual(result['bridge'], expected['bridge'])
+            self.assertEqual(result['patches'], expected['patches'])
+            self.assertEqual(result['original_sha256'], expected['original_sha256'])
+
+    @unittest.skipUnless(os.environ.get('HSR_47_APP'), 'Optional local HSR 4.7.0 fixture')
+    def test_hsr_managed_names_reconstruct_both_47_profiles(self):
+        app = Path(os.environ['HSR_47_APP'])
+        contract = json.loads((ROOT / 'signatures/com.HoYoverse.hkrpgoversea.json').read_text())
+        metadata = (app / 'Data/Managed/Metadata/global-metadata.dat').read_bytes()
+        binary = (app / load_profile('hsr')['framework_binary']).read_bytes()
+        for suffix in ('', '-platform-pc-settings-test'):
+            expected = load_profile('com.HoYoverse.hkrpgoversea-4.7.0' + suffix)
+            result = resolve_profile(binary, metadata, expected, contract, expected['version'])
             self.assertEqual(result['bridge'], expected['bridge'])
             self.assertEqual(result['patches'], expected['patches'])
             self.assertEqual(result['original_sha256'], expected['original_sha256'])

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "zzz-input-system-arm64-v1",
+  "id": "zzz-input-system-arm64-v2",
   "bundle_id": "com.HoYoverse.Nap",
   "functions": {
     "InputSelector": {
@@ -13,8 +13,8 @@
       "parameters": 0
     },
     "AddDevice": {
-      "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fd030091f50302aaf30301aaf40300aa0800009008010091090140912801403908000036e00314aa0000009408000090080100910000003509014091200140f908004039080000340800009008010091080140f909014091360140f9ff7f00a9e0030091e10315aa00000094160000b4e31340a9e00316aae10314aae20313aa00000094fd7b43a9f44f42a9f65741a9ff030091",
-      "mask": "ffffffffffffffffffffffffffffffffff03c0ffffffffffffffffffffffffff1f00009fff03c0ffff03c0ffff03c0ff1f00f8ffffffffff000000fc1f00009fff03c0ff1f0000ffff03c0ffff03c0ffff03c0ff1f0000ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ffffffffffff03c0ffffffffff000000fc1f0000ffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffff03c0ff",
+      "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fd030091f50302aaf30301aaf40300aa",
+      "mask": "ffffffffffffffffffffffffffffffffff03c0ffffffffffffffffffffffffff",
       "module": "Unity.InputSystem.dll",
       "namespace": "UnityEngine.InputSystem",
       "class": "InputSystem",
@@ -40,8 +40,8 @@
       "parameters": 0
     },
     "KeyboardCurrent": {
-      "pattern": "fd7bbfa9fd0300910800009008010091090140912801403908000036080000900801009109014091200140f908004039080000340800009008010091080140f909014091200140f9fd7bc1a8c0035fd600000094000000140000009400000014",
-      "mask": "ffffffffff03c0ff1f00009fff03c0ffff03c0ffff03c0ff1f00f8ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ff1f0000ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ffffffffffffffffff000000fc000000fc000000fc000000fc",
+      "pattern": "fd7bbfa9fd0300910800009008010091090140912801403908000036080000900801009109014091200140f908004039080000340800009008010091080140f909014091200140f9fd7bc1a8c0035fd6",
+      "mask": "ffffffffff03c0ff1f00009fff03c0ffff03c0ffff03c0ff1f00f8ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ff1f0000ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ffffffffffffffffff",
       "module": "Unity.InputSystem.dll",
       "namespace": "UnityEngine.InputSystem",
       "class": "Keyboard",
@@ -59,7 +59,7 @@
     },
     "StateBlock": {
       "pattern": "080449a9e00308aac0035fd6",
-      "mask": "ffffffffffffffffffffffff",
+      "mask": "ff7fc0ffffffffffffffffff",
       "module": "Unity.InputSystem.dll",
       "namespace": "UnityEngine.InputSystem",
       "class": "InputControl",
@@ -130,31 +130,34 @@
       "parameters": 0
     },
     "AppPlatform": {
-      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa140000909402009108008052886a6838080000360800009008010091080140391f0500710000005415000090b50200911300003408008052a06a68f80800403908000034000000940000003408008052a06a68f8080040390800003408008052886a68380800003608008052a06a68f808004039080000340800009008010091000140b9fd7b42a9f44f41a9f657c3a8c0035fd608008052a06a68f80800403908000034fd7b42a9f44f41a9",
-      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ffff03c0ffffffffffffffffffffffffffffffffff1f00e0ffffffffffff03c0ff1f0000ffffffffffffffffff",
+      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa140000909402009108008052886a6838080000360800009008010091080140391f0500710000005415000090b50200911300003408008052a06a68f80800403908000034000000940000003408008052a06a68f8080040390800003408008052886a68380800003608008052a06a68f808004039080000340800009008010091000140b9",
+      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ffff03c0ff",
       "module": "Foundation.dll",
       "namespace": "Foundation",
       "class": "AppUtils",
       "method": "GetApplicationPlatform",
-      "parameters": 1
+      "parameters": 1,
+      "test_only": true
     },
     "AppMobile": {
-      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa140000909402009108008052886a6838080000360800009008010091080140391f0500710000005415000090b50200911300003408008052a06a68f80800403908000034000000940000003408008052a06a68f8080040390800003408008052886a68380800003608008052a06a68f8080040390800003408000090080100910900805200696938fd7b42a9f44f41a9f657c3a8c0035fd608008052a06a68f80800403908000034fd7b42a9",
-      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ff1f00e0ffffffffffffffffffffffffffffffffffffffffff1f00e0ffffffffffff03c0ff1f0000ffffffffff",
+      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa140000909402009108008052886a6838080000360800009008010091080140391f0500710000005415000090b50200911300003408008052a06a68f80800403908000034000000940000003408008052a06a68f8080040390800003408008052886a68380800003608008052a06a68f8080040390800003408000090080100910900805200696938",
+      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ff1f00e0ffffffffff",
       "module": "Foundation.dll",
       "namespace": "Foundation",
       "class": "AppUtils",
       "method": "IsMobilePlatform",
-      "parameters": 1
+      "parameters": 1,
+      "test_only": true
     },
     "AppPC": {
-      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa15000090b502009108008052a86a6838080000360800009008010091080140391f0500710000005414000090940200911300003408008052806a68f80800403908000034000000940000003408008052806a68f8080040390800003408008052a86a68380800003608008052806a68f808004039080000340800009008010091090080520000001408008052806a68f8080040390800003408008052a86a68380800003608008052806a68f808004039080000340800009008010091090080520869693800010012fd7b42a9f44f41a9f657c3a8c0035fd6",
-      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ff1f00e0ff000000fc1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ff1f00e0ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pattern": "f657bda9f44f01a9fd7b02a9fd030091f30300aa15000090b502009108008052a86a6838080000360800009008010091080140391f0500710000005414000090940200911300003408008052806a68f80800403908000034000000940000003408008052806a68f8080040390800003408008052a86a68380800003608008052806a68f8080040390800003408000090080100910900805200000014",
+      "mask": "ffffffffffffffffffffffffff03c0ffffffffff1f00009fff03c0ff1f00e0ffffffffff1f00f8ff1f00009fff03c0ffff03c0ffffffffff1f0000ff1f00009fff03c0ff1f0000ff1f00e0ffffffffffff03c0ff1f0000ff000000fc1f0000ff1f00e0ffffffffffff03c0ff1f0000ff1f00e0ffffffffff1f00f8ff1f00e0ffffffffffff03c0ff1f0000ff1f00009fff03c0ff1f00e0ff000000fc",
       "module": "Foundation.dll",
       "namespace": "Foundation",
       "class": "AppUtils",
       "method": "IsPCPlatform",
-      "parameters": 1
+      "parameters": 1,
+      "test_only": true
     },
     "NewString": {
       "pattern": "ff4301d1f65702a9f44f03a9fd7b04a9fd030091e103012af3030091e803009100000094e803c039e90340f9ea0340b91f010071",
@@ -233,8 +236,8 @@
       "parameters": 1
     },
     "SettingsCategoryFilter": {
-      "pattern": "f44fbea9fd7b01a9fd030091f40301aaf30300aa0800009008010091090140912801403908000036080000900801009109014091280140391f0500710000005414000035080000900801009109014091200140f908004039080000340000805200000094f40300aa9f0e00710c000054880a00511f090071020000547f22007101000054000000149f120071000000549f1a007101000054080080527f02086b01000054000000149f06007101000054080080527f02086b0100005408000090",
-      "mask": "ffffffffffffffffff03c0ffffffffffffffffff1f00009fff03c0ffff03c0ffff03c0ff1f00f8ff1f00009fff03c0ffff03c0ffff03c0ffffffffff1f0000ff1f0000ff1f00009fff03c0ffff03c0ffff03c0ffff03c0ff1f0000ff1f00e0ff000000fcffffffffffffffff1f0000ffffffffffffffffff1f0000ffffffffff1f0000ff000000fcffffffff1f0000ffffffffff1f0000ff1f00e0ffffffffff1f0000ff000000fcffffffff1f0000ff1f00e0ffffffffff1f0000ff1f00009f",
+      "pattern": "f44fbea9fd7b01a9fd030091f40301aaf30300aa",
+      "mask": "ffffffffffffffffff03c0ffffffffffffffffff",
       "module": "Logic.dll",
       "namespace": "",
       "class": "CHODNEDHGJE",
@@ -309,7 +312,7 @@
     },
     "StateBlock": {
       "pattern": "080449a9e00308aac0035fd6",
-      "mask": "ffffffffffffffffffffffff",
+      "mask": "ff7fc0ffffffffffffffffff",
       "function": "StateBlock",
       "kind": "pair-load",
       "offset": 0,
@@ -402,7 +405,8 @@
       "offset": 0,
       "expected": "f44fbea9fd7b01a9",
       "replacement": "40008052c0035fd6",
-      "expected_mask": "ffffffffffffffff"
+      "expected_mask": "ffffffffffffffff",
+      "entry": true
     },
     "app-platform-pc-enum": {
       "pattern": "0800009008010091000140b9fd7b42a9f44f41a9f657c3a8c0035fd6",

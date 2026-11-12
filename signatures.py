@@ -173,24 +173,125 @@ def rule_bytes(rule):
     return pattern, mask
 
 
+class HsrMethods:
+    """Resolve managed names through the verified MHY tables and native index."""
+
+    def __init__(self, image, data, contract, wanted):
+        require(data.startswith(b'MHY\0'), 'Unsupported HSR metadata header')
+        helpers = resolve_functions(image, None, contract['helpers'])
+        locations = {}
+        for name, rule in contract['locations'].items():
+            function = helpers[rule['function']]
+            offset = unique(scan(image.body(function), *rule_bytes(rule)), f'HSR {name} table reference')
+            locations[name] = decode(image, function + offset, 'adrp-add')
+
+        def table(name, stride):
+            pos = image.file(locations[name], 8)
+            start, size = struct.unpack_from('<II', image.data, pos)
+            start += 0x208
+            require(size >= stride and start + size <= len(data), f'Invalid HSR {name} table bounds')
+            return start, size // stride
+
+        types, type_count = table('types', 70)
+        methods, method_count = table('methods', 26)
+        strings = 0x208 + struct.unpack_from('<I', image.data, image.file(locations['strings'], 4))[0]
+        require(strings < len(data), 'Invalid HSR string table bounds')
+        pointers = struct.unpack_from('<Q', image.data, image.file(locations['pointers'], 8))[0]
+        self.image, self.index = image, {}
+
+        def name(token):
+            if token == 0xffffffff:
+                return ''
+            if token & 0x80000000:
+                length, offset = (token >> 23) & 255, token & 0x7fffff
+            else:
+                length, offset = token >> 25, token & 0x1ffffff
+            start = strings + offset
+            size = (length + 7) & ~7
+            require(start + size <= len(data), 'Invalid HSR metadata name offset')
+            mask = (1 << 64) - 1
+            key = ((offset * 0x2b223d8800a99250 + 0x7fe5c12e5e83991b) & mask) ^ 0x1116ec07046b892f
+            decoded = bytearray()
+            for (block,) in struct.iter_unpack('<Q', data[start:start + size]):
+                decoded.extend((block ^ key).to_bytes(8, 'little'))
+                key = (key + 0x603a0ce018305482) & mask
+            return decoded[:length].decode('utf-8', errors='replace')
+
+        for i in range(type_count):
+            row = types + i * 70
+            cls = name(struct.unpack_from('<I', data, row)[0] ^ 0x6aec8c0d)
+            if cls not in wanted:
+                continue
+            first = struct.unpack_from('<I', data, row + 0x24)[0] ^ 0x37105e01
+            count = (struct.unpack_from('<H', data, row + 0x36)[0] - 0x4abf) & 0xffff
+            require(not count or first + count <= method_count, f'Invalid HSR method range for {cls}')
+            for j in range(first, first + count):
+                key = (((j * 0x4fbdb37d09) >> 14) * 0xa417dd) ^ 0x4f09b4
+                raw = struct.unpack_from('<I', data, methods + j * 26 + 4)[0]
+                method = name(((raw ^ 0x6677ebb1) - key) & 0xffffffff)
+                if method in wanted[cls]:
+                    entry = image.file(pointers + j * 8, 8, '__DATA_CONST')
+                    address = struct.unpack_from('<Q', image.data, entry)[0]
+                    self.index.setdefault((cls, method), []).append(address)
+
+    def address(self, rule):
+        candidates = []
+        overloads = self.index.get((rule['class'], rule['method']), ())
+        for address in overloads:
+            if not address:
+                continue
+            body = self.image.body(address)
+            if 'pattern' in rule:
+                pattern, mask = rule_bytes(rule)
+                if not matches(body[:len(pattern)], pattern, mask):
+                    continue
+            if rule.get('tail_calls_overload'):
+                branch = struct.unpack_from('<I', body, 4)[0]
+                target = address + 4 + signed(branch & 0x3ffffff, 26) * 4
+                if branch >> 26 != 5 or target == address or target not in overloads:
+                    continue
+            candidates.append(address)
+        return unique(candidates, f'{rule["class"]}.{rule["method"]}')
+
+
 def resolve_functions(image, metadata, rules):
-    resolved, modules = {}, {}
+    resolved, modules, errors = {}, {}, []
     for name, rule in rules.items():
         if 'method' in rule:
-            require(metadata is not None, 'Managed method resolution requires supported metadata')
-            modules.setdefault(rule['module'], []).append((name, rule, metadata.method(rule)))
+            if metadata is None:
+                errors.append(f'{name}: managed method resolution requires supported metadata')
+                continue
+            try:
+                if isinstance(metadata, HsrMethods):
+                    resolved[name] = metadata.address(rule)
+                    continue
+                token = metadata.method(rule)
+            except RuntimeError as error:
+                errors.append(f'{name}: {error}')
+                continue
+            modules.setdefault(rule['module'], []).append((name, rule, token))
         else:
-            pattern, mask = rule_bytes(rule)
-            _, count, start = image.sections['__TEXT', '__text']
-            position = unique(scan(image.data, pattern, mask, start, start + count), name)
-            address = image.vm(position) - rule.get('offset', 0)
-            image.body(address)
-            resolved[name] = address
+            try:
+                pattern, mask = rule_bytes(rule)
+                _, count, start = image.sections['__TEXT', '__text']
+                positions = list(scan(image.data, pattern, mask, start, start + count))
+                if len(positions) != 1:
+                    errors.append(f'{name}: expected one verified match, found {len(positions)}')
+                    continue
+                address = image.vm(positions[0]) - rule.get('offset', 0)
+                image.body(address)
+                resolved[name] = address
+            except RuntimeError as error:
+                errors.append(f'{name}: {error}')
     for module, members in modules.items():
-        needle = b'\0' + module.encode() + b'\0'
-        string = unique(scan(image.data, needle, b'\xff' * len(needle), alignment=1), module) + 1
-        refs = [pos for pos in scan(image.data, struct.pack('<I', image.vm(string) & 0xffffffff), b'\xff' * 4, alignment=8)
-                if pos + 8 <= len(image.data) and struct.unpack_from('<Q', image.data, pos)[0] & 0xfffffffff == image.vm(string)]
+        try:
+            needle = b'\0' + module.encode() + b'\0'
+            string = unique(scan(image.data, needle, b'\xff' * len(needle), alignment=1), module) + 1
+            refs = [pos for pos in scan(image.data, struct.pack('<I', image.vm(string) & 0xffffffff), b'\xff' * 4, alignment=8)
+                    if pos + 8 <= len(image.data) and struct.unpack_from('<Q', image.data, pos)[0] & 0xfffffffff == image.vm(string)]
+        except RuntimeError as error:
+            errors.append(f'{module} method table: {error}')
+            continue
         candidates = []
         for ref in refs:
             if not any(name != '__TEXT' and off <= ref < off + stored for name, _, _, off, stored in image.segments):
@@ -215,12 +316,24 @@ def resolve_functions(image, metadata, rules):
                             candidates.append(tuple(sorted(found.items())))
                     except RuntimeError:
                         continue
-        resolved.update(dict(unique(candidates, f'{module} method table and ABI signatures')))
+        try:
+            resolved.update(dict(unique(candidates, f'{module} method table and ABI signatures')))
+        except RuntimeError as error:
+            errors.append(f'{module} method table: {error}')
+    if errors:
+        raise RuntimeError('Function signature checks failed:\n' + '\n'.join(f'- {error}' for error in errors))
     return resolved
 
 
 def signed(value, bits):
     return value - (1 << bits) if value & (1 << (bits - 1)) else value
+
+
+def direct_call_target(body, function, offset):
+    if 0 <= offset <= len(body) - 4:
+        instruction = struct.unpack_from('<I', body, offset)[0]
+        if instruction & 0xfc000000 == 0x94000000:
+            return function + offset + signed(instruction & 0x3ffffff, 26) * 4
 
 
 def decode(image, address, kind):
@@ -262,7 +375,19 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
     image = Image(binary)
     require(contract.get('metadata', 'zzz') in ('zzz', 'none'), 'Unsupported metadata resolution mode')
     metadata = Metadata(metadata_bytes) if contract.get('metadata', 'zzz') == 'zzz' else None
-    functions = resolve_functions(image, metadata, contract['functions'])
+    function_rules = {name: rule for name, rule in contract['functions'].items()
+                      if not rule.get('test_only') or template.get('test_only')}
+    patch_rules = contract['patches']
+    framework_hash = hashlib.sha256(binary).hexdigest()
+    managed = contract.get('managed')
+    if managed and framework_hash != managed['legacy_sha256']:
+        wanted = {}
+        for rule in managed['functions'].values():
+            wanted.setdefault(rule['class'], set()).add(rule['method'])
+        metadata = HsrMethods(image, metadata_bytes, managed, wanted)
+        function_rules = {**function_rules, **managed['functions']}
+        patch_rules = {**patch_rules, **managed['patches']}
+    functions = resolve_functions(image, metadata, function_rules)
     values, evidence = {}, {}
     for name, rule in contract['extract'].items():
         body = image.body(functions[rule['function']])
@@ -279,7 +404,7 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
     result = copy.deepcopy(template)
     suffix = '-platform-pc-settings-test' if template.get('test_only') else ''
     result.update(id=f'{template["bundle_id"]}-{version}{suffix}', version=version,
-                  original_sha256=hashlib.sha256(binary).hexdigest())
+                  original_sha256=framework_hash)
     for name, source in contract['addresses'].items():
         value = functions[source] if source in functions else values[source]
         if name == 'Statics' or name.endswith('Slot'):
@@ -291,11 +416,21 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
     for name, source in contract['fields'].items():
         result['bridge']['fields'][name] = hex(values[source])
     for patch in result['patches']:
-        rule = contract['patches'][patch['name']]
-        body = image.body(functions[rule['function']])
+        rule = patch_rules[patch['name']]
+        function = functions[rule['function']]
+        body = image.body(function)
         pattern, mask = rule_bytes(rule)
-        found = unique(scan(body, pattern, mask), patch['name'])
-        offset = image.file(functions[rule['function']] + found + rule.get('offset', 0))
+        if 'calls' in rule:
+            target = functions[rule['calls']]
+            candidates = (pos for pos in range(0, len(body) - len(pattern) + 1, 4)
+                          if direct_call_target(body, function, pos + rule['call_at']) == target
+                          and matches(body[pos:pos + len(pattern)], pattern, mask))
+        elif rule.get('entry'):
+            candidates = [0] if matches(body[:len(pattern)], pattern, mask) else []
+        else:
+            candidates = scan(body, pattern, mask)
+        found = unique(candidates, patch['name'])
+        offset = image.file(function + found + rule.get('offset', 0))
         expected = bytes.fromhex(rule['expected'])
         actual = binary[offset:offset + len(expected)]
         require(matches(actual, expected, bytes.fromhex(rule.get('expected_mask', 'ff' * len(expected)))),
@@ -309,7 +444,7 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
         if 'branch_to' in rule:
             target_pattern, target_mask = rule_bytes(rule['branch_to'])
             target = unique(scan(body, target_pattern, target_mask), patch['name'] + ' return path')
-            delta = image.file(functions[rule['function']] + target) - (offset + len(replacement) - 4)
+            delta = function + target - (image.vm(offset) + len(replacement) - 4)
             require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Patch branch target is out of range')
             replacement = replacement[:-4] + struct.pack('<I', 0x14000000 | ((delta // 4) & 0x3ffffff))
         patch.update(file_offset=hex(offset), expected=actual.hex(), replacement=replacement.hex())
