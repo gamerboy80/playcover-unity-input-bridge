@@ -241,17 +241,40 @@ class HsrMethods:
             if not address:
                 continue
             body = self.image.body(address)
-            if 'pattern' in rule:
-                pattern, mask = rule_bytes(rule)
-                if not matches(body[:len(pattern)], pattern, mask):
-                    continue
             if rule.get('tail_calls_overload'):
+                if len(body) < 8:
+                    continue
                 branch = struct.unpack_from('<I', body, 4)[0]
                 target = address + 4 + signed(branch & 0x3ffffff, 26) * 4
                 if branch >> 26 != 5 or target == address or target not in overloads:
                     continue
             candidates.append(address)
         return unique(candidates, f'{rule["class"]}.{rule["method"]}')
+
+
+def verify_function(image, address, rule):
+    body = image.body(address)
+    require(rule.get('abi') in (None, 'callback'), 'Unsupported function ABI check')
+    if 'verify' in rule:
+        check = rule['verify']
+        pattern, mask = rule_bytes(check)
+        offset = check.get('offset', 0)
+        require(matches(body[offset:offset + len(pattern)], pattern, mask),
+                'method found, but required instructions changed')
+    if rule.get('abi') == 'callback':
+        require(len(body) >= 16, 'Truncated callback wrapper')
+        slot = decode(image, address, 'adrp-add-load')
+        load, branch = struct.unpack_from('<II', body, 8)
+        register = load & 31
+        require(branch == (0xd61f0000 | (register << 5)), 'Callback wrapper does not branch to its loaded pointer')
+        require(any(segment == '__DATA' and vm <= slot and slot + 8 <= vm + size
+                    for segment, vm, size, _, _ in image.segments), 'Callback slot is outside writable data')
+    # Existing contracts can still request an explicit entry signature.
+    if 'pattern' in rule and 'method' in rule:
+        pattern, mask = rule_bytes(rule)
+        offset = rule.get('offset', 0)
+        require(matches(body[offset:offset + len(pattern)], pattern, mask),
+                'method found, but legacy entry signature changed')
 
 
 def resolve_functions(image, metadata, rules):
@@ -285,6 +308,8 @@ def resolve_functions(image, metadata, rules):
                 errors.append(f'{name}: {error}')
     for module, members in modules.items():
         try:
+            require(any('registration_anchor' in rule or 'pattern' in rule for _, rule, _ in members),
+                    'At least one independent registration anchor is required')
             needle = b'\0' + module.encode() + b'\0'
             string = unique(scan(image.data, needle, b'\xff' * len(needle), alignment=1), module) + 1
             refs = [pos for pos in scan(image.data, struct.pack('<I', image.vm(string) & 0xffffffff), b'\xff' * 4, alignment=8)
@@ -307,19 +332,28 @@ def resolve_functions(image, metadata, rules):
                             entry = image.file(pointer + (token + bias) * 8, 8)
                             address = struct.unpack_from('<Q', image.data, entry)[0] & 0xfffffffff
                             body = image.body(address)
-                            pattern, mask = rule_bytes(rule)
-                            offset = rule.get('offset', 0)
-                            if not matches(body[offset:offset + len(pattern)], pattern, mask):
-                                break
+                            anchor = rule.get('registration_anchor', rule if 'pattern' in rule else None)
+                            if anchor is not None:
+                                pattern, mask = rule_bytes(anchor)
+                                offset = anchor.get('offset', 0)
+                                valid = (len(list(scan(body, pattern, mask))) == 1 if anchor.get('search')
+                                         else matches(body[offset:offset + len(pattern)], pattern, mask))
+                                if not valid:
+                                    break
                             found[name] = address
                         else:
                             candidates.append(tuple(sorted(found.items())))
                     except RuntimeError:
                         continue
         try:
-            resolved.update(dict(unique(candidates, f'{module} method table and ABI signatures')))
+            resolved.update(dict(unique(candidates, f'{module} native method table')))
         except RuntimeError as error:
             errors.append(f'{module} method table: {error}')
+    for name, address in resolved.items():
+        try:
+            verify_function(image, address, rules[name])
+        except RuntimeError as error:
+            errors.append(f'{name} validation: {error}')
     if errors:
         raise RuntimeError('Function signature checks failed:\n' + '\n'.join(f'- {error}' for error in errors))
     return resolved
@@ -388,19 +422,25 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
         function_rules = {**function_rules, **managed['functions']}
         patch_rules = {**patch_rules, **managed['patches']}
     functions = resolve_functions(image, metadata, function_rules)
-    values, evidence = {}, {}
+    values, evidence, errors = {}, {}, []
     for name, rule in contract['extract'].items():
-        body = image.body(functions[rule['function']])
-        pattern, mask = rule_bytes(rule)
-        offset = unique(scan(body, pattern, mask), name)
-        at = functions[rule['function']] + offset + rule.get('offset', 0)
-        value = decode(image, at, rule['kind'])
-        require(rule.get('minimum', 0) <= value <= rule.get('maximum', 2**64 - 1), f'{name}: implausible resolved value')
-        require(value % rule.get('alignment', 1) == 0, f'{name}: misaligned resolved value')
-        values[name] = value
-        evidence[name] = {'function': rule['function'], 'instruction': hex(at), 'value': hex(value)}
+        try:
+            body = image.body(functions[rule['function']])
+            pattern, mask = rule_bytes(rule)
+            offset = unique(scan(body, pattern, mask), name)
+            at = functions[rule['function']] + offset + rule.get('offset', 0)
+            value = decode(image, at, rule['kind'])
+            require(rule.get('minimum', 0) <= value <= rule.get('maximum', 2**64 - 1), f'{name}: implausible resolved value')
+            require(value % rule.get('alignment', 1) == 0, f'{name}: misaligned resolved value')
+            values[name] = value
+            evidence[name] = {'function': rule['function'], 'instruction': hex(at), 'value': hex(value)}
+        except RuntimeError as error:
+            errors.append(f'{name} extraction: {error}')
     for left, right in contract['equal']:
-        require(values[left] == values[right], f'Cross-check failed: {left} differs from {right}')
+        if left in values and right in values and values[left] != values[right]:
+            errors.append(f'Cross-check failed: {left} differs from {right}')
+    if errors:
+        raise RuntimeError('Field and callback checks failed:\n' + '\n'.join(f'- {error}' for error in errors))
     result = copy.deepcopy(template)
     suffix = '-platform-pc-settings-test' if template.get('test_only') else ''
     result.update(id=f'{template["bundle_id"]}-{version}{suffix}', version=version,
@@ -415,39 +455,45 @@ def resolve_profile(binary, metadata_bytes, template, contract, version):
         result['bridge']['addresses'][name] = hex(value)
     for name, source in contract['fields'].items():
         result['bridge']['fields'][name] = hex(values[source])
+    errors = []
     for patch in result['patches']:
-        rule = patch_rules[patch['name']]
-        function = functions[rule['function']]
-        body = image.body(function)
-        pattern, mask = rule_bytes(rule)
-        if 'calls' in rule:
-            target = functions[rule['calls']]
-            candidates = (pos for pos in range(0, len(body) - len(pattern) + 1, 4)
-                          if direct_call_target(body, function, pos + rule['call_at']) == target
-                          and matches(body[pos:pos + len(pattern)], pattern, mask))
-        elif rule.get('entry'):
-            candidates = [0] if matches(body[:len(pattern)], pattern, mask) else []
-        else:
-            candidates = scan(body, pattern, mask)
-        found = unique(candidates, patch['name'])
-        offset = image.file(function + found + rule.get('offset', 0))
-        expected = bytes.fromhex(rule['expected'])
-        actual = binary[offset:offset + len(expected)]
-        require(matches(actual, expected, bytes.fromhex(rule.get('expected_mask', 'ff' * len(expected)))),
-                f'{patch["name"]}: replacement ABI changed')
-        replacement = bytes.fromhex(rule['replacement'])
-        if 'call_to' in rule:
-            require(len(actual) == 4 and struct.unpack('<I', actual)[0] & 0xfc000000 == 0x94000000, 'Expected direct BL for redirected call')
-            delta = functions[rule['call_to']] - image.vm(offset)
-            require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Redirected call is out of range')
-            replacement = struct.pack('<I', 0x94000000 | ((delta // 4) & 0x3ffffff))
-        if 'branch_to' in rule:
-            target_pattern, target_mask = rule_bytes(rule['branch_to'])
-            target = unique(scan(body, target_pattern, target_mask), patch['name'] + ' return path')
-            delta = function + target - (image.vm(offset) + len(replacement) - 4)
-            require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Patch branch target is out of range')
-            replacement = replacement[:-4] + struct.pack('<I', 0x14000000 | ((delta // 4) & 0x3ffffff))
-        patch.update(file_offset=hex(offset), expected=actual.hex(), replacement=replacement.hex())
+        try:
+            rule = patch_rules[patch['name']]
+            function = functions[rule['function']]
+            body = image.body(function)
+            pattern, mask = rule_bytes(rule)
+            if 'calls' in rule:
+                target = functions[rule['calls']]
+                candidates = (pos for pos in range(0, len(body) - len(pattern) + 1, 4)
+                              if direct_call_target(body, function, pos + rule['call_at']) == target
+                              and matches(body[pos:pos + len(pattern)], pattern, mask))
+            elif rule.get('entry'):
+                candidates = [0] if matches(body[:len(pattern)], pattern, mask) else []
+            else:
+                candidates = scan(body, pattern, mask)
+            found = unique(candidates, patch['name'])
+            offset = image.file(function + found + rule.get('offset', 0))
+            expected = bytes.fromhex(rule['expected'])
+            actual = binary[offset:offset + len(expected)]
+            require(matches(actual, expected, bytes.fromhex(rule.get('expected_mask', 'ff' * len(expected)))),
+                    f'{patch["name"]}: replacement ABI changed')
+            replacement = bytes.fromhex(rule['replacement'])
+            if 'call_to' in rule:
+                require(len(actual) == 4 and struct.unpack('<I', actual)[0] & 0xfc000000 == 0x94000000, 'Expected direct BL for redirected call')
+                delta = functions[rule['call_to']] - image.vm(offset)
+                require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Redirected call is out of range')
+                replacement = struct.pack('<I', 0x94000000 | ((delta // 4) & 0x3ffffff))
+            if 'branch_to' in rule:
+                target_pattern, target_mask = rule_bytes(rule['branch_to'])
+                target = unique(scan(body, target_pattern, target_mask), patch['name'] + ' return path')
+                delta = function + target - (image.vm(offset) + len(replacement) - 4)
+                require(delta % 4 == 0 and -(1 << 27) <= delta < (1 << 27), 'Patch branch target is out of range')
+                replacement = replacement[:-4] + struct.pack('<I', 0x14000000 | ((delta // 4) & 0x3ffffff))
+            patch.update(file_offset=hex(offset), expected=actual.hex(), replacement=replacement.hex())
+        except RuntimeError as error:
+            errors.append(f'{patch["name"]}: {error}')
+    if errors:
+        raise RuntimeError('Patch instruction checks failed:\n' + '\n'.join(f'- {error}' for error in errors))
     if template['bridge']['backend'] == 'unity-input-system-v1':
         result['bridge']['addresses']['ReadVector2'] = '0x0'
     result['resolution'] = {'contract': contract['id'],

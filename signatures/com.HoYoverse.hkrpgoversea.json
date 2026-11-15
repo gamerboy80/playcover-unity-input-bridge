@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "hsr-legacy-arm64-v2",
+  "id": "hsr-legacy-arm64-v3",
   "bundle_id": "com.HoYoverse.hkrpgoversea",
   "metadata": "none",
   "functions": {
@@ -464,56 +464,43 @@
       "ScreenWidth": {
         "class": "Screen",
         "method": "get_width",
-        "pattern": "0800009008010091000140f900001fd6",
-        "mask": "1f00009fff03c0ffff03c0ffffffffff"
+        "abi": "callback"
       },
       "ScreenHeight": {
         "class": "Screen",
         "method": "get_height",
-        "pattern": "0800009008010091000140f900001fd6",
-        "mask": "1f00009fff03c0ffff03c0ffffffffff"
+        "abi": "callback"
       },
       "CursorLock": {
         "class": "Cursor",
         "method": "get_lockState",
-        "pattern": "0800009008010091000140f900001fd6",
-        "mask": "1f00009fff03c0ffff03c0ffffffffff"
+        "abi": "callback"
       },
       "CursorVisible": {
         "class": "Cursor",
         "method": "get_visible",
-        "pattern": "0800009008010091000140f900001fd6",
-        "mask": "1f00009fff03c0ffff03c0ffffffffff"
+        "abi": "callback"
       },
       "FrameCount": {
         "class": "Time",
         "method": "get_frameCount",
-        "pattern": "0800009008010091000140f900001fd6",
-        "mask": "1f00009fff03c0ffff03c0ffffffffff"
+        "abi": "callback"
       },
       "pc-layoutFunction": {
         "class": "AppUtils",
-        "method": "get_IsPCLayout",
-        "pattern": "f44fbea9fd7b01a9fd030091",
-        "mask": "ffffffffffffffffff03c0ff"
+        "method": "get_IsPCLayout"
       },
       "pc-uiFunction": {
         "class": "UIUtils",
-        "method": "get_IsPCMode",
-        "pattern": "f44fbea9fd7b01a9fd030091",
-        "mask": "ffffffffffffffffff03c0ff"
+        "method": "get_IsPCMode"
       },
       "global-platform-pcFunction": {
         "class": "AppUtils",
-        "method": "InitPlatformType",
-        "pattern": "f44fbea9fd7b01a9fd030091",
-        "mask": "ffffffffffffffffff03c0ff"
+        "method": "InitPlatformType"
       },
       "mobile-settings-gate-for-pc-platformFunction": {
         "class": "AppUtils",
-        "method": "get_IsMobilePlatform",
-        "pattern": "f44fbea9fd7b01a9fd030091",
-        "mask": "ffffffffffffffffff03c0ff"
+        "method": "get_IsMobilePlatform"
       },
       "cursor-show-mobile-gateFunction": {
         "class": "MouseInputController",
@@ -550,9 +537,11 @@
       "ProcessMouseEvent": {
         "class": "InControlInputModule",
         "method": "ProcessMouseEvent",
-        "pattern": "0100805200000014",
-        "mask": "dfffffff000000fc",
-        "tail_calls_overload": true
+        "tail_calls_overload": true,
+        "verify": {
+          "pattern": "0100805200000014",
+          "mask": "dfffffff000000fc"
+        }
       }
     },
     "patches": {

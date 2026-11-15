@@ -5,7 +5,7 @@ import struct
 import unittest
 
 from profiles import ROOT, load_profile
-from signatures import Image, Metadata, decode, resolve_functions, resolve_profile, scan, unique
+from signatures import Image, Metadata, decode, resolve_functions, resolve_profile, scan, unique, verify_function
 
 
 def uleb(value):
@@ -84,7 +84,7 @@ class SignatureTests(unittest.TestCase):
         metadata = Metadata(fixture_metadata())
         rules = self.rules()
         rules['Bar']['pattern'] = '40008052c0035fd6'
-        with self.assertRaisesRegex(RuntimeError, 'verified match, found 0'):
+        with self.assertRaisesRegex(RuntimeError, 'native method table.*found 0'):
             resolve_functions(Image(fixture_image()), metadata, rules)
         rules = self.rules()
         rules['Foo']['parameters'] = 3
@@ -103,6 +103,35 @@ class SignatureTests(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn('FirstMissing: expected one verified match, found 0', message)
         self.assertIn('SecondMissing: expected one verified match, found 0', message)
+
+    def test_named_method_resolution_allows_changed_body_and_checks_after_lookup(self):
+        metadata = Metadata(fixture_metadata())
+        rules = self.rules()
+        rules['Foo']['registration_anchor'] = {
+            'pattern': rules['Foo'].pop('pattern'), 'mask': rules['Foo'].pop('mask')}
+        del rules['Bar']['pattern']
+        data = fixture_image()
+        struct.pack_into('<II', data, 0x240, 0x52800040, 0xd65f03c0)
+        functions = resolve_functions(Image(data), metadata, rules)
+        self.assertEqual(functions['Bar'], 0x10000240)
+        rules['Bar']['verify'] = {'pattern': '20008052c0035fd6'}
+        with self.assertRaisesRegex(RuntimeError, 'Bar validation: method found'):
+            resolve_functions(Image(data), metadata, rules)
+        # An entry check must never choose between two otherwise valid tables.
+        struct.pack_into('<Q', data, 0x1100 - 16, 0x20000300)
+        struct.pack_into('<QQ', data, 0x1300 + 16, 0x10000220, 0x10000200)
+        with self.assertRaisesRegex(RuntimeError, 'native method table.*found 2'):
+            resolve_functions(Image(data), metadata, rules)
+
+    def test_callback_check_allows_register_changes_but_requires_the_loaded_target(self):
+        data = fixture_image()
+        for register in (1, 4):
+            struct.pack_into('<4I', data, 0x220, 0x90080008, 0x91000108,
+                             0xf9401100 | register, 0xd61f0000 | (register << 5))
+            verify_function(Image(data), 0x10000220, {'abi': 'callback'})
+        struct.pack_into('<I', data, 0x22c, 0xd61f0000)
+        with self.assertRaisesRegex(RuntimeError, 'loaded pointer'):
+            verify_function(Image(data), 0x10000220, {'abi': 'callback'})
 
     def test_scanner_rejects_ambiguity_alignment_and_overrun(self):
         pattern = bytes.fromhex('20008052c0035fd6')
@@ -154,6 +183,14 @@ class SignatureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'outside writable data'):
             resolve_profile(data, b'', profile, contract, '4.6.0')
         contract['addresses']['KeySlot'] = 'Slot'
+        invalid = dict(function='Caller', pattern='f0f0f0f0', kind='return-pc')
+        contract['extract'].update(FirstMissing=invalid, SecondMissing=invalid)
+        with self.assertRaises(RuntimeError) as raised:
+            resolve_profile(data, b'', profile, contract, '4.6.0')
+        self.assertIn('FirstMissing extraction:', str(raised.exception))
+        self.assertIn('SecondMissing extraction:', str(raised.exception))
+        del contract['extract']['FirstMissing'], contract['extract']['SecondMissing']
+        contract['addresses']['KeySlot'] = 'Slot'
         # A return address must follow BLR.
         struct.pack_into('<I', data, 0x240, 0xd65f03c0)
         with self.assertRaisesRegex(RuntimeError, 'Expected BLR'):
@@ -175,7 +212,9 @@ class SignatureTests(unittest.TestCase):
         app = Path(os.environ['HSR_47_APP'])
         contract = json.loads((ROOT / 'signatures/com.HoYoverse.hkrpgoversea.json').read_text())
         metadata = (app / 'Data/Managed/Metadata/global-metadata.dat').read_bytes()
-        binary = (app / load_profile('hsr')['framework_binary']).read_bytes()
+        framework = Path(os.environ.get('HSR_47_ORIGINAL_FRAMEWORK',
+                                        str(app / load_profile('hsr')['framework_binary'])))
+        binary = framework.read_bytes()
         for suffix in ('', '-platform-pc-settings-test'):
             expected = load_profile('com.HoYoverse.hkrpgoversea-4.7.0' + suffix)
             result = resolve_profile(binary, metadata, expected, contract, expected['version'])
