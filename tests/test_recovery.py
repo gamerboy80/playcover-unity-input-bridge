@@ -40,6 +40,147 @@ class RecoveryTests(unittest.TestCase):
     def install(self):
         module.install(self.app, self.profile, self.local)
 
+    def test_confirmed_profile_switch_restores_then_installs_and_can_switch_back(self):
+        requested = copy.deepcopy(self.profile)
+        requested['id'] += '-switch-test'
+        requested['test_only'] = True
+        requested['patches'][0]['replacement'] = '31323334'
+        profiles = {p['id']: p for p in (self.profile, requested)}
+        (self.root / 'profiles').mkdir()
+        for name in profiles:
+            (self.root / 'profiles' / (name + '.json')).write_text('{}')
+        new_bridge = self.root / 'build' / requested['id'] / 'NativeInputBridge.dylib'
+        new_bridge.parent.mkdir(parents=True)
+        new_bridge.write_bytes(b'test profile bridge')
+        new_local = self.root / '.local' / requested['id']
+        binary = self.app / self.profile['framework_binary']
+        original = binary.read_bytes()
+        with patch.object(module, 'load_profile', side_effect=profiles.__getitem__), \
+                patch('builtins.input', return_value=' YES ') as confirm:
+            self.install()
+            confirm.assert_not_called()
+            module.install(self.app, requested, new_local)
+            self.assertEqual(self.state()['status'], 'restored')
+            switched = json.loads((new_local / 'state.json').read_text())
+            self.assertEqual(switched['status'], 'installed')
+            self.assertEqual(switched['profile'], requested['id'])
+            self.assertEqual(binary.read_bytes(), b'----1234----')
+            self.assertEqual((self.app / module.LIBRARY).read_bytes(), b'test profile bridge')
+            self.assertEqual(module.original_framework(self.app, requested, new_local), original)
+            prompt = confirm.call_args.args[0]
+            self.assertIn(module.profile_name(self.profile), prompt)
+            self.assertIn(requested['id'], prompt)
+            self.assertIn('[y/N]', prompt)
+            confirm.return_value = 'y'
+            self.install()
+            self.assertEqual(confirm.call_count, 2)
+        self.assertEqual(self.state()['status'], 'installed')
+        self.assertEqual(json.loads((new_local / 'state.json').read_text())['status'], 'restored')
+        self.assertEqual(binary.read_bytes(), b'----WXYZ----')
+
+    def test_declined_or_interrupted_profile_switch_does_not_change_files(self):
+        requested = dict(self.profile, id=self.profile['id'] + '-switch-test')
+        before = {str(p.relative_to(self.root)): module.digest(p)
+                  for p in self.root.rglob('*') if p.is_file()}
+        for answer in ('', 'n', 'no', 'maybe', EOFError(), KeyboardInterrupt()):
+            with self.subTest(answer=answer), \
+                    patch.object(module, 'applied_profile', return_value=(self.profile, {}, self.local, 'installed')), \
+                    patch.object(module, 'restore') as restore, \
+                    patch('builtins.input', return_value=answer if isinstance(answer, str) else None,
+                          side_effect=None if isinstance(answer, str) else answer):
+                module.install(self.app, requested, self.root / '.local' / requested['id'])
+                restore.assert_not_called()
+                module.build.assert_not_called()
+                self.assertEqual({str(p.relative_to(self.root)): module.digest(p)
+                                  for p in self.root.rglob('*') if p.is_file()}, before)
+
+    def test_profile_switch_keeps_same_profile_and_recovery_guards(self):
+        for status, requested, error in (
+                ('installed', self.profile, 'already applied'),
+                ('changed', dict(self.profile, id='other'), 'needs attention'),
+                ('prepared', dict(self.profile, id='other'), 'needs attention'),
+                ('restoring', dict(self.profile, id='other'), 'needs attention'),
+                ('installed', dict(self.profile, id='other', original_sha256='0' * 64), 'different game binary')):
+            with self.subTest(status=status, requested=requested['id']), \
+                    patch.object(module, 'applied_profile', return_value=(self.profile, {}, self.local, status)), \
+                    patch('builtins.input') as confirm, patch.object(module, 'restore') as restore:
+                with self.assertRaisesRegex(RuntimeError, error):
+                    module.install(self.app, requested, self.root / '.local' / requested['id'])
+                confirm.assert_not_called()
+                restore.assert_not_called()
+
+    def test_framework_diff_survives_resigning_update_and_restore(self):
+        binary = self.app / self.profile['framework_binary']
+        original = b'----abcd----' + bytes(range(256)) * 2048
+        binary.write_bytes(original)
+        self.profile['original_sha256'] = module.digest(binary)
+        signature_byte = [1]
+
+        def sign_framework(*args):
+            target = Path(args[-1])
+            if '--force' in args and target.suffix == '.framework':
+                framework_binary = target / binary.name
+                data = bytearray(framework_binary.read_bytes())
+                # Signing can change headers, signature location and file length.
+                data[signature_byte[0] * module.backups.BLOCK_SIZE + 50] ^= 1
+                framework_binary.write_bytes(data + bytes(signature_byte) * 100)
+
+        with patch.object(module, 'run', side_effect=sign_framework):
+            self.install()
+            backup = self.local / 'original' / self.profile['framework_binary']
+            self.assertFalse(backup.exists())
+            self.assertLess(module.backups.diff_path(backup).stat().st_size, len(original) // 10)
+            self.assertEqual(module.original_framework(self.app, self.profile, self.local), original)
+            signature_byte[0] = 3
+            module.update(self.app, self.state(), self.profile, self.local)
+            self.assertEqual(module.original_framework(self.app, self.profile, self.local), original)
+            signature_byte[0] = 5
+            real_replace = module.replace_file
+
+            def fail_main(source, target):
+                if target == self.app / self.profile['executable']:
+                    raise OSError('interrupted update')
+                real_replace(source, target)
+
+            with patch.object(module, 'replace_file', side_effect=fail_main), \
+                    patch.object(module, 'restore', side_effect=OSError('rollback interrupted')):
+                with self.assertRaises(OSError):
+                    module.update(self.app, self.state(), self.profile, self.local)
+            self.assertEqual(self.state()['status'], 'prepared')
+            self.assertEqual(module.original_framework(self.app, self.profile, self.local), original)
+            module.restore(self.app, self.state(), self.profile, self.local)
+            self.assertEqual(binary.read_bytes(), original)
+            self.install()
+            module.restore(self.app, self.state(), self.profile, self.local)
+            self.assertEqual(binary.read_bytes(), original)
+
+    def test_damaged_framework_diff_is_rejected_before_restore(self):
+        self.install()
+        binary = self.app / self.profile['framework_binary']
+        before = binary.read_bytes()
+        backup = self.local / 'original' / self.profile['framework_binary']
+        module.backups.diff_path(backup).write_bytes(b'damaged diff')
+        with self.assertRaisesRegex(RuntimeError, 'Original backup changed'):
+            module.restore(self.app, self.state(), self.profile, self.local)
+        self.assertEqual(binary.read_bytes(), before)
+        self.assertEqual(self.state()['status'], 'installed')
+
+    def test_resolver_reads_the_reconstructed_original_framework(self):
+        original = (self.app / self.profile['framework_binary']).read_bytes()
+        self.install()
+        metadata = self.app / 'Data/Managed/Metadata/global-metadata.dat'
+        metadata.parent.mkdir(parents=True)
+        metadata.write_bytes(b'metadata')
+        contracts = self.root / 'signatures'
+        contracts.mkdir()
+        (contracts / (self.profile['bundle_id'] + '.json')).write_text('{}')
+        resolved = copy.deepcopy(self.profile)
+        resolved['resolution'] = {'contract_sha256': 'a' * 64}
+        with patch.object(module, 'applied_profile', return_value=(self.profile, self.state(), self.local, 'installed')), \
+                patch('signatures.resolve_profile', return_value=resolved) as resolve:
+            module.resolve_app_profile(self.app, module.read_app_info(self.app), self.profile)
+        self.assertEqual(resolve.call_args.args[0], original)
+
     def test_staging_failure_can_retry_with_saved_backup(self):
         with patch.object(module, 'stage_framework', side_effect=RuntimeError('signing failed')):
             with self.assertRaisesRegex(RuntimeError, 'signing failed'):

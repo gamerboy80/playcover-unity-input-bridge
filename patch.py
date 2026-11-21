@@ -14,6 +14,7 @@ import tempfile
 
 from profiles import DEFAULT_PROFILE, PROFILE_ALIASES, instruction_patches, load_profile, match_app, require, select_profile, profile_paths
 import bridge_registry
+import backups
 from macho import add_dylib, has_dylib, executable_content
 
 ROOT = Path(__file__).resolve().parent
@@ -63,6 +64,11 @@ def digest(path):
         for block in iter(lambda: f.read(1024 * 1024), b''):
             result.update(block)
     return result.hexdigest()
+
+
+def original_framework(app, profile, local):
+    binary = profile['framework_binary']
+    return backups.read_original(app / binary, local / 'original' / binary, profile['original_sha256'])
 
 
 def run(*args):
@@ -180,6 +186,8 @@ def check_recoverable(app, state, profile, local):
     require(state.get('original', {}).get(binary) == profile['original_sha256'],
             'The saved original framework does not match this profile.')
     for relative, expected in state.get('original', {}).items():
+        if relative == binary:
+            continue
         source = local / 'original' / relative
         require(expected and source.is_file() and digest(source) == expected, 'Original backup changed')
     original_signatures = {p: value for p, value in state['original'].items() if '_CodeSignature/' in p}
@@ -203,6 +211,7 @@ def check_recoverable(app, state, profile, local):
         signature = relative.startswith('_CodeSignature/') or '/_CodeSignature/' in relative
         require(actual in known and (actual is not None or relative == LIBRARY or signature),
                 f'Cannot recover {relative}: it does not match a recorded original or patched file. No files were changed.')
+    original_framework(app, profile, local)
 
 
 def read_app_info(app):
@@ -249,7 +258,7 @@ def restore_files(app, profile, local):
     with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
         staged = Path(tmp) / app.name
         clone_app(app, staged)
-        replace_file(BACKUP / BINARY, staged / BINARY)
+        (staged / BINARY).write_bytes(original_framework(app, profile, local))
         staged_main = staged / MAIN
         staged_main.write_bytes(backup_main if restore_exact else bridge_registry.compose(registry, owners))
         shutil.copystat(app / MAIN, staged_main)
@@ -359,15 +368,15 @@ def resolve_app_profile(app, info, source):
         installed, state, local, status = active
         require(status == 'installed', 'Restore or repair the active patch before resolving a version.')
         check_installed(app, state, installed)
-        framework = local / 'original' / source['framework_binary']
-        require(digest(framework) == installed['original_sha256'], 'The original framework backup changed.')
+        framework_bytes = original_framework(app, installed, local)
     else:
         require(not has_dylib((app / source['executable']).read_bytes(), LOAD_PATH) and not (app / LIBRARY).exists(),
                 'An input bridge is present without a verified active profile. Run status --verbose before resolving this app.')
+        framework_bytes = framework.read_bytes()
     metadata = app / 'Data/Managed/Metadata/global-metadata.dat'
     require(metadata.is_file() and metadata.stat().st_size <= 512 * 1024 * 1024, 'Game metadata is missing or too large.')
     print('Finding input methods and checking their signatures and object layouts...', flush=True)
-    profile = resolve_profile(framework.read_bytes(), metadata.read_bytes(), source,
+    profile = resolve_profile(framework_bytes, metadata.read_bytes(), source,
                               json.loads(contract_path.read_text()), version)
     revision = profile['resolution']['contract_sha256'][:12]
     suffix = f'-platform-pc-settings-auto-{revision}-test' if source.get('test_only') else f'-auto-{revision}'
@@ -398,14 +407,15 @@ def app_template(info, requested=None):
     return max(candidates, key=lambda p: tuple(int(v) for v in re.findall(r'\d+', p['version'])))
 
 
-def stage_framework(directory, profile, local):
+def stage_framework(directory, app, profile, local):
     BINARY, FRAMEWORK, _ = app_paths(profile)
     BACKUP = local / 'original'
-    require(digest(BACKUP / BINARY) == profile['original_sha256'], 'Original framework backup changed')
+    original = original_framework(app, profile, local)
     framework = directory / Path(FRAMEWORK).name
-    shutil.copytree(BACKUP / FRAMEWORK, framework, symlinks=True)
+    clone_app(app / FRAMEWORK, framework)
+    replace_signature(BACKUP / FRAMEWORK / '_CodeSignature', framework / '_CodeSignature')
     (framework / Path(BINARY).name).write_bytes(
-        patch_instructions(bytearray((BACKUP / BINARY).read_bytes()), profile))
+        patch_instructions(original, profile))
     run('/usr/bin/codesign', '--force', '--sign', '-', str(framework))
     run('/usr/bin/codesign', '--verify', '--strict', str(framework))
     return framework
@@ -425,7 +435,7 @@ def install(app, profile, local):
             'The game app is missing its executable file permission. Reinstall the app in PlayCover, then try again.')
     active = applied_profile(app, info)
     if active:
-        active_profile, _, _, active_status = active
+        active_profile, active_state, active_local, active_status = active
         app_option = f'--app {shlex.quote(str(app))}'
         if active_status == 'installed' and active_profile['id'] == profile['id']:
             raise RuntimeError(
@@ -435,10 +445,18 @@ def install(app, profile, local):
             raise RuntimeError(
                 f'{profile_name(active_profile)} needs attention before another profile can be applied. '
                 'Run status --verbose to inspect it.')
-        raise RuntimeError(
-            f'{profile_name(active_profile)} is currently applied. To switch profiles, run '
-            f'`python3 patch.py restore {app_option}`, then '
-            f'`python3 patch.py apply --profile {profile_name(profile)} {app_option}`.')
+        require(active_profile['original_sha256'] == profile['original_sha256'],
+                'The selected profile targets a different game binary. No files were changed.')
+        try:
+            answer = input(
+                f'Restore {profile_name(active_profile)} and apply {profile_name(profile)} '
+                f'for {profile["game"]}? [y/N] ')
+        except (EOFError, KeyboardInterrupt):
+            answer = ''
+        if answer.strip().lower() not in ('y', 'yes'):
+            print('Profile switch cancelled. No files were changed.')
+            return
+        restore(app, active_state, active_profile, active_local)
 
     try:
         registry = bridge_registry.load(app, profile['bundle_id'], profile['version'], MAIN)
@@ -468,8 +486,11 @@ def install(app, profile, local):
                 'The saved original files do not match this profile.')
         for relative in (BINARY, MAIN):
             expected = original.get(relative)
-            require(expected and (BACKUP / relative).is_file() and digest(BACKUP / relative) == expected,
-                    f'The saved original file {relative} is missing or has changed.')
+            if relative == BINARY:
+                original_framework(app, profile, local)
+            else:
+                require(expected and (BACKUP / relative).is_file() and digest(BACKUP / relative) == expected,
+                        f'The saved original file {relative} is missing or has changed.')
             if relative == MAIN:
                 require(not bridge_registry.owners_in((app / MAIN).read_bytes()).get('native-input'),
                         'The input bridge is still present. Run restore before trying again.')
@@ -480,6 +501,8 @@ def install(app, profile, local):
                 (BACKUP / '_CodeSignature').is_dir(),
                 'The saved app signatures are missing. Keep this backup and inspect it before continuing.')
         for relative, expected in original.items():
+            if relative == BINARY:
+                continue
             require((BACKUP / relative).is_file() and digest(BACKUP / relative) == expected,
                     f'The saved original file {relative} is missing or has changed.')
         saved_signatures = {p: value for p, value in original.items()
@@ -518,10 +541,10 @@ def install(app, profile, local):
             saved = Path(tmp) / 'saved'
             backup = saved / 'original'
             backup.mkdir(parents=True)
-            shutil.copytree(app / FRAMEWORK, backup / FRAMEWORK, symlinks=True)
+            backups.write_diff(backup / BINARY, (app / BINARY).read_bytes(), [], profile['original_sha256'])
             shutil.copy2(app / MAIN, backup / MAIN)
             copy_all_signatures(app, backup)
-            original = {p: digest(backup / p) for p in (BINARY, MAIN)}
+            original = {BINARY: profile['original_sha256'], MAIN: digest(backup / MAIN)}
             original.update(signature_hashes(backup, profile))
             save_state({'profile': profile['id'], 'app': str(app), 'original': original,
                         'installed': {}, 'status': 'restored'}, saved)
@@ -534,7 +557,7 @@ def install(app, profile, local):
     with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
         staged = Path(tmp) / app.name
         clone_app(app, staged)
-        framework = stage_framework(Path(tmp), profile, local)
+        framework = stage_framework(Path(tmp), app, profile, local)
         replace_file(framework / Path(BINARY).name, staged / BINARY)
         replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
         main = staged / MAIN
@@ -545,6 +568,8 @@ def install(app, profile, local):
         run('/usr/bin/codesign', '--verify', '--strict', str(staged))
         planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
                    LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
+        backups.write_diff(BACKUP / BINARY, original_framework(app, profile, local),
+                           [app / BINARY, staged / BINARY], profile['original_sha256'])
         begin_change(state, profile, local, planned)
         bridge_registry.begin(registry, owners, staged)
         try:
@@ -604,7 +629,7 @@ def update(app, state, profile, local):
     with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
         staged = Path(tmp) / app.name
         clone_app(app, staged)
-        framework = stage_framework(Path(tmp), profile, local)
+        framework = stage_framework(Path(tmp), app, profile, local)
         replace_file(framework / Path(BINARY).name, staged / BINARY)
         replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
         staged_main = staged / MAIN
@@ -615,6 +640,8 @@ def update(app, state, profile, local):
         run('/usr/bin/codesign', '--verify', '--strict', str(staged))
         planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
                    LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
+        backups.write_diff(local / 'original' / BINARY, original_framework(app, profile, local),
+                           [app / BINARY, staged / BINARY], profile['original_sha256'])
         begin_change(state, profile, local, planned)
         bridge_registry.begin(registry, owners, staged)
         try:

@@ -1,0 +1,68 @@
+{
+  "bundle_id": "com.HoYoverse.hkrpgoversea",
+  "version": "4.7.0",
+  "framework_sha256": [
+    "43fced3fe4baeac769ce981ec09d49bdb02555c9ca5a1746160cae7d3e67e114",
+    "45047af18a57f8b3f0a457f6948f25c5a09bacb4cb78a6aabaa87e1310ca50e1"
+  ],
+  "code_padding": "0x14e44028",
+  "data_padding": "0x16e15558",
+  "entries": {
+    "Damage": [
+      "0xdf2fac",
+      "eb2bb86de923016dfc6f02a9"
+    ],
+    "BattleBegin": [
+      "0x28393e4",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "BattleEnd": [
+      "0x28394c0",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "TurnBegin": [
+      "0x2834d70",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "UseSkill": [
+      "0x27c6174",
+      "ff4303d1fc6f07a9fa6708a9"
+    ],
+    "DirectDamage": [
+      "0x2811114",
+      "ff4307d1fc6f17a9fa6718a9"
+    ]
+  },
+  "methods": {
+    "GetProperty": "0x2807218",
+    "GetActualOwnerID": "0x25c64e8",
+    "GetTeam": "0x26f1000",
+    "GetActualOwner": "0x25d6140",
+    "GetAvatarID": "0x2506018",
+    "GetAvatarName": "0x1159700",
+    "GetOwnerWorld": "0x26f0d40",
+    "GetEntityManager": "0x275c538",
+    "GetEntitySummoner": "0x26a7d68",
+    "GetElapsedActionDelay": "0x283ed40",
+    "GetWave": "0x283effc",
+    "GetComponentOwner": "0x26eb0ec",
+    "GetSkillData": "0x27c2a9c",
+    "GetObjectType": "0xcf1deb4",
+    "GetTypeName": "0xcfaab7c",
+    "GetAvatarSkillName": "0x2648e68",
+    "GetMonsterSkillName": "0x2790928",
+    "GetServantSkillName": "0x27bcd08",
+    "GetBattleEventSkillName": "0x2651de4",
+    "GetText": "0x23f4290"
+  },
+  "damage_fields": [
+    "0x608",
+    "0x3d0",
+    "0x4a8",
+    "0x260"
+  ],
+  "fields": {
+    "AttackTypeField": "0x204",
+    "SkillRowField": "0x30"
+  }
+}

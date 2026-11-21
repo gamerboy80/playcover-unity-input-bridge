@@ -4,6 +4,7 @@
 #include "../src/Scroll.h"
 #include "../src/Capture.h"
 #include "../src/EventRouting.h"
+#include "../plugins/zzz_damage/Probe.h"
 
 // Fake host and backend boundaries; EventHandler.h is the production handler.
 @interface ZZZHostEvent : NSObject
@@ -39,7 +40,10 @@ static int screenHeight(void) { return 600; }
 #define GameScreenHeight ((uintptr_t)screenHeight)
 static void note(const char *s) { (void)s; }
 static BOOL editingGameText(void) { return editing; }
-static unsigned unityKey(unsigned code) { return code==13 ? 37 : code==53 ? 60 : 0; }
+static unsigned unityKey(unsigned code) {
+    if (code>=18 && code<=21) return code+23;
+    return code==13 ? 37 : code==53 ? 60 : code==29 ? 50 : 0;
+}
 static void setCapture(BOOL value) { captured=value; }
 static void sendKeyboard(void) { keyboardWrites++; }
 static void sendMouse(void) {
@@ -89,6 +93,16 @@ int main(void) {
         key.window=window; handleEvent(key);
         key.modifierFlags=1u<<20;
         assert(handleEvent(key)==key && keys[37/8]==0);
+        const unsigned markerCodes[]={29,18,19,20,21};
+        for (unsigned phase=0;phase<5;phase++) {
+            key.keyCode=markerCodes[phase];
+            key.modifierFlags=(1u<<18)|(1u<<19);
+            assert(handleEvent(key)==nil);
+            key.modifierFlags=(1u<<18)|(1u<<20);
+            id forwarded=handleEvent(key);
+            assert(forwarded==key);
+            assert(ProbePhaseForKey([forwarded modifierFlags],[forwarded keyCode])==(int)phase);
+        }
         key.modifierFlags=1u<<19; key.keyCode=46;
         assert(handleEvent(key)==nil && captured && forcedCapture);
         key.isARepeat=YES; handleEvent(key);

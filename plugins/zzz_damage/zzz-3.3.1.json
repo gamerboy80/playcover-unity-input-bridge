@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "test_only": true,
+  "bundle_id": "com.HoYoverse.Nap",
+  "version": "3.3.1",
+  "build": "4",
+  "executable": "ZenlessZoneZero",
+  "game": "Zenless Zone Zero",
+  "framework_sha256": [
+    "657b2def5d3f7f687965bcc2764252ee579dc2701cf0a999ebea7da824c24d94",
+    "8e5060baa505f6e95db6602a803bb1ba9b5efa75ddffaa92cf213cbae3fbc594"
+  ],
+  "metadata_sha256": "a24fce26653429531a2838457da20a55384b96b5388d3ae57b8d6e25f4fbf090",
+  "uuid": "9b4466db006e3776bf0a3d144d66ee57",
+  "code_padding": "0x18dc4030",
+  "data_padding": "0x1bd94500",
+  "entries": {
+    "DamageEvent": {
+      "address": "0xba86700",
+      "expected": "eb2bba6de923016df85f02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "UIInLevelDamageTextContainerChildWindowController",
+        "method": "GMBBKAAGOJA",
+        "parameters": 1
+      },
+      "replacement": "f09906d010c2009100021fd6"
+    },
+    "LookupEntity": {
+      "address": "0xd2d901c",
+      "expected": "f44fbea9fd7b01a9fd430091",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "",
+        "class": "GDIACAHPLBB",
+        "method": "EIMKFKGAHBN",
+        "parameters": 1
+      },
+      "replacement": "50d705f01082019100021fd6"
+    }
+  },
+  "fields": {
+    "EntityRoot": 64,
+    "UnityCachedPointer": 16,
+    "StringLength": 16,
+    "StringCharacters": 20,
+    "EventTarget": 0,
+    "EventSource": 4,
+    "EventAmount": 52,
+    "EventKind": 56,
+    "EventHidden": 60,
+    "EventSuppress": 87,
+    "EventSize": 106,
+    "EntityID": 56,
+    "EntityType": 80,
+    "AvatarTemplateID": 104
+  },
+  "name_getter": {
+    "address": "0x12e9b3b0",
+    "expected": "f44fbea9fd7b01a9fd430091f30300aa485e04b008411391"
+  },
+  "avatar_getters": {
+    "AvatarActor": {
+      "address": "0xe4290e4",
+      "expected": "f657bda9f44f01a9fd7b02a9fd830091f30300aac8b106f0"
+    },
+    "AvatarData": {
+      "address": "0xb751924",
+      "expected": "f44fbea9fd7b01a9fd430091f30300aa881808f008411391"
+    },
+    "AvatarName": {
+      "address": "0xf832908",
+      "expected": "f44fbea9fd7b01a9fd430091f40301aaf30300aa881106d0"
+    },
+    "LocalizedText": {
+      "address": "0x105ad1b8",
+      "expected": "f44fbea9fd7b01a9fd430091f40301aaf30300aac87f05f0"
+    }
+  },
+  "validation": {
+    "static": "Exact original hash, named IL2CPP method mapping, ARM64 argument use and accessed fields reviewed.",
+    "runtime": "Live training captured 16 positive events with matching source/target entity lookups and distinct Alice/Nangong direct-hit sources. Missing third marker prevents off-field confirmation. Displayed amounts, effective HP loss and complete coverage remain unverified.",
+    "evidence": "docs/games/zzz-damage-probe.md"
+  }
+}

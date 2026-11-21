@@ -106,17 +106,23 @@ python3 patch.py restore --app '/path/to/Honkai: Star Rail.app'
 `status` reports `Patched (profile name)` when a saved profile matches the
 installed files, and `Unpatched` when the original game files are present. With
 `--app`, `status`, `update` and `restore` detect the active profile, including
-test profiles. To switch profiles, restore the active one first, then apply the
-new profile. A verified backup can be reused when applying that profile again.
+test profiles. Applying a different profile asks for confirmation, then restores
+the active profile and applies the requested one. Press Enter or answer `n` to
+cancel. Modified or incomplete installs must be repaired before switching.
+A verified backup can be reused when applying that profile again.
 
 Add `--verbose` to see profile IDs and file locations, or `--json` to print
 status details as JSON. Incomplete or modified installs report that they need
 attention instead of claiming to be unpatched. Run `python3 patch.py --help` for
 the command options and examples.
 
-The installer stores original binaries and signature resources under
-`.local/<profile-id>/`. Preserve this directory for restoration. Update applies
-the same profile to the same exact binary; it does not port patches to a newer
+The installer stores a compressed reverse diff for the original Unity framework,
+plus full copies of the executable and signature resources, under
+`.local/<profile-id>/`. The diff saves changed 64 KiB blocks, including bytes
+changed by signing, and verifies the reconstructed original SHA-256 before use.
+Existing full framework backups remain readable and are converted when applying
+or updating a patch. Preserve this directory and the installed game for restoration.
+Update applies the same profile to the same exact binary; it does not port patches to a newer
 game release. Restore before updating the game. The installer rejects files that
 changed after installation rather than overwriting them.
 
@@ -183,3 +189,10 @@ Original project code and documentation are licensed under the [MIT License](LIC
 That license does not grant rights to game code or assets. The optional
 PlayTools patch remains under its upstream AGPL-3.0 license in
 [patches/PlayTools-LICENSE](patches/PlayTools-LICENSE).
+
+## PlayCover plugins
+
+PlayCover builds with **Custom Plugins** support can load native dylibs through
+PlayTools. The [Veritas Live preview](plugins/veritas/README.md) charts live Honkai: Star Rail damage from combat events.
+The [ZZZ live damage preview](plugins/zzz_damage/README.md) shows damage and DPS
+by source entity and includes a diagnostic capture for attribution checks.

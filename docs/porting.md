@@ -33,8 +33,13 @@ exact game build's** patch; it does not port a patch to a game update.
 Output is isolated in `build/<profile-id>/`. New installation backups and state
 live in `.local/<profile-id>/`; each profile supports one app installation at a
 time. The pre-profile `.local/state.json` and `.local/original/` remain usable for
-the matching original framework hash. The installer does not move or overwrite
-those backups. Restore before updating the game; an externally updated game will
+the matching original framework hash. The installer keeps those backup locations.
+Full framework binaries are converted to compressed reverse
+diffs during apply/update; executable and signature backups remain full copies.
+Diffs retain original blocks changed in either the current or planned framework
+before app writes, so interrupted operations can reconstruct the original from
+either recorded version. Reconstruction must match the exact original SHA-256.
+Restore before updating the game; an externally updated game will
 fail the installed-hash guard and must not be overwritten with an old backup.
 
 ## Profile format

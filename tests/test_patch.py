@@ -105,7 +105,8 @@ class PatchTests(unittest.TestCase):
             self.assertEqual({p: state['original'][p] for p in original}, original)
             self.assertEqual({p: state['original'][p] for p in module.signature_hashes(backup, profile)},
                              module.signature_hashes(backup, profile))
-            self.assertEqual(module.digest(backup / binary), backup_hash)
+            self.assertFalse((backup / binary).exists())
+            self.assertEqual(module.hashlib.sha256(module.original_framework(app, profile, local)).hexdigest(), backup_hash)
 
     def test_input_restore_preserves_zzmi_installed_before_it(self):
         profile = copy.deepcopy(load_profile())

@@ -3,6 +3,10 @@ set -eu
 cd "$(dirname "$0")/.."
 python3 -m unittest discover -s tests -v
 mkdir -p build
+python3 plugins/zzz_damage/stage.py --header build/plugins/ZZZDamageProfile.h
+xcrun clang -I build/plugins -I plugins/zzz_damage -Wall -Wextra -Werror \
+    plugins/zzz_damage/test-probe.c -o build/test-zzz-damage
+build/test-zzz-damage
 xcrun clang -Wall -Wextra -Werror tests/scroll.c -o build/test-scroll
 build/test-scroll
 xcrun clang -Wall -Wextra -Werror tests/mouse-presence.c -o build/test-mouse-presence
@@ -20,10 +24,10 @@ done
 xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit tests/native-wheel.m -o build/test-native-wheel
 build/test-native-wheel
 for backend in 0 1; do
-    xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
+    xcrun clang -I build/plugins -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
         -DGameLegacyBackend=$backend tests/event-handler.m -o build/test-event-handler-$backend
     build/test-event-handler-$backend
 done
-xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
+xcrun clang -I build/plugins -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
     -DGameNativeMenuButtons=1 tests/event-handler.m -o build/test-event-handler-native-menu
 build/test-event-handler-native-menu
