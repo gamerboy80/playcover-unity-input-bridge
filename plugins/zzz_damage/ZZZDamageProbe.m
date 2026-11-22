@@ -36,9 +36,11 @@ static NSMutableDictionary<NSNumber *, NSString *> *avatarNames;
 static dispatch_queue_t writer;
 static FILE *logFile;
 static atomic_uint phase, events, markers;
+static atomic_bool refreshPending;
 static id keyboardMonitor;
 static os_unfair_lock meterLock = OS_UNFAIR_LOCK_INIT;
 static DamageMeter meter;
+static double gameClock;
 static UIWindow *meterWindow;
 static UILabel *meterLabel;
 static BOOL meterVisible = YES;
@@ -84,18 +86,23 @@ static NSString *AvatarLabel(uint32_t avatarID) {
     NSString *label = avatarNames[identifier];
     if (label) return label;
     if (avatarNamesAvailable) {
-        const char *(*nameForID)(uint32_t, bool, void *) = (void *)(unity + ProbeAvatarName);
+        void *(*servicesGetter)(void *) = (void *)(unity + ProbeConfigServices);
+        void *(*configForID)(void *, uint32_t, void *) = (void *)(unity + ProbeAvatarNameConfig);
+        const char *(*keyGetter)(void *, void *) = (void *)(unity + ProbeAvatarNameKey);
         const char *(*translate)(const char *, uint16_t, void *) = (void *)(unity + ProbeLocalizedText);
-        const char *value = nameForID(avatarID, true, NULL);
-        NSString *name = GameString(value);
-        if ([name containsString:@"_"]) {
-            label = GameString(translate(value, 0, NULL));
-            if ([label isEqualToString:name]) label = nil;
-        } else {
-            label = name;
+        void *services = servicesGetter(NULL);
+        void *table = NULL;
+        if (services) memcpy(&table, (const char *)services + ProbeAvatarNameConfigTable, sizeof(table));
+        void *config = table ? configForID(table, avatarID, NULL) : NULL;
+        const char *key = config ? keyGetter(config, NULL) : NULL;
+        if (GameString(key)) {
+            const char *value = translate(key, 0, NULL);
+            label = GameString(value);
+            if (label && !MeterIsAgentName((const void *)(value + ProbeStringCharacters),
+                                           ProbeU32(value, ProbeStringLength))) label = nil;
         }
     }
-    if (!label.length) label = [NSString stringWithFormat:@"Agent %u", avatarID];
+    if (!label.length) return [NSString stringWithFormat:@"Agent %u", avatarID];
     if (!avatarNames) avatarNames = [NSMutableDictionary new];
     avatarNames[identifier] = label;
     return label;
@@ -182,14 +189,15 @@ static void RefreshMeter(void) {
     meterWindow.hidden = NO;
     os_unfair_lock_lock(&meterLock);
     DamageMeter snapshot = meter;
+    double currentGameTime = gameClock;
     os_unfair_lock_unlock(&meterLock);
     NSMutableString *display = [NSMutableString stringWithString:@"ZZZ · Damage display events"];
     if (!snapshot.total) {
         [display appendString:@"\nWaiting for damage"];
     } else {
-        double elapsed = snapshot.last - snapshot.first;
+        double elapsed = MeterElapsed(&snapshot, currentGameTime);
         [display appendFormat:@"\n%@ raw total", Amount(snapshot.total)];
-        if (elapsed > 0) [display appendFormat:@"  ·  %@ raw/s  ·  %.1fs", Amount(snapshot.total / elapsed), elapsed];
+        if (elapsed > 0) [display appendFormat:@"  ·  %@ raw/s  ·  %.1f game s", Amount(snapshot.total / elapsed), elapsed];
         [display appendFormat:@"\nLatest: %@", SourceLabel(snapshot.latestSource)];
         qsort(snapshot.sources, snapshot.count, sizeof(snapshot.sources[0]), MostDamageFirst);
         double remaining = snapshot.other;
@@ -205,6 +213,14 @@ static void RefreshMeter(void) {
     if (![meterLabel.text isEqualToString:display]) meterLabel.text = display;
 }
 
+static void QueueMeterRefresh(void) {
+    if (atomic_exchange(&refreshPending, true)) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        atomic_store(&refreshPending, false);
+        RefreshMeter();
+    });
+}
+
 static void Write(NSDictionary *record) {
     if (!logFile) return;
     NSData *json = [NSJSONSerialization dataWithJSONObject:record options:NSJSONWritingSortedKeys error:NULL];
@@ -214,6 +230,45 @@ static void Write(NSDictionary *record) {
         logFile = NULL;
         NSLog(@"[ZZZDamageProbe] Capture stopped: could not write diagnostic log");
     }
+}
+
+static void ResetMeter(NSString *reason, BOOL resume) {
+    os_unfair_lock_lock(&meterLock);
+    double time = Now();
+    MeterReset(&meter, time);
+    if (resume) meter.frozen = false;
+    os_unfair_lock_unlock(&meterLock);
+    dispatch_async(dispatch_get_main_queue(), ^{ [avatarNames removeAllObjects]; });
+    dispatch_async(writer, ^{ Write(@{@"type": @"meter_reset", @"reason": reason, @"time": @(time)}); });
+}
+
+static void BattleStart(void *subsystem, void *method) {
+    const uint8_t *active = (const uint8_t *)subsystem + ProbeBattleStatisticsActive;
+    if (!*active) ResetMeter(@"battle_start", YES);
+    void (*original)(void *, void *) = (void *)(unity + ProbeBattleStartOriginal);
+    original(subsystem, method);
+}
+
+static void BattleEnd(void *subsystem, uintptr_t argument, void *method) {
+    if (*((const uint8_t *)subsystem + ProbeBattleStatisticsActive) == 1) {
+        os_unfair_lock_lock(&meterLock);
+        MeterFreeze(&meter, gameClock);
+        os_unfair_lock_unlock(&meterLock);
+        double time = Now();
+        dispatch_async(writer, ^{ Write(@{@"type": @"battle_end", @"time": @(time)}); });
+    }
+    void (*original)(void *, uintptr_t, void *) = (void *)(unity + ProbeBattleEndOriginal);
+    original(subsystem, argument, method);
+}
+
+static void GameTick(void *manager, float delta, void *method) {
+    void (*original)(void *, float, void *) = (void *)(unity + ProbeGameTickOriginal);
+    original(manager, delta, method);
+    float scaledDelta;
+    memcpy(&scaledDelta, (const char *)manager + ProbeScaledFrameDelta, sizeof(scaledDelta));
+    os_unfair_lock_lock(&meterLock);
+    gameClock = MeterAdvanceClock(gameClock, scaledDelta);
+    os_unfair_lock_unlock(&meterLock);
 }
 
 static NSDictionary *Resolution(ProbeEntity entity) {
@@ -245,6 +300,9 @@ static void DamageEvent(void *controller, const void *payload, void *method) {
     }
     ProbeFrame current = {.event = ProbeDecode(payload), .previous = frame};
     double time = Now();
+    os_unfair_lock_lock(&meterLock);
+    double gameTime = gameClock;
+    os_unfair_lock_unlock(&meterLock);
     unsigned capturedPhase = atomic_load(&phase);
     frame = &current;
     @try {
@@ -260,8 +318,9 @@ static void DamageEvent(void *controller, const void *payload, void *method) {
         memcpy(hit.name, current.sourceName, sizeof(hit.name));
         MeterDropRuntimeName(&hit);
         os_unfair_lock_lock(&meterLock);
-        MeterRecord(&meter, hit, time);
+        MeterRecord(&meter, hit, time, gameTime);
         os_unfair_lock_unlock(&meterLock);
+        QueueMeterRefresh();
     }
     unsigned sequence = atomic_fetch_add(&events, 1);
     if (sequence >= 4096) return;
@@ -269,6 +328,7 @@ static void DamageEvent(void *controller, const void *payload, void *method) {
         @autoreleasepool {
             Write(@{@"type": @"damage_candidate", @"sequence": @(sequence + 1),
                     @"time": @(time), @"phase": @(capturedPhase),
+                    @"game_time": @(gameTime),
                     @"target_id": @(event.target), @"source_id": @(event.source),
                     @"source_avatar_id": @(avatarID),
                     @"amount": isfinite(event.amount) ? @(event.amount) : NSNull.null,
@@ -302,20 +362,35 @@ static BOOL Connect(void) {
             memcmp((void *)(image + ProbeDamageEventEntry), ProbeDamageEventJump, sizeof(ProbeDamageEventJump)) ||
             memcmp((void *)(image + ProbeDamageEventStub), ProbeDamageEventCode, sizeof(ProbeDamageEventCode)) ||
             memcmp((void *)(image + ProbeLookupEntityEntry), ProbeLookupEntityJump, sizeof(ProbeLookupEntityJump)) ||
-            memcmp((void *)(image + ProbeLookupEntityStub), ProbeLookupEntityCode, sizeof(ProbeLookupEntityCode))) return NO;
+            memcmp((void *)(image + ProbeLookupEntityStub), ProbeLookupEntityCode, sizeof(ProbeLookupEntityCode)) ||
+            memcmp((void *)(image + ProbeBattleStartEntry), ProbeBattleStartJump, sizeof(ProbeBattleStartJump)) ||
+            memcmp((void *)(image + ProbeBattleStartStub), ProbeBattleStartCode, sizeof(ProbeBattleStartCode)) ||
+            memcmp((void *)(image + ProbeBattleEndEntry), ProbeBattleEndJump, sizeof(ProbeBattleEndJump)) ||
+            memcmp((void *)(image + ProbeBattleEndStub), ProbeBattleEndCode, sizeof(ProbeBattleEndCode)) ||
+            memcmp((void *)(image + ProbeGameTickEntry), ProbeGameTickJump, sizeof(ProbeGameTickJump)) ||
+            memcmp((void *)(image + ProbeGameTickStub), ProbeGameTickCode, sizeof(ProbeGameTickCode))) return NO;
         _Atomic(uintptr_t) *lookupSlot = (void *)(image + ProbeLookupEntitySlot);
         _Atomic(uintptr_t) *damageSlot = (void *)(image + ProbeDamageEventSlot);
-        if (atomic_load(lookupSlot) || atomic_load(damageSlot)) return NO;
+        _Atomic(uintptr_t) *battleSlot = (void *)(image + ProbeBattleStartSlot);
+        _Atomic(uintptr_t) *endSlot = (void *)(image + ProbeBattleEndSlot);
+        _Atomic(uintptr_t) *tickSlot = (void *)(image + ProbeGameTickSlot);
+        if (atomic_load(lookupSlot) || atomic_load(damageSlot) || atomic_load(battleSlot) ||
+            atomic_load(endSlot) || atomic_load(tickSlot)) return NO;
         unity = image;
         objectNamesAvailable = !memcmp((void *)(image + ProbeObjectName), ProbeObjectNameCode, sizeof(ProbeObjectNameCode));
         avatarLookupAvailable =
             !memcmp((void *)(image + ProbeAvatarActor), ProbeAvatarActorCode, sizeof(ProbeAvatarActorCode)) &&
             !memcmp((void *)(image + ProbeAvatarData), ProbeAvatarDataCode, sizeof(ProbeAvatarDataCode));
         avatarNamesAvailable =
-            !memcmp((void *)(image + ProbeAvatarName), ProbeAvatarNameCode, sizeof(ProbeAvatarNameCode)) &&
+            !memcmp((void *)(image + ProbeConfigServices), ProbeConfigServicesCode, sizeof(ProbeConfigServicesCode)) &&
+            !memcmp((void *)(image + ProbeAvatarNameConfig), ProbeAvatarNameConfigCode, sizeof(ProbeAvatarNameConfigCode)) &&
+            !memcmp((void *)(image + ProbeAvatarNameKey), ProbeAvatarNameKeyCode, sizeof(ProbeAvatarNameKeyCode)) &&
             !memcmp((void *)(image + ProbeLocalizedText), ProbeLocalizedTextCode, sizeof(ProbeLocalizedTextCode));
         atomic_store_explicit(lookupSlot, (uintptr_t)LookupEntity, memory_order_release);
         atomic_store_explicit(damageSlot, (uintptr_t)DamageEvent, memory_order_release);
+        atomic_store_explicit(battleSlot, (uintptr_t)BattleStart, memory_order_release);
+        atomic_store_explicit(endSlot, (uintptr_t)BattleEnd, memory_order_release);
+        atomic_store_explicit(tickSlot, (uintptr_t)GameTick, memory_order_release);
         return YES;
     }
     return NO;
@@ -348,7 +423,7 @@ static void StartProbe(void) {
             dispatch_async(writer, ^{ Write(@{@"type": @"hooks", @"ready": @(connected)}); });
             NSLog(@"[ZZZDamageProbe] %@; diagnostic log: %@", connected ? @"Ready" : @"Hooks unavailable", path);
             if (!connected) return;
-            [NSTimer scheduledTimerWithTimeInterval:0.25 repeats:YES block:^(__unused NSTimer *timer) {
+            [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(__unused NSTimer *timer) {
                 RefreshMeter();
             }];
             keyboardMonitor = [NSClassFromString(@"NSEvent") addLocalMonitorForEventsMatchingMask:1UL << 10
@@ -362,10 +437,7 @@ static void StartProbe(void) {
                             meterVisible = !meterVisible;
                             meterWindow.hidden = !meterVisible;
                         } else {
-                            os_unfair_lock_lock(&meterLock);
-                            meter = (DamageMeter){.resetAt = Now()};
-                            os_unfair_lock_unlock(&meterLock);
-                            [avatarNames removeAllObjects];
+                            ResetMeter(@"manual", NO);
                         }
                         RefreshMeter();
                         return nil;

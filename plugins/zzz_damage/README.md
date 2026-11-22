@@ -8,16 +8,25 @@ not assign damage to the active agent or guess agent names from entity IDs.
 
 The preview shows raw damage-display totals, their average rate, the latest
 source, and share by agent or source. Use **Control+Command+D** to show or hide it and
-**Control+Command+R** to reset. Reset before each fight or comparison.
-DPS uses the interval from the first counted hit to the latest, including
-gaps between hits. The panel keeps the final values until reset.
+**Control+Command+R** to reset manually. The meter also resets when the game's
+battle-statistics session begins. This hook still needs a live check across
+battle modes. Use the manual reset for training comparisons.
+The session-exit hook freezes the totals, source shares and DPS at battle end.
+Manual reset clears the frozen result. The next battle start resumes counting.
+DPS refreshes on hits and every 100 ms, using scaled game time from the first
+counted hit through the current tick, including
+gaps between hits. The clock accumulates the time-slow manager's scaled frame
+delta. The panel keeps the final values until reset. Chain-attack and ultimate
+timing still need comparison against the live game clock.
 
 The meter groups resolved agents by roster ID across changes to their runtime
-source IDs. It looks up agent names in the game and translates name keys
+source IDs. It reads the character-name key from the game's role configuration
+and translates it
 using the game's text service. It caches labels until the meter is reset.
 If a name is unavailable, the overlay shows the roster ID. Unresolved
 sources use the Unity object name and runtime ID when available. Captures
 include `source_avatar_id`, with 0 for an unresolved source.
+Icon paths and untranslated keys fall back to the roster ID.
 The meter counts positive, visible
 events with matching source and target lookups and the entity kinds observed
 for agent-to-enemy hits in training. It shows the five largest sources and
@@ -43,6 +52,10 @@ source/planned hashes before editing the isolated copy, includes the plugin in
 `Frameworks/UserPlugins`, and signs/verifies the copy. Existing input patches,
 load commands and other plugins are retained. The source installation and its
 backup state are untouched. The preview uses the same game account/data container.
+
+After successfully staging a new preview in `build/plugins`, the stager removes
+older `ZZZ-Damage-*.app` previews whose recorded framework, executable and plugin
+hashes still match. Modified or unrecognized copies are kept.
 
 Open the staged copy with a PlayTools build that loads Custom Plugins. Loading
 the standalone dylib into the ordinary app is insufficient: it requires the

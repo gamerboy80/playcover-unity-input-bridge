@@ -99,6 +99,36 @@ def instrument(binary, profile=PROFILE):
     return data
 
 
+def cleanup_previews(output, source_app):
+    directory = ROOT / 'build/plugins'
+    if output.parent != directory:
+        return
+    closed(PROFILE)
+    for plan in sorted(directory.glob('ZZZ-Damage-*.plan.json')):
+        app = directory / (plan.name.removesuffix('.plan.json') + '.app')
+        if app in (output, source_app) or app.is_symlink() or plan.is_symlink() or not app.is_dir():
+            continue
+        try:
+            record = json.loads(plan.read_text())
+            info = read_app_info(app)
+            require(isinstance(record, dict) and isinstance(info, dict), 'Invalid preview record')
+            files = {
+                app / FRAMEWORK / 'UnityFramework': 'signed_framework_sha256',
+                app / PROFILE['executable']: 'signed_executable_sha256',
+                app / 'Frameworks/UserPlugins' / PLUGIN: 'plugin_sha256',
+            }
+            require(record.get('status') == 'signed' and info.get('CFBundleIdentifier') == PROFILE['bundle_id'],
+                    'Unrecognized preview')
+            require(all(path.resolve().is_relative_to(app) and digest(path) == record.get(key)
+                        for path, key in files.items()), 'Preview files changed')
+        except (OSError, RuntimeError, ValueError):
+            print(f'Kept unverified preview: {app.name}')
+            continue
+        shutil.rmtree(app)
+        plan.unlink()
+        print(f'Removed old preview: {app.name}')
+
+
 def stage(app, output):
     info = read_app_info(app)
     require(all(str(info.get(key)) == PROFILE[field] for key, field in [
@@ -145,6 +175,7 @@ def stage(app, output):
         require(digest(source) == record['source_framework_sha256'], 'Source app changed during staging')
         staged.rename(output)
     print(f'Prepared diagnostic copy: {output}')
+    cleanup_previews(output, app)
 
 
 def main():

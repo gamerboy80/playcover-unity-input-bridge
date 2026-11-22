@@ -123,6 +123,44 @@ class DamageProbeTests(unittest.TestCase):
                                 'target_lookup': {'observed': True, 'matches': True, 'id': 300}})
         return records
 
+    def test_preview_cleanup_preserves_current_source_changed_and_unowned_apps(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            directory = root / 'build/plugins'
+            directory.mkdir(parents=True)
+            apps = {}
+            for name in ['Old', 'Current', 'Source', 'Changed', 'Unowned', 'Invalid']:
+                app = directory / f'ZZZ-Damage-{name}.app'
+                app.mkdir()
+                (app / 'Info.plist').write_bytes(plistlib.dumps({
+                    'CFBundleIdentifier': stage.PROFILE['bundle_id']}))
+                files = {
+                    app / stage.FRAMEWORK / 'UnityFramework': 'signed_framework_sha256',
+                    app / stage.PROFILE['executable']: 'signed_executable_sha256',
+                    app / 'Frameworks/UserPlugins' / stage.PLUGIN: 'plugin_sha256',
+                }
+                record = {'status': 'signed'}
+                for path, key in files.items():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b'generated preview')
+                    record[key] = stage.digest(path)
+                if name != 'Unowned':
+                    app.with_suffix('.plan.json').write_text(json.dumps(record))
+                apps[name] = app
+            (apps['Changed'] / stage.PROFILE['executable']).write_bytes(b'user modification')
+            apps['Invalid'].with_suffix('.plan.json').write_text('[]')
+            link = directory / 'ZZZ-Damage-Link.app'
+            link.symlink_to(apps['Old'], target_is_directory=True)
+            link.with_suffix('.plan.json').write_text(apps['Old'].with_suffix('.plan.json').read_text())
+            with patch.object(stage, 'ROOT', root), patch.object(stage, 'closed') as closed:
+                stage.cleanup_previews(apps['Current'], apps['Source'])
+                closed.assert_called_once()
+            self.assertFalse(apps['Old'].exists())
+            self.assertFalse(apps['Old'].with_suffix('.plan.json').exists())
+            for name in ['Current', 'Source', 'Changed', 'Unowned', 'Invalid']:
+                self.assertTrue(apps[name].is_dir())
+            self.assertTrue(link.is_symlink())
+
     def test_controlled_sources_and_independent_amount_checks(self):
         capture = self.capture()
         result = report.summarize(capture, {3: 1235, 4: 999, 999: 1})

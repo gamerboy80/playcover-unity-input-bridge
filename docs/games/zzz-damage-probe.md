@@ -148,15 +148,18 @@ under the operator's controlled sequence, not complete combat attribution.
 
 ## Live meter preview
 
-The meter uses the same two hooks and binary profile. In training, the positive
+The meter uses the damage and entity-lookup hooks plus a battle-entry hook.
+In training, the positive
 outgoing events observed so far had source kind 1, target kind 2, and event
 selector 0 or 2. The recorded enemy-to-agent events reversed the entity kinds.
 The meter requires matching lookups and applies that observed outgoing filter,
-then groups by source runtime ID. Other entity kinds and incomplete lookups
+then groups resolved agents by roster ID. Other entity kinds and incomplete lookups
 require further validation before inclusion.
 
-Totals reset manually. The first-to-latest hit interval determines displayed
-DPS. The overlay refreshes four times per second and the diagnostic log retains
+Totals reset manually or at the game's battle-statistics session entry.
+Scaled time from the first hit through the current tick determines displayed
+DPS. The overlay refreshes on hits and ten times per second. Hit-triggered
+refresh requests share one pending main-thread refresh. The diagnostic log retains
 its independent cap. The meter adds no binary edits beyond the probe hooks.
 
 Automatic labels read the matched source entity's Unity root object on the
@@ -204,21 +207,73 @@ runtime ID reuse and changes. Controlled Alice and Nangong hits before,
 during, and after switches are still needed to validate live results.
 Owner resolution for non-avatar sources remains open.
 
-Agent labels use `GKHEGNDIKMM.KNMOEANDPIE` at `0xf832908`.
-`UINewbieGuideFetchPopWindowController.RefreshRoleInfo` calls it at
-`0xc0514a0` with the avatar template ID in w0 and 1 in w1, then passes
-the returned managed string to the game text widget. This branch looks
-up the avatar name through `0xf833040` and `0xe81a774`.
-`GPPMPHICDEA.FLMNMKCEGID` at `0x105ad1b8` accepts a managed text key
-in x0 and the default option 0 in w1, as at `0xf5902a0` in
-`UIActivityRoleSkinAwardPopWindowController.RefreshRewardTextInfo`.
-It forwards to the game's text service. Both helper bodies match between
-the reviewed original and installed frameworks.
+The first dynamic-label attempt incorrectly classified an icon helper as a
+name helper. Live output showed `IconRole/UnPacker/IconRole55`.
+The replacement follows `UIActivityAbyssRoleRowWidgetController.SetRoleInfo`
+at `0xa8d6968`. At `0xa8d6aa0` it calls configuration service accessor
+`0xb782c04`, reads service +0x230, and calls `0xb883524` with the roster
+ID. At `0xa8d6ad0` it calls `0x7c291b8`, a branch to the string-key
+getter at `0xe6e2c8`. It passes that key to `0x105ad1b8` with w1=0,
+then sends the translated result to the text setter at `0xc1b5b38`.
+The plugin follows that configuration/key/translation path during the
+main-thread refresh. It rejects paths and untranslated keys, caches successful
+labels until reset, and retries unresolved labels. The replacement still needs
+a live check.
 
-The plugin uses these byte-checked functions during the main-thread
-overlay refresh. It translates key-shaped strings, copies the result and
-caches the label by roster ID until reset. A missing label falls back to
-the roster ID. The dynamic labels still need a live check.
+## Automatic reset evidence
+
+`BigSceneMiscLogicSubSystem.OnEventFromAnyone` at `0xc46cf6c` dispatches
+event 0x8d after matching the event entity against its tracked entity.
+When event +0x20 is 1, it tail-calls `EnterBattleStatistics` at
+`0xc46d30c`. That routine checks subsystem +0xd4, sets it to 1 and
+initializes the statistics session. The exit branch calls `0xc46d654`,
+which clears +0xd4 at `0xc46d6a4`.
+
+The new entry detour preserves x0 (subsystem) and x1 (method context).
+Its first twelve bytes are stack operations with no PC-relative instructions.
+It resets the meter only when +0xd4 is zero, then runs the original method.
+The reset timestamp prevents in-flight hits from the prior session being added
+after the reset. Each automatic or manual reset writes a `meter_reset` record.
+All newly called and hooked function bodies match the reviewed original
+framework. Battle-mode and training-restart coverage remain unverified.
+
+The exit detour hooks the metadata-resolved
+`BigSceneMiscLogicSubSystem.ExitBattleStatistics` at `0xc46d654`.
+Its first twelve bytes are stack stores with no PC-relative instructions and
+match the original framework. The wrapper preserves x0, x1 and x2, including
+the managed argument and method context. When subsystem +0xd4 is 1, it
+freezes the meter under the same lock used by hit recording before calling
+the original exit method. Late damage callbacks cannot change totals, latest
+source, timestamps or shares. Manual reset preserves the frozen state.
+The next battle start resets and resumes counting. A `battle_end` log record
+marks the freeze. Finish-screen timing and mode coverage need a live check.
+
+## Damage amount research
+
+### Scaled DPS clock
+
+`HPILLDFKPPL.Update(float)` at `0xbde32c4` receives delta in s0,
+this in x0 and method context in x1. It updates time-slow state through
+`0xbde34a8`, obtains the effective scale through `0xbde3580`,
+multiplies incoming delta by that scale at `0xbde3330`, and writes the
+scaled delta to +0x9c at `0xbde3334`. It also advances its scaled
+accumulator +0xb4 and forwards the scaled delta to game systems.
+`PlayTimeSlowUtils.InvokeTimeSlowKey` feeds slow-motion requests to this
+same manager through `0xbde50c0`. The caller of Update is
+`MCOMHEIPINI.Update` at `0xef01a68`.
+
+The new detour forwards the original float argument and method context,
+then accumulates the resulting scaled frame delta in a double. Its first
+twelve bytes are relocatable stack operations. The full original and
+installed method bodies match. Hits sample this clock under the meter lock.
+Events emitted inside the original update see the prior completed tick.
+Real monotonic timestamps remain in diagnostic logs and protect reset ordering.
+The meter's hit timestamps and DPS denominator use game seconds.
+Between hits, the denominator advances with the current game clock.
+At battle end it stops at the exit hook's game-clock sample.
+Zero delta holds the clock. Negative and nonfinite deltas are rejected.
+Synthetic checks cover slowed/frozen time and stale hits after reset.
+Live chain-attack, ultimate, hit-stop and pause timing remain unverified.
 
 The damage display controller registers listeners for event IDs 545, 546
 and 547 through `0xba010fc`. Cross-references lead upstream to the

@@ -12,12 +12,37 @@ typedef struct {
 typedef struct {
     double resetAt, first, last, total, other;
     unsigned count;
+    bool frozen;
     MeterSource latestSource;
     MeterSource sources[64];
 } DamageMeter;
 
-static inline void MeterRecord(DamageMeter *meter, MeterSource hit, double time) {
-    if (time < meter->resetAt) return;
+static inline void MeterReset(DamageMeter *meter, double time) {
+    *meter = (DamageMeter){.resetAt = time, .frozen = meter->frozen};
+}
+
+static inline void MeterFreeze(DamageMeter *meter, double gameTime) {
+    if (meter->total) meter->last = fmax(meter->last, gameTime);
+    meter->frozen = true;
+}
+
+static inline double MeterElapsed(const DamageMeter *meter, double gameTime) {
+    if (!meter->total) return 0;
+    double end = meter->frozen ? meter->last : fmax(meter->last, gameTime);
+    return fmax(0, end - meter->first);
+}
+
+static inline bool MeterIsAgentName(const uint16_t *name, size_t length) {
+    if (!length || length >= MeterNameCapacity) return false;
+    for (size_t i = 0; i < length; ++i) {
+        if (name[i] < 32 || (name[i] >= 127 && name[i] <= 159) ||
+            name[i] == '/' || name[i] == '\\' || name[i] == '_') return false;
+    }
+    return true;
+}
+
+static inline void MeterRecord(DamageMeter *meter, MeterSource hit, double realTime, double time) {
+    if (meter->frozen || realTime < meter->resetAt) return;
     if (!meter->total || time < meter->first) meter->first = time;
     if (!meter->total || time >= meter->last) {
         meter->last = time;
@@ -36,6 +61,10 @@ static inline void MeterRecord(DamageMeter *meter, MeterSource hit, double time)
     // shortcut: group new IDs beyond storage capacity, add encounter tracking if long runs need it.
     if (meter->count == sizeof(meter->sources) / sizeof(meter->sources[0])) meter->other += hit.damage;
     else meter->sources[meter->count++] = hit;
+}
+
+static inline double MeterAdvanceClock(double time, float delta) {
+    return isfinite(delta) && delta >= 0 ? time + delta : time;
 }
 
 static inline void MeterCopyName(uint16_t *out, const uint16_t *name, size_t length) {

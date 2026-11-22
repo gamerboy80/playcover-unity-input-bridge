@@ -38,6 +38,42 @@
         "parameters": 1
       },
       "replacement": "50d705f01082019100021fd6"
+    },
+    "BattleStart": {
+      "address": "0xc46d30c",
+      "expected": "ff0302d1f85f04a9f65705a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "BigSceneMiscLogicSubSystem",
+        "method": "EnterBattleStatistics",
+        "parameters": 0
+      },
+      "replacement": "b04a06f01042029100021fd6"
+    },
+    "BattleEnd": {
+      "address": "0xc46d654",
+      "expected": "f657bda9f44f01a9fd7b02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "BigSceneMiscLogicSubSystem",
+        "method": "ExitBattleStatistics",
+        "parameters": 1
+      },
+      "replacement": "b04a06f01002039100021fd6"
+    },
+    "GameTick": {
+      "address": "0xbde32c4",
+      "expected": "ff0301d1e923016df44f02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "",
+        "class": "HPILLDFKPPL",
+        "method": "Update",
+        "parameters": 1
+      },
+      "replacement": "107f06b010c2039100021fd6"
     }
   },
   "fields": {
@@ -54,7 +90,10 @@
     "EventSize": 106,
     "EntityID": 56,
     "EntityType": 80,
-    "AvatarTemplateID": 104
+    "AvatarTemplateID": 104,
+    "AvatarNameConfigTable": 560,
+    "BattleStatisticsActive": 212,
+    "ScaledFrameDelta": 156
   },
   "name_getter": {
     "address": "0x12e9b3b0",
@@ -69,13 +108,21 @@
       "address": "0xb751924",
       "expected": "f44fbea9fd7b01a9fd430091f30300aa881808f008411391"
     },
-    "AvatarName": {
-      "address": "0xf832908",
-      "expected": "f44fbea9fd7b01a9fd430091f40301aaf30300aa881106d0"
-    },
     "LocalizedText": {
       "address": "0x105ad1b8",
       "expected": "f44fbea9fd7b01a9fd430091f40301aaf30300aac87f05f0"
+    },
+    "ConfigServices": {
+      "address": "0xb782c04",
+      "expected": "f44fbea9fd7b01a9fd430091081708d00841139109b14091"
+    },
+    "AvatarNameConfig": {
+      "address": "0xb883524",
+      "expected": "ff8301d1f85f02a9f65703a9f44f04a9fd7b05a9fd430191"
+    },
+    "AvatarNameKey": {
+      "address": "0xe6e2c8",
+      "expected": "ffc300d1f44f01a9fd7b02a9fd830091f30300aa08b44139"
     }
   },
   "validation": {
