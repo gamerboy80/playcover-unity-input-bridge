@@ -13,6 +13,7 @@
 #include "MousePresence.h"
 #include "Capture.h"
 #include "EventRouting.h"
+#include "PointerLock.h"
 #include "Profile.h"
 
 // Catalyst hosts AppKit. Resolve its classes at runtime, as PlayCover's plugin does.
@@ -329,6 +330,13 @@ static void traceLegacy(void) {
 #endif
 
 static void initializeDevices(void) {
+    static BOOL pointerLockChecked;
+    Class controller=NSClassFromString(@"IOSViewController");
+    if (!pointerLockChecked && controller) {
+        pointerLockChecked=YES;
+        if (restoreNativePointerLock(controller)) note("Restored native pointer lock around the PlayTools override");
+        else note("Native pointer lock: no recognized PlayTools override to restore");
+    }
     id hostApp=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     if (!gameWindow) gameWindow=[hostApp mainWindow];
     if (!slide) {

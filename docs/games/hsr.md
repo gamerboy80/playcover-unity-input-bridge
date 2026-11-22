@@ -40,7 +40,9 @@ python3 patch.py restore --profile hsr
 
 Builds and backups are separate from ZZZ under the canonical profile ID.
 Existing `.local/hsr/` backups are reused without moving them. `--app` can auto-select this exact build.
-Disable PlayCover keymapping and preserve the PlayTools pointer-lock fix.
+Disable PlayCover keymapping. The shared bridge now restores the recognized
+PlayTools pointer-lock override at runtime; physical validation on vanilla
+PlayCover is pending.
 
 ## Analysis
 

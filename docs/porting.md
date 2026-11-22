@@ -190,7 +190,8 @@ different static storage, or an engine without this Input System require code.
    signatures, configuration loading and device setup before entering gameplay.
    Check physical keyboard releases, modifiers, F-keys, mouse buttons/look, native
    capture and focus loss with PlayCover keymapping off. Preserve unrelated PlayTools
-   display/window fixes and its native pointer-lock source patch when applicable.
+   display/window fixes. The bridge restores the recognized PlayTools pointer-lock
+   override at runtime; check vanilla PlayCover as well as already patched PlayTools.
 7. Test physical wheels and precise trackpads separately, in menus and gameplay.
    Record successes and failures in `validation` and analysis notes. The present
    ZZZ trackpad implementation was confirmed working only after bridging the

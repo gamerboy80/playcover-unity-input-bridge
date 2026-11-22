@@ -3,6 +3,8 @@ set -eu
 cd "$(dirname "$0")/.."
 python3 -m unittest discover -s tests -v
 mkdir -p build
+xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation tests/pointer-lock.m -o build/test-pointer-lock
+build/test-pointer-lock
 python3 plugins/zzz_damage/stage.py --header build/plugins/ZZZDamageProfile.h
 xcrun clang -I build/plugins -I plugins/zzz_damage -Wall -Wextra -Werror \
     plugins/zzz_damage/test-probe.c -o build/test-zzz-damage

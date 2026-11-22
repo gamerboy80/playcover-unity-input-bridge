@@ -153,9 +153,14 @@ standard 120-unit wheel step. Physical notched wheels remain immediate. See the
 analysis notes for implementation details and hardware validation.
 
 PlayTools window and display adjustments can remain enabled with keymapping off.
-The optional source change in
+The bridge restores Unity's native pointer-lock preference when it recognizes
+PlayTools' `IOSViewController.prefersPointerLocked` override. This works inside
+the game process, so rebuilding PlayCover or PlayTools with
 [patches/playtools-native-pointer-lock.patch](patches/playtools-native-pointer-lock.patch)
-is separate from game profiles and is not installed automatically.
+is no longer required for that override. Already patched PlayTools is left alone.
+The source patch remains available for older bridges and is not installed
+automatically. The runtime workaround has synthetic coverage; physical capture,
+mouse look, menus and focus transitions with vanilla PlayCover still need checking.
 
 ## Development
 
@@ -167,6 +172,7 @@ python3 patch.py build --profile com.HoYoverse.Nap-3.3.0
 ~~~
 
 Tests cover profile validation, binary edits, installer recovery, backup integrity,
+recognition/restoration of the PlayTools pointer-lock override,
 and the shared event handler's key releases, capture controls and queued scroll
 delivery using fake host/backend callbacks. AppKit wheel conversion is also
 checked. Window and view checks require WindowServer
