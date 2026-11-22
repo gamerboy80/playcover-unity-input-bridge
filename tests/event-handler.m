@@ -84,7 +84,13 @@ int main(void) {
         editing=YES; captured=forcedCapture=YES; mouseState.buttons=1;
         assert(handleEvent(key)==key && keys[37/8]==0);
         assert(!captured && !forcedCapture && mouseState.buttons==0);
+        for (NSUInteger type=10;type<=12;type++) {
+            key.type=type;
+            assert(handleEvent(key)==key && keys[37/8]==0);
+        }
+        key.type=10;
         editing=NO; handleEvent(key);
+        assert(keys[37/8]&(1u<<(37%8)));
         window.firstResponder=[NSTextField new];
         assert(handleEvent(key)==key && keys[37/8]==0);
         window.firstResponder=nil; handleEvent(key);

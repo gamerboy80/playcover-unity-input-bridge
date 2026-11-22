@@ -5,6 +5,13 @@ python3 -m unittest discover -s tests -v
 mkdir -p build
 xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation tests/pointer-lock.m -o build/test-pointer-lock
 build/test-pointer-lock
+sdk=$(xcrun --sdk macosx --show-sdk-path)
+xcrun clang -target arm64-apple-ios15.0-macabi -isysroot "$sdk" \
+    -iframework "$sdk/System/iOSSupport/System/Library/Frameworks" \
+    -F"$sdk/System/iOSSupport/System/Library/Frameworks" \
+    -L"$sdk/System/iOSSupport/usr/lib" -fobjc-arc -Wall -Wextra -Werror \
+    -framework Foundation -framework UIKit tests/text-input.m -o build/test-text-input
+build/test-text-input
 python3 plugins/zzz_damage/stage.py --header build/plugins/ZZZDamageProfile.h
 xcrun clang -I build/plugins -I plugins/zzz_damage -Wall -Wextra -Werror \
     plugins/zzz_damage/test-probe.c -o build/test-zzz-damage

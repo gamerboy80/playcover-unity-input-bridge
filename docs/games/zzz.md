@@ -30,6 +30,26 @@ the reported purchase quantity slider snapping back. Live launch, world entry,
 Mouse/Keyboard creation and graphics/sound settings were checked. Dedicated
 physical trackpad and broader gameplay regression checks remain pending.
 
+### Embedded browser text input
+
+The bridge's UIKit focus check previously recognized only `UITextField` and
+`UITextView`. A focused WebKit input therefore fell through to the gameplay
+handler, which consumed mapped key events before UIKit could deliver text.
+WebKit's [content view](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/ios/WKContentViewInteraction.h)
+implements `UITextInput`, inheriting `UIKeyInput`, rather than either text-view
+class. The bridge now recognizes any first responder adopting `UIKeyInput`,
+including empty fields. The same check suspends pointer capture while editing;
+the event handler releases held game input and forwards native key events.
+
+A Catalyst regression test reproduces the old miss with a nested custom text
+responder and checks empty fields, focus loss, ordinary game views and standard
+text controls. Event-handler tests cover key down/up/modifier forwarding and
+resuming gameplay. Static Objective-C metadata in the reviewed 3.3.1 framework
+shows neither `UnityView` nor its `UnityRenderingView` superclass adopts a
+text-input protocol. No game addresses or byte patches change. The reported
+login verification screen and bottom black bar still need a physical retest;
+the tests do not establish the bar's origin or live login behavior.
+
 ### Keyboard binding settings
 
 The PC input layout showed keyboard rows, but the settings registry excluded

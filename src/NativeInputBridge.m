@@ -13,6 +13,7 @@
 #include "MousePresence.h"
 #include "Capture.h"
 #include "EventRouting.h"
+#include "TextInput.h"
 #include "PointerLock.h"
 #include "Profile.h"
 
@@ -286,13 +287,6 @@ static void setCapture(BOOL value) {
     }
     balanceCursorHide(&cursorHideClaims,value,cursorVisible && cursorVisible(),hideHostCursor,unhideHostCursor);
     note(value ? "Pointer captured" : "Pointer released");
-}
-
-static BOOL editingUIKitText(UIView *view) {
-    if (view.isFirstResponder &&
-        ([view isKindOfClass:UITextField.class] || [view isKindOfClass:UITextView.class])) return YES;
-    for (UIView *child in view.subviews) if (editingUIKitText(child)) return YES;
-    return NO;
 }
 
 static BOOL editingGameText(void) {
