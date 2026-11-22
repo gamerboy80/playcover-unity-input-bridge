@@ -12,7 +12,8 @@ source, and share by agent or source. Use **Control+Command+D** to show or hide 
 battle-statistics session begins. This hook still needs a live check across
 battle modes. Use the manual reset for training comparisons.
 The session-exit hook freezes the totals, source shares and DPS at battle end.
-Manual reset clears the frozen result. The next battle start resumes counting.
+Result-screen entry also freezes game seconds and DPS. Manual reset clears the
+result and resumes counting. The battle-start hook also resets and resumes.
 DPS refreshes on hits and every 100 ms, using scaled game time from the first
 counted hit through the current tick, including
 gaps between hits. The clock accumulates the time-slow manager's scaled frame

@@ -22,6 +22,7 @@ static inline void MeterReset(DamageMeter *meter, double time) {
 }
 
 static inline void MeterFreeze(DamageMeter *meter, double gameTime) {
+    if (meter->frozen) return;
     if (meter->total) meter->last = fmax(meter->last, gameTime);
     meter->frozen = true;
 }

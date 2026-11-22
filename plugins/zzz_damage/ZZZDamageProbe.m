@@ -271,6 +271,33 @@ static void GameTick(void *manager, float delta, void *method) {
     os_unfair_lock_unlock(&meterLock);
 }
 
+static void FreezeAtResult(void) {
+    os_unfair_lock_lock(&meterLock);
+    MeterFreeze(&meter, gameClock);
+    os_unfair_lock_unlock(&meterLock);
+    QueueMeterRefresh();
+    double time = Now();
+    dispatch_async(writer, ^{ Write(@{@"type": @"result_open", @"time": @(time)}); });
+}
+
+static void ResultOpen(void *controller, void *context, void *method) {
+    FreezeAtResult();
+    void (*original)(void *, void *, void *) = (void *)(unity + ProbeResultOpenOriginal);
+    original(controller, context, method);
+}
+
+static void WinOpen(void *controller, void *context, void *method) {
+    FreezeAtResult();
+    void (*original)(void *, void *, void *) = (void *)(unity + ProbeWinOpenOriginal);
+    original(controller, context, method);
+}
+
+static void FailOpen(void *controller, void *method) {
+    FreezeAtResult();
+    void (*original)(void *, void *) = (void *)(unity + ProbeFailOpenOriginal);
+    original(controller, method);
+}
+
 static NSDictionary *Resolution(ProbeEntity entity) {
     return @{@"observed": @(entity.observed), @"matches": @(entity.matches),
              @"id": @(entity.id), @"kind": @(entity.kind)};
@@ -368,14 +395,24 @@ static BOOL Connect(void) {
             memcmp((void *)(image + ProbeBattleEndEntry), ProbeBattleEndJump, sizeof(ProbeBattleEndJump)) ||
             memcmp((void *)(image + ProbeBattleEndStub), ProbeBattleEndCode, sizeof(ProbeBattleEndCode)) ||
             memcmp((void *)(image + ProbeGameTickEntry), ProbeGameTickJump, sizeof(ProbeGameTickJump)) ||
-            memcmp((void *)(image + ProbeGameTickStub), ProbeGameTickCode, sizeof(ProbeGameTickCode))) return NO;
+            memcmp((void *)(image + ProbeGameTickStub), ProbeGameTickCode, sizeof(ProbeGameTickCode)) ||
+            memcmp((void *)(image + ProbeResultOpenEntry), ProbeResultOpenJump, sizeof(ProbeResultOpenJump)) ||
+            memcmp((void *)(image + ProbeResultOpenStub), ProbeResultOpenCode, sizeof(ProbeResultOpenCode)) ||
+            memcmp((void *)(image + ProbeWinOpenEntry), ProbeWinOpenJump, sizeof(ProbeWinOpenJump)) ||
+            memcmp((void *)(image + ProbeWinOpenStub), ProbeWinOpenCode, sizeof(ProbeWinOpenCode)) ||
+            memcmp((void *)(image + ProbeFailOpenEntry), ProbeFailOpenJump, sizeof(ProbeFailOpenJump)) ||
+            memcmp((void *)(image + ProbeFailOpenStub), ProbeFailOpenCode, sizeof(ProbeFailOpenCode))) return NO;
         _Atomic(uintptr_t) *lookupSlot = (void *)(image + ProbeLookupEntitySlot);
         _Atomic(uintptr_t) *damageSlot = (void *)(image + ProbeDamageEventSlot);
         _Atomic(uintptr_t) *battleSlot = (void *)(image + ProbeBattleStartSlot);
         _Atomic(uintptr_t) *endSlot = (void *)(image + ProbeBattleEndSlot);
         _Atomic(uintptr_t) *tickSlot = (void *)(image + ProbeGameTickSlot);
+        _Atomic(uintptr_t) *resultSlot = (void *)(image + ProbeResultOpenSlot);
+        _Atomic(uintptr_t) *winSlot = (void *)(image + ProbeWinOpenSlot);
+        _Atomic(uintptr_t) *failSlot = (void *)(image + ProbeFailOpenSlot);
         if (atomic_load(lookupSlot) || atomic_load(damageSlot) || atomic_load(battleSlot) ||
-            atomic_load(endSlot) || atomic_load(tickSlot)) return NO;
+            atomic_load(endSlot) || atomic_load(tickSlot) || atomic_load(resultSlot) ||
+            atomic_load(winSlot) || atomic_load(failSlot)) return NO;
         unity = image;
         objectNamesAvailable = !memcmp((void *)(image + ProbeObjectName), ProbeObjectNameCode, sizeof(ProbeObjectNameCode));
         avatarLookupAvailable =
@@ -391,6 +428,9 @@ static BOOL Connect(void) {
         atomic_store_explicit(battleSlot, (uintptr_t)BattleStart, memory_order_release);
         atomic_store_explicit(endSlot, (uintptr_t)BattleEnd, memory_order_release);
         atomic_store_explicit(tickSlot, (uintptr_t)GameTick, memory_order_release);
+        atomic_store_explicit(resultSlot, (uintptr_t)ResultOpen, memory_order_release);
+        atomic_store_explicit(winSlot, (uintptr_t)WinOpen, memory_order_release);
+        atomic_store_explicit(failSlot, (uintptr_t)FailOpen, memory_order_release);
         return YES;
     }
     return NO;
@@ -437,7 +477,7 @@ static void StartProbe(void) {
                             meterVisible = !meterVisible;
                             meterWindow.hidden = !meterVisible;
                         } else {
-                            ResetMeter(@"manual", NO);
+                            ResetMeter(@"manual", YES);
                         }
                         RefreshMeter();
                         return nil;

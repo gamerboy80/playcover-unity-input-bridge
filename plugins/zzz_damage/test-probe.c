@@ -109,6 +109,8 @@ int main(void) {
     assert(MeterElapsed(&slowed, clock + 1) == 1.25);
     MeterFreeze(&slowed, clock + 2);
     assert(MeterElapsed(&slowed, clock + 100) == 2.25);
+    MeterFreeze(&slowed, clock + 100);
+    assert(MeterElapsed(&slowed, clock + 200) == 2.25);
     assert(slowed.total == 200);
     MeterReset(&slowed, 111);
     MeterRecord(&slowed, (MeterSource){.id = 1, .damage = 100}, 110, clock);

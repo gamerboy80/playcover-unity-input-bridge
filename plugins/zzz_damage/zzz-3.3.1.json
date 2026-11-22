@@ -74,6 +74,42 @@
         "parameters": 1
       },
       "replacement": "107f06b010c2039100021fd6"
+    },
+    "ResultOpen": {
+      "address": "0xebd1abc",
+      "expected": "f85fbca9f65701a9f44f02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "UILevelResultV2_PageController",
+        "method": "OnUIOpen",
+        "parameters": 1
+      },
+      "replacement": "900f05f01082049100021fd6"
+    },
+    "WinOpen": {
+      "address": "0xb493a10",
+      "expected": "f85fbca9f65701a9f44f02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "UILevelGeneralWinResultDialogPopWindowController",
+        "method": "OnUIOpen",
+        "parameters": 1
+      },
+      "replacement": "90c906b01042059100021fd6"
+    },
+    "FailOpen": {
+      "address": "0xfeb7024",
+      "expected": "ff0301d1f65701a9f44f02a9",
+      "identity": {
+        "module": "Logic.dll",
+        "namespace": "MoleMole",
+        "class": "UILevelGeneralFailedResultDialogPopWindowController",
+        "method": "OnPopShowed",
+        "parameters": 0
+      },
+      "replacement": "707804b01002069100021fd6"
     }
   },
   "fields": {

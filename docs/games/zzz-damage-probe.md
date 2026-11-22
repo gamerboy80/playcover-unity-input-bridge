@@ -250,6 +250,19 @@ marks the freeze. Finish-screen timing and mode coverage need a live check.
 
 ## Damage amount research
 
+The recent live capture had no `battle_end` notification. Result-screen
+hooks supplement the statistics exit hook. The metadata-resolved
+`UILevelResultV2_PageController.OnUIOpen` at `0xebd1abc` and
+`UILevelGeneralWinResultDialogPopWindowController.OnUIOpen` at `0xb493a10`
+preserve controller, context and method arguments. The legacy failure screen's
+`OnPopShowed` at `0xfeb7024` preserves controller and method context.
+Their first twelve bytes are stack operations, and the full method bodies
+match the original framework. Each freezes the meter before executing the
+original and writes `result_open`. Freezing is idempotent, so a second
+notification cannot advance the saved end time. Manual reset now explicitly
+resumes counting for modes without an observed battle-start event.
+Live result-screen coverage remains to be checked.
+
 ### Scaled DPS clock
 
 `HPILLDFKPPL.Update(float)` at `0xbde32c4` receives delta in s0,
