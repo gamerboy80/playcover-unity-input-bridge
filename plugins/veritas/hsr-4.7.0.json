@@ -31,6 +31,46 @@
     "DirectDamage": [
       "0x2811114",
       "ff4307d1fc6f17a9fa6718a9"
+    ],
+    "SetLineup": [
+      "0x26540b8",
+      "ff8304d1e9230b6dfc6f0ca9"
+    ],
+    "TurnEnd": [
+      "0x281f8ac",
+      "f657bda9f44f01a9fd7b02a9"
+    ],
+    "WaveUpdate": [
+      "0x283885c",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "CycleUpdate": [
+      "0x283f204",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "AVReset": [
+      "0x2831b84",
+      "ff8301d1fa6701a9f85f02a9"
+    ],
+    "DirectChangeHP": [
+      "0x2811dc8",
+      "ff0307d1fc6f16a9fa6717a9"
+    ],
+    "StatChange": [
+      "0x2807390",
+      "ff0307d1fc6f16a9fa6717a9"
+    ],
+    "EnemyInitialize": [
+      "0x278b510",
+      "ffc305d1fa6712a9f85f13a9"
+    ],
+    "CharacterInitialize": [
+      "0x2662d50",
+      "f44fbea9fd7b01a9fd430091"
+    ],
+    "FormationUpdate": [
+      "0x27ed180",
+      "fc6fbaa9fa6701a9f85f02a9"
     ]
   },
   "methods": {
@@ -53,7 +93,47 @@
     "GetMonsterSkillName": "0x2790928",
     "GetServantSkillName": "0x27bcd08",
     "GetBattleEventSkillName": "0x2651de4",
-    "GetText": "0x23f4290"
+    "GetText": "0x23f4290",
+    "GetRuntimeID": "0x26f0d58",
+    "GetTurnOwner": "0x2828e68",
+    "GetMaxWave": "0x283f070",
+    "GetMaxCycle": "0x283f27c",
+    "GetStageID": "0x28407c8",
+    "GetCharacterData": "0x2825048",
+    "GetCharacterName": "0x2663844",
+    "GetMonsterID": "0x278c3b4",
+    "GetMonsterRow": "0x278da4c",
+    "GetMonsterNameID": "0x278ea38",
+    "GetMonsterLevel": "0x278dedc",
+    "GetAvatarSkillType": "0x2648a48",
+    "GetMonsterSkillType": "0x27908c4",
+    "GetServantSkillType": "0x27bcc14",
+    "GetBattleEventSkillType": "0x2651d20",
+    "EnumNames": "0xcec5fec",
+    "EnumValues": "0xcec5f04",
+    "AvatarIconPath": "0x1155eec",
+    "MonsterIconPath": "0x278ec0c",
+    "LoadSprite": "0x129ffd0",
+    "SpriteTexture": "0xf13e0e4",
+    "TextureWidth": "0xf13ebd0",
+    "TextureHeight": "0xf13ebe0",
+    "TemporaryTexture": "0xf128a04",
+    "ActiveTexture": "0xf1276ac",
+    "SetActiveTexture": "0xf1276dc",
+    "ReleaseTexture": "0xf127998",
+    "BlitTexture": "0xf107f34",
+    "TextureConstructor": "0xf1426e8",
+    "ReadPixels": "0xf1434a8",
+    "ApplyTexture": "0xf1432ac",
+    "EncodePNG": "0xf1518f0",
+    "DestroyObject": "0xf11a970",
+    "ResolveClass": "0xf307c00",
+    "TypeObject": "0xf315180",
+    "AllocateObject": "0xf31387c",
+    "GetFields": "0xcfa98e4",
+    "FieldName": "0xcf3ce68",
+    "FieldValue": "0xcf3ce84",
+    "PropertyIconRow": "0x12edc880"
   },
   "damage_fields": [
     "0x608",
@@ -63,6 +143,46 @@
   ],
   "fields": {
     "AttackTypeField": "0x204",
-    "SkillRowField": "0x30"
+    "SkillRowField": "0x30",
+    "LineupLightTeam": "0x20",
+    "LineupCharacterID": "0x6c",
+    "ArrayLength": "0x18",
+    "ArrayItems": "0x20",
+    "AbilityProperties": "0xc8",
+    "PropertyValue": "0x60",
+    "FormationList": "0xa8",
+    "ListItems": "0x10",
+    "ListCount": "0x18",
+    "ComponentOwner": "0x10",
+    "EnemyDefaultHP": "0x190",
+    "ClassType": "0x68",
+    "StringLength": "0x10",
+    "StringCharacters": "0x14",
+    "ObjectClass": "0x0",
+    "BoxedValue": "0x10"
+  },
+  "metadata_sha256": "4e436c79f75e7283969a7755544ac991beb736c476631fffec7c0b9091b9f6e0",
+  "validation": {
+    "evidence": "docs/games/veritas.md",
+    "runtime": "Expanded combat features require live verification; signature resolution and synthetic tests are separate."
+  },
+  "properties": {
+    "MaxHP": 1,
+    "CurrentHP": 10,
+    "Attack": 18,
+    "Defence": 23,
+    "Speed": 32,
+    "ActionDelay": 38
+  },
+  "game": "Honkai: Star Rail",
+  "executable": "hkrpg",
+  "types": {
+    "AbilityProperty": 10323,
+    "AttackType": 10254,
+    "Sprite": 4279,
+    "AvatarPropertyType": 10296,
+    "RenderTextureFormat": 4034,
+    "RenderTextureReadWrite": 4037,
+    "Texture2D": 4056
   }
 }

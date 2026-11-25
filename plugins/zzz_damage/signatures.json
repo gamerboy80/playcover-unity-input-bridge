@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "bundle_id": "com.HoYoverse.Nap",
+  "metadata": "zzz",
+  "metadata_sha256": "a24fce26653429531a2838457da20a55384b96b5388d3ae57b8d6e25f4fbf090",
+  "functions": {
+    "DamageEvent": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "UIInLevelDamageTextContainerChildWindowController",
+      "method": "GMBBKAAGOJA",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "eb2bba6de923016df85f02a9f65703a9f44f04a9fd7b05a9fd430191f30301aaf40300aae8fe07d00841139109c5409128d15b39e80a003608d907d008411391a94b9452086969381f050071600a005477e607f0f7623291e8a24191083154f9000540f9083040f9080940f9a80a00b4083d40f9000140f9c00a00b4610240b9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "eb2bba6de923016df85f02a9f65703a9f44f04a9fd7b05a9fd430191f30301aaf40300aae8fe07d00841139109c5409128d15b39e80a003608d907d008411391a94b9452086969381f050071600a005477e607f0f7623291e8a24191083154f9000540f9083040f9080940f9a80a00b4083d40f9000140f9c00a00b4610240b9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "LookupEntity": {
+      "module": "Logic.dll",
+      "namespace": "",
+      "class": "GDIACAHPLBB",
+      "method": "EIMKFKGAHBN",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30301aaf40300aa483c07f008411391098d4091284d713928020036681607f00841139109814191289d5d391f050071a0010054804e40f9e82307900861329109e1419123b57bf9e10313aa02008052fd7b41a9f44fc2a83a6ea61687f9a494efffff17e0ec8052c000a0724c86bf97c00000b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fcffffffffffffffff000000fcffffffff"
+      },
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30301aaf40300aa483c07f008411391098d4091284d713928020036681607f00841139109814191289d5d391f050071a0010054804e40f9e82307900861329109e1419123b57bf9e10313aa02008052fd7b41a9f44fc2a83a6ea61687f9a494efffff17e0ec8052c000a0724c86bf97c00000b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fcffffffffffffffff000000fcffffffff"
+      }
+    },
+    "BattleStart": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "BigSceneMiscLogicSubSystem",
+      "method": "EnterBattleStatistics",
+      "parameters": 0,
+      "registration_anchor": {
+        "pattern": "ff0302d1f85f04a9f65705a9f44f06a9fd7b07a9fdc30191f30300aaa8af07f00841139109fd4091280d4b39a8050036c88907f0084113910955409128a97f391f0500712005005468524339881200372800805268520339602a40f9c00400b4010080d21891ab9657970790f7623291e8a24191084154f9000540f9083040f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "ff0302d1f85f04a9f65705a9f44f06a9fd7b07a9fdc30191f30300aaa8af07f00841139109fd4091280d4b39a8050036c88907f0084113910955409128a97f391f0500712005005468524339881200372800805268520339602a40f9c00400b4010080d21891ab9657970790f7623291e8a24191084154f9000540f9083040f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "BattleEnd": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "BigSceneMiscLogicSubSystem",
+      "method": "ExitBattleStatistics",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30301aaf40300aaa8af07f00841139109fd409128114b39c8060036c88907f0084113910955409128ad7f391f05007140060054885243391f050071e10100549f520339e00314aae10313aa51040094f40300aaf30301aa488e07f008c12b9109e1409120257ef9084c4339e8040034",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30301aaf40300aaa8af07f00841139109fd409128114b39c8060036c88907f0084113910955409128ad7f391f05007140060054885243391f050071e10100549f520339e00314aae10313aa51040094f40300aaf30301aa488e07f008c12b9109e1409120257ef9084c4339e8040034",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GameTick": {
+      "module": "Logic.dll",
+      "namespace": "",
+      "class": "HPILLDFKPPL",
+      "method": "Update",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "ff0301d1e923016df44f02a9fd7b03a9fdc30091081ca04ef30300aae00f00bd08e407b00841139109c14091282d5539c80a003628be07b008411391093d419128e95d391f050071400a005468aa40b90805001168aa00b9e00313aa001da84e61000094e00313aa950000940809201e689e00bd60b640bd0029201e60b600bd",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffffffffffffffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "ff0301d1e923016df44f02a9fd7b03a9fdc30091081ca04ef30300aae00f00bd08e407b00841139109c14091282d5539c80a003628be07b008411391093d419128e95d391f050071400a005468aa40b90805001168aa00b9e00313aa001da84e61000094e00313aa950000940809201e689e00bd60b640bd0029201e60b600bd",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "ResultOpen": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "UILevelResultV2_PageController",
+      "method": "OnUIOpen",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f40301aaf30300aa887406f0084113910989409128e14039a80f0036a84e06f008411391093d419128456e391f050071200f0054e00313aae10314aa5ea73897375c0690f7623291e8a24191085154f9000540f9083040f9080940f9c80e00b4083d40f9150140f9385306f0",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009f"
+      },
+      "verify": {
+        "pattern": "f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f40301aaf30300aa887406f0084113910989409128e14039a80f0036a84e06f008411391093d419128456e391f050071200f0054e00313aae10314aa5ea73897375c0690f7623291e8a24191085154f9000540f9083040f9080940f9c80e00b4083d40f9150140f9385306f0",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009f"
+      }
+    },
+    "WinOpen": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "UILevelGeneralWinResultDialogPopWindowController",
+      "method": "OnUIOpen",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f40301aaf30300aa882e08b00841139109b9409128694a39280b0036a80808b0084113910945409128a97f391f050071a00a0054e00313aae10314aa899f1594171608d0f7623291e8a24191085154f9000540f9083040f9080940f9480a00b4083d40f9150140f9380d08b0",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009f"
+      },
+      "verify": {
+        "pattern": "f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f40301aaf30300aa882e08b00841139109b9409128694a39280b0036a80808b0084113910945409128a97f391f050071a00a0054e00313aae10314aa899f1594171608d0f7623291e8a24191085154f9000540f9083040f9080940f9480a00b4083d40f9150140f9380d08b0",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009f"
+      }
+    },
+    "FailOpen": {
+      "module": "Logic.dll",
+      "namespace": "MoleMole",
+      "class": "UILevelGeneralFailedResultDialogPopWindowController",
+      "method": "OnPopShowed",
+      "parameters": 0,
+      "registration_anchor": {
+        "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f30300aa68dd05b00841139109ad409128b94139e80d003688b705b00841139109554091286d5c391f050071600d00542800805268660d3915bc05b0b5c22b91a0e645f9f467c694f40300aaf6c405d0d6623291c8824291020d64f9e10313aaf55f3694e00313aa01028052",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffff000000fcffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f30300aa68dd05b00841139109ad409128b94139e80d003688b705b00841139109554091286d5c391f050071600d00542800805268660d3915bc05b0b5c22b91a0e645f9f467c694f40300aaf6c405d0d6623291c8824291020d64f9e10313aaf55f3694e00313aa01028052",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffff000000fcffffffffffffffff"
+      }
+    },
+    "ObjectName": {
+      "module": "UnityEngine.CoreModule.dll",
+      "namespace": "UnityEngine",
+      "class": "Object",
+      "method": "get_name",
+      "parameters": 0,
+      "registration_anchor": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa485e04b008411391e96f895208696938a8010036e83c04b008c12b91003d77f9084c433948010034e83b04f008811891013168f9e00313aafd7b41a9f44fc2a820001fd6c3c83795f3ffff1709d70694f6ffff17",
+        "mask": "ffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc000000fc"
+      },
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa485e04b008411391e96f895208696938a8010036e83c04b008c12b91003d77f9084c433948010034e83b04f008811891013168f9e00313aafd7b41a9f44fc2a820001fd6c3c83795f3ffff1709d70694f6ffff17",
+        "mask": "ffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "AvatarActor": {
+      "module": "Logic.dll",
+      "namespace": "",
+      "class": "APNCODNOFLH",
+      "method": "NIAPOMKHHOP",
+      "parameters": 1,
+      "registration_anchor": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30300aac8b106f0084113910925419128a1693988060036e88b06f00841139109254191288d5f391f05007100060054e00313aa544a259400040034b30600b4685240b91f05007181030054689906900861329109a1419135c15bf9e00313aaa103805211616096f30300aaa80a40f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff"
+      },
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30300aac8b106f0084113910925419128a1693988060036e88b06f00841139109254191288d5f391f05007100060054e00313aa544a259400040034b30600b4685240b91f05007181030054689906900861329109a1419135c15bf9e00313aaa103805211616096f30300aaa80a40f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff"
+      }
+    },
+    "AvatarData": {
+      "module": "Logic.dll",
+      "namespace": "",
+      "class": "HJGOAJHNEGC",
+      "method": "HJJKLFDKFLO",
+      "parameters": 0,
+      "registration_anchor": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa881808f00841139109b1409128fd7a3988020036604e40f9e00100b428f707f008c12b9109014191218979f9080040f90a454339294443395f01096b63010054083940f9080d098b08815ff81f0101ebc1000054fd7b41a9f44fc2a8c0035fd6d89b1195ecffff17f9fde395",
+        "mask": "ffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc"
+      },
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa881808f00841139109b1409128fd7a3988020036604e40f9e00100b428f707f008c12b9109014191218979f9080040f90a454339294443395f01096b63010054083940f9080d098b08815ff81f0101ebc1000054fd7b41a9f44fc2a8c0035fd6d89b1195ecffff17f9fde395",
+        "mask": "ffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc"
+      }
+    },
+    "LocalizedText": {
+      "pattern": "f44fbea9fd7b01a9fd430091f40301aaf30300aac87f05f00841139109a14191282d49391f050071600100548856c796400200b4000441f9200200b4833e4092e10313aa22008052fd7b41a9f44fc2a8f598bb1760499052c000a072ec35f496000100b4823e4092e10313aafd7b41a9f44fc2a8abeb5d17898faa94888faa94",
+      "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc"
+    },
+    "ConfigServices": {
+      "pattern": "f44fbea9fd7b01a9fd430091081708d00841139109b1409128e57f394803003693fe07f07362329168a2419108f954f9000540f9083040f9080940f9880200b4083d40f9080140f9880000b568a2429100e967f9b508c19668a2419108f954f9000540f9083040f9080940f9880100b4083d40f9000140f9fd7b41a9f44fc2a8",
+      "mask": "ffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "AvatarNameConfig": {
+      "pattern": "ff8301d1f85f02a9f65703a9f44f04a9fd7b05a9fd430191f30301aaf40300aa080f08b00841139109c1409128dd5d39c80b0036ff1f00b9ffff00a9ff0700b928e907b00841139169539952086969381f050071e00a0054800a40f9000c00b4e10313aa020080d2a7d2a19660000036150080d246000014801a40f9200b00b4",
+      "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffff"
+    },
+    "AvatarNameKey": {
+      "pattern": "ffc300d1f44f01a9fd7b02a9fd830091f30300aa08b44139a806083760e20091c45edf97601a00f968b6413908011f3268b60139a85f0dd00841139109a28e5208696938e805003668ba41390805003768be41390805001168be01391f2d007161040054742640f9f40300b4483e0dd008c12b9109159652016969f8890240f9",
+      "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff"
+    }
+  },
+  "bindings": {
+    "DamageEvent": [
+      "entry",
+      "DamageEvent"
+    ],
+    "LookupEntity": [
+      "entry",
+      "LookupEntity"
+    ],
+    "BattleStart": [
+      "entry",
+      "BattleStart"
+    ],
+    "BattleEnd": [
+      "entry",
+      "BattleEnd"
+    ],
+    "GameTick": [
+      "entry",
+      "GameTick"
+    ],
+    "ResultOpen": [
+      "entry",
+      "ResultOpen"
+    ],
+    "WinOpen": [
+      "entry",
+      "WinOpen"
+    ],
+    "FailOpen": [
+      "entry",
+      "FailOpen"
+    ],
+    "ObjectName": [
+      "name_getter",
+      ""
+    ],
+    "AvatarActor": [
+      "avatar_getter",
+      "AvatarActor"
+    ],
+    "AvatarData": [
+      "avatar_getter",
+      "AvatarData"
+    ],
+    "LocalizedText": [
+      "avatar_getter",
+      "LocalizedText"
+    ],
+    "ConfigServices": [
+      "avatar_getter",
+      "ConfigServices"
+    ],
+    "AvatarNameConfig": [
+      "avatar_getter",
+      "AvatarNameConfig"
+    ],
+    "AvatarNameKey": [
+      "avatar_getter",
+      "AvatarNameKey"
+    ]
+  }
+}

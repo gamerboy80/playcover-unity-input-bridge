@@ -165,5 +165,6 @@
     "static": "Exact original hash, named IL2CPP method mapping, ARM64 argument use and accessed fields reviewed.",
     "runtime": "Live training captured 16 positive events with matching source/target entity lookups and distinct Alice/Nangong direct-hit sources. Missing third marker prevents off-field confirmation. Displayed amounts, effective HP loss and complete coverage remain unverified.",
     "evidence": "docs/games/zzz-damage-probe.md"
-  }
+  },
+  "signature_contract": "signatures.json"
 }

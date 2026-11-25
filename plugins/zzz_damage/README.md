@@ -7,7 +7,8 @@ entity IDs, and matching entity lookups made by the original game code. It does
 not assign damage to the active agent or guess agent names from entity IDs.
 
 The preview shows raw damage-display totals, their average rate, the latest
-source, and share by agent or source. Use **Control+Command+D** to show or hide it and
+source, and share by agent or source. The gear menu lists the meter shortcuts
+and all five training markers. Use **Control+Command+D** to show or hide it and
 **Control+Command+R** to reset manually. The meter also resets when the game's
 battle-statistics session begins. This hook still needs a live check across
 battle modes. Use the manual reset for training comparisons.
@@ -35,6 +36,20 @@ groups the rest under Other. Summon ownership, anomaly/disorder attribution,
 full event coverage and effective HP loss still need verification. See the
 [native analysis](../../docs/games/zzz-damage-probe.md).
 
+## Name-based lookup
+
+Staging resolves the eight hook targets and identified helpers by managed
+class/method name through the same metadata resolver as the main patch, then
+checks their native instructions. Remaining obfuscated helpers use unique native
+signatures. The resolved map must match this build's reviewed object/ABI profile;
+missing or ambiguous matches stop staging. Object fields and cave reservations
+remain build-specific JSON data.
+
+To inspect discovery without changing the app, run
+`python3 plugins/zzz_damage/stage.py --resolve --app '/path/to/Zenless Zone Zero.app'`.
+The report is saved under `.local/profiles/plugins/`. This is preparation-time
+lookup, not per-call runtime reflection or automatic approval of a new build.
+
 ## Build and stage
 
 Quit ZZZ. From the repository root:
@@ -46,8 +61,9 @@ python3 plugins/zzz_damage/stage.py \
   --output build/plugins/ZZZ-Damage-Probe.app
 ```
 
-The stager accepts only the reviewed original framework or the exact examined
-desktop-input test install. It checks the metadata hash, framework hash, UUID,
+The stager accepts the reviewed original framework, the recorded examined test
+install, or a desktop-input installation whose active state, installed hashes and
+reconstructed original pass the main installer's checks. It checks the metadata hash, framework hash, UUID,
 entry instructions, nonoverlapping edits and unused segment padding. It records
 source/planned hashes before editing the isolated copy, includes the plugin in
 `Frameworks/UserPlugins`, and signs/verifies the copy. Existing input patches,

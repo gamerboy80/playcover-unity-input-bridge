@@ -1,0 +1,937 @@
+{
+  "types": {
+    "AbilityProperty": {
+      "class": "AbilityProperty"
+    },
+    "AttackType": {
+      "class": "AttackType"
+    },
+    "Sprite": {
+      "class": "Sprite",
+      "method": "get_texture",
+      "function": "SpriteTexture"
+    },
+    "AvatarPropertyType": {
+      "class": "AvatarPropertyType"
+    },
+    "RenderTextureFormat": {
+      "class": "RenderTextureFormat"
+    },
+    "RenderTextureReadWrite": {
+      "class": "RenderTextureReadWrite"
+    },
+    "Texture2D": {
+      "class": "Texture2D",
+      "method": ".ctor",
+      "function": "TextureConstructor"
+    }
+  },
+  "schema_version": 1,
+  "bundle_id": "com.HoYoverse.hkrpgoversea",
+  "metadata": "hsr",
+  "metadata_sha256": "4e436c79f75e7283969a7755544ac991beb736c476631fffec7c0b9091b9f6e0",
+  "functions": {
+    "Damage": {
+      "class": "PGOOHIHKHNJ",
+      "method": "NNGMOCFGPBN",
+      "verify": {
+        "pattern": "eb2bb86de923016dfc6f02a9fa6703a9f85f04a9f65705a9f44f06a9fd7b07a9fdc30191ffc312d1e73300f9f30306aaf40305aaf80304aaf90303aaf60302aafa0301aaf70300aaa80f40f9e81300f9a8020ad008dd45f9080140f9a88317f8e27f01f9ff7b01f9ff7301f9e8030f91e9c30a9100e4004fe00316adffbb02b9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "BattleBegin": {
+      "class": "TurnBasedGameMode",
+      "method": "_GameModeBegin",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa80749952e000a07254763895a0040035604e41f9c00400b45e182f957f3603b969e240f9685a40f9090100b4c80400b40ba942a92b0d00f98a0400b44abd42b92a5900b902000014480300b4080d40f9280300b4002140f9000300b468f9099008413f9109548a52a902a072016969f8",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff"
+      }
+    },
+    "BattleEnd": {
+      "class": "TurnBasedGameMode",
+      "method": "_GameModeEnd",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aaa0749952e000a0721d763895e0020035e00313aa2de1ff97685a40f9c80200b4080d40f9a80200b4002140f9800200b468f9099008413f91095b8a52a902a072016969f8a4056a95c00100b4210080527ca6d69768f60d911f010079fd7b41a9f44fc2a8c0035fd6e00313aac1055195",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "TurnBegin": {
+      "class": "TurnBasedGameMode",
+      "method": "DoTurnPrepareStartWork",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aac06e9952e000a072f18738956006003568d242b90805001168d202b909f109b0292126918a6e8b5228692ab8e00313aaa7ffff977f8200f97ffe0d397fb60b39685a40f9080500b4080d40f9e80400b4002140f9c00400b494f909b094423f9108308852a802a072816a68f86e176a95",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "UseSkill": {
+      "class": "SkillCharacterComponent",
+      "method": "UseSkill",
+      "verify": {
+        "pattern": "ff4303d1fc6f07a9fa6708a9f85f09a9f6570aa9f44f0ba9fd7b0ca9fd030391f80306aaf30305aafa0304aaf90303aafc0302aaf50301aaf40300aabf831af8a0f39c52e000a072e4423a9500390035e00314aae10315aa0200801233f2ff97603700b4880a40f9483a00b4092140f9293a00b4f60300aa203140f9e03900b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "DirectDamage": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "DirectDamageHP",
+      "verify": {
+        "pattern": "ff4307d1fc6f17a9fa6718a9f85f19a9f6571aa9f44f1ba9fd7b1ca9fd030791f90307aaf40306aaf70305aaf60304aae31300f9fc0302aaf50301aaf30300aaa59b39a9bfff38a9bf0318f860c59c52e000a072f91639950027003535ff5395c00200f9686640f9082900b4091940b93f29007109260054183940f9982800b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "SetLineup": {
+      "class": "BattleInstance",
+      "method": ".ctor",
+      "verify": {
+        "pattern": "ff8304d1e9230b6dfc6f0ca9fa670da9f85f0ea9f6570fa9f44f10a9fd7b11a9fd430491f80305aaf70304aaf60303aae20700f9f30301aaf40300aaff5300f900e4004fe00304ad38c35a95687a40390801001288220139f30f00f9686e4039bb000af07ba336910801003608378f522800a072606b68f8f11c5b95f90300aa",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffff"
+      }
+    },
+    "TurnEnd": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "ProcessOnLevelTurnActionEndEvent",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30301aaf40300aa40d69c52e000a07220dd38952005003788da40f9680400b41500805276f20990d6a23691081140f9e80300b4091940b9bf02096b4a040054080940f9680300b4091940b9bf02096b2203005408cd358b001140f9c00300b4c8c661f9090040f93f0108eb40010054",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "WaveUpdate": {
+      "class": "TurnBasedGameMode",
+      "method": "UpdateCurrentWaveCount",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa40809952e000a07236793895a0030035685a40f9c80300b4080d40f9a80300b4083140f9880300b4004940f9600300b468f909b008413f9101d95cf9eb606397e00200b4f40300aa66ecfc97e0000034881e40f9680200b4081140f9480200b4085540b90200001468b642b908050011",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff"
+      }
+    },
+    "CycleUpdate": {
+      "class": "TurnBasedGameMode",
+      "method": "get_ChallengeTurnLeft",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aaa08d9952e000a072cc5e38950001003568be42b9695e43b90801096be033881afd7b41a9f44fc2a8c0035fd6a08d9952e000a0726dbb4295a00000b4e10313aafd7b41a9f44fc2a8035f3815b0705395",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc000000fc"
+      }
+    },
+    "AVReset": {
+      "class": "TurnBasedGameMode",
+      "method": "ResetAllEntityActionDelay",
+      "verify": {
+        "pattern": "ff8301d1fa6701a9f85f02a9f65703a9f44f04a9fd7b05a9fd430191f30300aaa0699952e000a07268943895a00b0035b7f90990f7423f91081c9452c800a072f46a68f8881240f9000940f9c00b00b408fc4239280c0034881240f9080940f9080c00b4084940f9150140f9550c00b4881240f9010d40f9010c00b4e00315aa",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "DirectChangeHP": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "DirectChangeHP",
+      "verify": {
+        "pattern": "ff0307d1fc6f16a9fa6717a9f85f18a9f65719a9f44f1aa9fd7b1ba9fdc30691f90304aaf40303aaf60302aafa0301aaf30300aabfff39a980c59c52e000a072d113399500210035686640f9e82200b4091940b93f29007149200054183940f9782200b4153340f9f70316aa5f0b0071e00000545f070071c1070054e00316aa",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "StatChange": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "ModifyProperty",
+      "verify": {
+        "pattern": "ff0307d1fc6f16a9fa6717a9f85f18a9f65719a9f44f1aa9fd7b1ba9fdc30691f50304aafa0303aafb0302aaf40301aaf30300aaff7f02a9f6c59c52f600a072e0c59c52e000a0725d3e399500420035603a40f9800000b4e10314aa2ff25395600a0037c01a0011553e399520430035687642b91f01146bad090054686640f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "EnemyInitialize": {
+      "class": "MonsterDataComponent",
+      "method": "OnAbilityCharacterInitialized",
+      "verify": {
+        "pattern": "ffc305d1fa6712a9f85f13a9f65714a9f44f15a9fd7b16a9fd830591f40301aaf30300aa205088520001a072042e3b954025003568ae40f9882500b4161140f9153940f919f7099039a33691083289522801a072206b68f841008052e33f5695602400b4f70300aa960100b4e80240f918a540b9b80000340000805200405695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "CharacterInitialize": {
+      "class": "CharacterDataComponent",
+      "method": "OnAbilityCharacterInitialized",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30301aaf40300aa803584520001a072f8cf3f9580000035fd7b41a9f44fc2a8c0035fd6e00314aae10313aac24f5895faffff17",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc"
+      }
+    },
+    "FormationUpdate": {
+      "class": "TeamFormationComponent",
+      "method": "_RefreshTeammateIndex",
+      "verify": {
+        "pattern": "fc6fbaa9fa6701a9f85f02a9f65703a9f44f04a9fd7b05a9fd430191f30300aa40bf88520001a072e9a63995c00b0037685640f9c80a00b4140080521a008012f9f309d039a33691150080121c00801216008012091940b99f02096b0a070054080940f9680900b4091940b99f02096bc208005408cd348b1b1140f9db0800b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetProperty": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "GetProperty",
+      "verify": {
+        "pattern": "ff0303d1f44f0aa9fd7b0ba9fdc30291f30300aa3f48007180030054f40301aa3f5c007121060054686640f9280800b4091940b93f5d0071a9070054086d40f9280700b528f3099008a1369100f155f908fc4239a8080034e8030091e00313aa6189f797e00741ade08703ade013c03de027803de10340ade18302ade0430191",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetActualOwnerID": {
+      "class": "AbilityStatic",
+      "method": "GetActualOwnerID",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa80b79b52e000a07213424295a0020035130200b468f640b91f21007160010054e80c0af008413f91091e9a522900a072016969f8e00313aac9296d97600000b4002840b90400001460d240b90200001400008052fd7b41a9f44fc2a8c0035fd680b79b52e000a072a79e4c95a00000b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff"
+      }
+    },
+    "GetTeam": {
+      "class": "GameEntity",
+      "method": "get_Team",
+      "verify": {
+        "pattern": "00dc40b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetActualOwner": {
+      "class": "AbilityStatic",
+      "method": "GetActualOwner",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aaa0b79b52e000a072fd02429540040035930000b468f640b91f210071a1000054e00313aafd7b41a9f44fc2a8c0035fd6740c0af094423f91081e9a522800a072816a68f8e00313aaafea6c97400100b4682240f9080300b4083140f9e80200b4012840b9e00308aafd7b41a9f44fc2a8",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetAvatarID": {
+      "class": "UIGameEntityUtils",
+      "method": "GetAvatarID",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa40608c524001a0724743459520020035930100b468ee40b91f05007121010054e8120af008413f9101f155f9e00313aaff2a7097800000b4001c41b90200001400008052fd7b41a9f44fc2a8c0035fd640608c524001a072df9f4f95a00000b4e10313aafd7b41a9f44fc2a875434515",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "GetAvatarName": {
+      "class": "AvatarHelper",
+      "method": "GetAvatarName",
+      "verify": {
+        "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f30300aac06f9e520001a0728bf59395e0060035e00313aa1efeff97c00000b4fd7b43a9f44f42a9f65741a9ff03019171c6ff17e003132ab5ea9f95e00700f994a80ad094a23691805e55f908fc423928060034f5a70a90b5022691a80240f900d549f9c00500b468b00a90",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009f"
+      }
+    },
+    "GetOwnerWorld": {
+      "class": "GameEntity",
+      "method": "get_OwnerWorldRef",
+      "verify": {
+        "pattern": "002040f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetEntityManager": {
+      "class": "GameWorld",
+      "method": "get_EntityManagerRef",
+      "verify": {
+        "pattern": "003040f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetEntitySummoner": {
+      "class": "EntityManager",
+      "method": "_GetEntitySummoner",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30301aaf40300aa200383520001a072f2bb3e9520020035330300b468ee40b91f85007121010054e8050ad008413f9101f155f9e00313aaaaa36997800000b4003c40f902000014000080d2fd7b41a9f44fc2a8c0035fd6200383520001a0728a184995e00000b4e10314aae20313aafd7b41a9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetElapsedActionDelay": {
+      "class": "TurnBasedGameMode",
+      "method": "get_ElapsedActionDelay",
+      "verify": {
+        "pattern": "006c41f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetWave": {
+      "class": "TurnBasedGameMode",
+      "method": "get_WaveMonsterCurrentCount",
+      "verify": {
+        "pattern": "00b442b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetComponentOwner": {
+      "class": "GameComponentBase",
+      "method": "get_OwnerRef",
+      "verify": {
+        "pattern": "000840f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetSkillData": {
+      "class": "SkillCharacterComponent",
+      "method": "GetSkillData",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30302aaf40301aaf50300aa60f59c52e000a072a3503a95400400359403f837a83240f9480500b4091940b93f01146bed020054080940f9e80400b4091940b93f01146b69040054084d348b001140f91302f837200400b4081040f9880100b4091940b93f01136b2d010054080940f9",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetObjectType": {
+      "class": "Object",
+      "method": "GetType",
+      "verify": {
+        "pattern": "97d78e14",
+        "mask": "000000fc"
+      }
+    },
+    "GetTypeName": {
+      "class": "RuntimeType",
+      "method": "get_Name",
+      "verify": {
+        "pattern": "cca48c14",
+        "mask": "000000fc"
+      }
+    },
+    "GetAvatarSkillName": {
+      "class": "AvatarSkillRowData",
+      "method": "get_SkillName",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30300aa808988520001a072b2374095a005003560a2049165205b9560030034738a40f9f30500b408010af008a1369109b18752a900a072156969f8740240f9880a433908050836886e4179280100b4892e40f9292100912a815ff85f0115eb8001005429410091080500f161ffff54",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetMonsterSkillName": {
+      "class": "MonsterSkillRowData",
+      "method": "get_SkillName",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa609088520001a07203193b958001003560820491b6015695a0000034680e40f9c80100b4000545a902000014600652a9fd7b41a9f44fc2a8c0035fd6609088520001a072a0754595a00000b4e10313aa52d03b95f7ffff17e42a5695e32a5695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "GetServantSkillName": {
+      "class": "ServantSkillRowData",
+      "method": "get_SkillName",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa009b88520001a0720b683a958001003560820491be505595a0000034688a40f9c80100b400854aa902000014600652a9fd7b41a9f44fc2a8c0035fd6009b88520001a072a8c44495a00000b4e10313aa5a1f3b95f7ffff17ec795595eb795595",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "GetBattleEventSkillName": {
+      "class": "BattleEventSkillRowData",
+      "method": "get_SkillName",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aaa09588520001a072d4134095800100356082009187fc5a95a0000034680a40f9c80100b400854fa902000014600642a9fd7b41a9f44fc2a8c0035fd6a09588520001a07271704a95a00000b4e10313aa23cb4095f7ffff17b5255b95b4255b95",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "GetText": {
+      "class": "TextmapStatic",
+      "method": "GetText",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30302aaf40301aaf50300aac06f8b524001a072a68a499540020035a8130af008a1369100555ef908fc423908030034881b0ab008413f9109de99528903a072036969f8e00315aae10314aae20313aafd7b42a9f44f41a9f657c3a883127215c06f8b524001a0723de75395400100b4",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffff"
+      }
+    },
+    "GetRuntimeID": {
+      "class": "GameEntity",
+      "method": "get_RuntimeID",
+      "verify": {
+        "pattern": "00d040b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetTurnOwner": {
+      "class": "TurnBasedGameMode",
+      "method": "GetCurrenTurnActionEntity",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa40649952e000a072b3b73895a0000035607a40f9fd7b41a9f44fc2a8c0035fd640649952e000a07257144395a00000b4e10313aafd7b41a9f44fc2a89bb838159ac95395",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc000000fc"
+      }
+    },
+    "GetMaxWave": {
+      "class": "TurnBasedGameMode",
+      "method": "get_WaveMonsterMaxCount",
+      "verify": {
+        "pattern": "00b042b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetMaxCycle": {
+      "class": "TurnBasedGameMode",
+      "method": "get_ChallengeTurnLimit",
+      "verify": {
+        "pattern": "00bc42b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetStageID": {
+      "class": "TurnBasedGameMode",
+      "method": "get_CurrentWaveStageID",
+      "verify": {
+        "pattern": "00b842b9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetCharacterData": {
+      "class": "TurnBasedAbilityComponent",
+      "method": "get_CharacterDataRef",
+      "verify": {
+        "pattern": "001041f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetCharacterName": {
+      "class": "CharacterDataComponent",
+      "method": "get_CharacterName",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30300aa803984520001a0723bcd3f9540060035732e40f9330300b448000a9008a1369109648e522900a072156969f8740240f9880a4339e8050836886e4179280100b4892e40f9292100912a815ff85f0115eb8002005429410091080500f161ffff54e00313aae10315aac2018052",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetMonsterID": {
+      "class": "MonsterDataComponent",
+      "method": "GetMonsterTemplateID",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aaa05088520001a072602a3b952001003568ae40f9e80100b4081d40f9c80100b400f940b9fd7b41a9f44fc2a8c0035fd6a05088520001a07200874595e00000b4e10313aafd7b41a9f44fc2a8962a3b15433c5695423c5695413c5695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "GetMonsterRow": {
+      "class": "MonsterDataComponent",
+      "method": "get_MonsterRowData",
+      "verify": {
+        "pattern": "00ac40f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "GetMonsterNameID": {
+      "class": "MonsterRowData",
+      "method": "get_CharacterName",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa806584520001a072bf203b958001003560e2019172095695a0000034683a40f9c80100b400854fa902000014608647a9fd7b41a9f44fc2a8c0035fd6806584520001a0725c7d4595a00000b4e10313aa0ed83b95f7ffff17a03256959f325695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fc000000fc000000fc000000fc"
+      }
+    },
+    "GetMonsterLevel": {
+      "class": "MonsterRowData",
+      "method": "get_Level",
+      "verify": {
+        "pattern": "082840f9680000b4004140b9c0035fd6fd7bbfa9fd0300918b355695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "GetAvatarSkillType": {
+      "class": "AvatarSkillRowData",
+      "method": "get_AttackType",
+      "verify": {
+        "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f30300aa008988520001a072b938409500050035738a40f9130600b408010af008a1369109b18752a900a072156969f8740240f9880a433928050836886e4179280100b4892e40f9292100912a815ff85f0115eb4001005429410091080500f161ffff54e00313aae10315aa",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "GetMonsterSkillType": {
+      "class": "MonsterSkillRowData",
+      "method": "get_AttackType",
+      "verify": {
+        "pattern": "080c40f9680000b4009540b9c0035fd6fd7bbfa9fd030091112b5695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "GetServantSkillType": {
+      "class": "ServantSkillRowData",
+      "method": "get_AttackType",
+      "verify": {
+        "pattern": "088840f9680000b400d540b9c0035fd6fd7bbfa9fd0300913d7a5595",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "GetBattleEventSkillType": {
+      "class": "BattleEventSkillRowData",
+      "method": "get_AttackType",
+      "verify": {
+        "pattern": "080840f9680000b4006140b9c0035fd6fd7bbfa9fd030091fa255b95",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "EnumNames": {
+      "class": "Enum",
+      "method": "GetNames",
+      "verify": {
+        "pattern": "ffc300d1f44f01a9fd7b02a9fd830091f30300aa28e304d008c1119109f486520869693848020036e00313aa010080d204ebfe9740030035f30100b4610240f920c040b9a0018836280040f9025142f9e0019836e00313aa010080d2fd7b42a9f44f41a9ffc3009140001fd6a09d7895eeffff1743069094e00301aa95e29094",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fcffffffff000000fc"
+      }
+    },
+    "EnumValues": {
+      "class": "Enum",
+      "method": "GetValues",
+      "verify": {
+        "pattern": "ffc300d1f44f01a9fd7b02a9fd830091f30300aa010080d244ebfe9700030035b30100b4610240f920c040b960018836280040f9025542f9a0019836e00313aa010080d2fd7b42a9f44f41a9ffc3009140001fd685069094e00301aad7e29094610240f920c040b9f2ffff17e20700f9922f3495e20740f9f1ffff1728bd04d0",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffff000000fcffffffff000000fcffffffff000000fc1f00009f"
+      }
+    },
+    "AvatarIconPath": {
+      "class": "AvatarHelper",
+      "method": "GetSideIconPath",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa606e9e520001a0729203949500030035e00313aa250c0094800000b4fd7b41a9f44fc2a818f5ff17e00313aa530b0094600000b4005440f90a000014e00313aa7c050094600000b40ff5ff97a00000b508a80a9008012691080140f9008940f9fd7b41a9f44fc2a8c0035fd6606e9e52",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffff000000fcffffffff000000fcffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    "MonsterIconPath": {
+      "class": "MonsterRowData",
+      "method": "get_RoundIconPath",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30300aa006684520001a0724a203b9520010035605240f9800000b5681e40f9a80100b4001540f9fd7b41a9f44fc2a8c0035fd6006684520001a072ea7c4595c00000b4e10313aafd7b41a9f44fc2a82e213b152d3256952c325695",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc000000fc000000fc"
+      }
+    },
+    "LoadSprite": {
+      "class": "CachedAssetLoader",
+      "method": "SyncLoadAsset",
+      "verify": {
+        "pattern": "ffc301d1fc6f01a9fa6702a9f85f03a9f65704a9f44f05a9fd7b06a9fd830191f50302aaf60301aaf70300aa5bf38e521b01a072734b0051e00313aa50db8e9580090035d72900b4e00316aa010080d22290a995802b0035c0e38a528000a0726d94a995200a0035e00317aae5c3a995f40300aaff0700f9600b001140db8e95",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffff000000fc"
+      }
+    },
+    "SpriteTexture": {
+      "class": "Sprite",
+      "method": "get_texture",
+      "verify": {
+        "pattern": "68a803b008613c9101116ef920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "TextureWidth": {
+      "class": "Texture",
+      "method": "get_width",
+      "verify": {
+        "pattern": "68a803b008613c91018571f920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "TextureHeight": {
+      "class": "Texture",
+      "method": "get_height",
+      "verify": {
+        "pattern": "68a803b008613c91018971f920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "TemporaryTexture": {
+      "class": "RenderTexture",
+      "method": "GetTemporary",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30302aaf40301aaf50300aae00303aae10304aa3dfeff97e30300aae00315aae10314aae20313aa240080520500805207008052fd7b42a9f44f41a9f657c3a82affff17",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc"
+      }
+    },
+    "ActiveTexture": {
+      "class": "RenderTexture",
+      "method": "GetActive",
+      "verify": {
+        "pattern": "28a9039008613c9100315ff900001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "SetActiveTexture": {
+      "class": "RenderTexture",
+      "method": "set_active",
+      "verify": {
+        "pattern": "28a9039008613c9101355ff920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "ReleaseTexture": {
+      "class": "RenderTexture",
+      "method": "ReleaseTemporary",
+      "verify": {
+        "pattern": "28a9039008613c9101895ff920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "BlitTexture": {
+      "class": "Graphics",
+      "method": "Blit",
+      "verify": {
+        "pattern": "f44fbea9fd7b01a9fd430091f30301aaf40300aa28ab039008a1369100495af908fc42392801003428aa039008613c91028951f9e00314aae10313aafd7b41a9f44fc2a840001fd672fe0694f7ffff17",
+        "mask": "ffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc"
+      }
+    },
+    "TextureConstructor": {
+      "class": "Texture2D",
+      "method": ".ctor",
+      "verify": {
+        "pattern": "f657bda9f44f01a9fd7b02a9fd830091f30302aaf40301aaf50300aa48a903b008a1369100fd5df908fc4239c801003488a803f00821269104214db9e00315aae10314aae20313aa8300805205008052060080d2fd7b42a9f44f41a9f657c3a89bffff177e140694f2ffff17",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc000000fc000000fc"
+      }
+    },
+    "ReadPixels": {
+      "class": "Texture2D",
+      "method": "ReadPixels",
+      "verify": {
+        "pattern": "23008052c9ffff17",
+        "mask": "ffffffff000000fc"
+      }
+    },
+    "ApplyTexture": {
+      "class": "Texture2D",
+      "method": "Apply",
+      "verify": {
+        "pattern": "2100805202008052e0ffff17",
+        "mask": "ffffffffffffffff000000fc"
+      }
+    },
+    "EncodePNG": {
+      "class": "ImageConversion",
+      "method": "EncodeToPNG",
+      "verify": {
+        "pattern": "c8a703d008613c9101a141f920001fd6",
+        "mask": "1f00009fffffffffffffffffffffffff"
+      }
+    },
+    "DestroyObject": {
+      "class": "Object",
+      "method": "Destroy",
+      "verify": {
+        "pattern": "88a903b008613c91010559f9e003271e20001fd6",
+        "mask": "1f00009fffffffffffffffffffffffffffffffff"
+      }
+    },
+    "ResolveClass": {
+      "pattern": "fc6fbaa9fa6701a9f85f02a9f65703a9f44f04a9fd7b05a9fd4301911f040031001d0054f30300aa767d03d0c85642f900d960f8801c00b5a0c30390002010910e8aff97c85642f908d973f8e81a00b5687d03d0c94502d029312091184942f9280180b90803088bc9088052ca4502d04ad11e914a0180b90a030a8b59d9b3b8",
+      "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffff1f00009fffffffff000000fcffffffffffffffffffffffff1f00009f1f00009fffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffffffffffffffffffff"
+    },
+    "TypeObject": {
+      "pattern": "ff8301d1f85f02a9f65703a9f44f04a9fd7b05a9fd430191ff0301a9567503d0c84241b9177d0390f7e21491187d039018c314911f0100710003979ae00300f9ff230039f854ff97157d0390a0ba42f9e1630091e2430091b1020094f40300aaf30b40f9e0030091eec7fe979403003728c303d008010491006940f967f9ff97",
+      "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffff1f00009fffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffff000000fcffffffffffffffffffffffff000000fcffffffff1f00009fffffffffffffffff000000fc"
+    },
+    "AllocateObject": {
+      "pattern": "f44fbea9fd7b01a9fd430091f30300aaa69dff9780000034e00313aaaf9dff97f30300aa6806433988003037e00313aa1600009406000014680640f9605a4179c80100b4e10313aac4640094f40300aa680e433968000036e00314aa1dd6fe97e00313aa28220094e00314aafd7b41a9f44fc2a8c0035fd61f680094f40300aa",
+      "mask": "ffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fc000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffff"
+    },
+    "GetFields": {
+      "class": "RuntimeType",
+      "method": "GetFields",
+      "verify": {
+        "pattern": "ffc300d1fd7b02a9fd830091e20301aaffff00a9ff0f00f9e8230091010080d203008052b2fdff97e8bd049008413f91094896528900a072016969f8e023009151883997fd7b42a9ffc30091c0035fd6",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fc1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffff"
+      }
+    },
+    "FieldName": {
+      "class": "MonoField",
+      "method": "get_Name",
+      "verify": {
+        "pattern": "001040f9c0035fd6",
+        "mask": "ffffffffffffffff"
+      }
+    },
+    "FieldValue": {
+      "class": "MonoField",
+      "method": "GetValue",
+      "verify": {
+        "pattern": "f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f30301aaf40300aa79e8ff97a0020037130500b4e00314aa210080521c748e94f50300aae00313aafd83ff97350300b4f60300aaa10240f920c040b9c0028836280040f9177d42f900039836e00315aae10316aa020080d2e0023fd620050036e00314aa4ae8ff9760000037",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffffffffffffffffffffffffffff000000fcffffffffffffffff000000fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000fcffffffff"
+      }
+    },
+    "PropertyIconRow": {
+      "class": "AvatarPropertyExcelTable",
+      "method": "GetData",
+      "verify": {
+        "pattern": "ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f30300aaff0300f975bc01f0b5a23691087c8d52151b9f9608040034d6bb01b0d622269128448952c86a6838a8000037087c8d520d1b9f9628040034f0b3b296001b9f96607e4093a73d0897221b9f96087c8d52051b9f96c802003408448952d31a9f96c8bb01b008012691",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f00009fffffffffffffffff000000fcffffffff1f00009fffffffffffffffffffffffffffffffffffffffff000000fcffffffff000000fc000000fcffffffff000000fc000000fcffffffff000000fcffffffffffffffff000000fc1f00009fffffffff"
+      }
+    }
+  },
+  "bindings": {
+    "Damage": [
+      "entry",
+      "Damage"
+    ],
+    "BattleBegin": [
+      "entry",
+      "BattleBegin"
+    ],
+    "BattleEnd": [
+      "entry",
+      "BattleEnd"
+    ],
+    "TurnBegin": [
+      "entry",
+      "TurnBegin"
+    ],
+    "UseSkill": [
+      "entry",
+      "UseSkill"
+    ],
+    "DirectDamage": [
+      "entry",
+      "DirectDamage"
+    ],
+    "SetLineup": [
+      "entry",
+      "SetLineup"
+    ],
+    "TurnEnd": [
+      "entry",
+      "TurnEnd"
+    ],
+    "WaveUpdate": [
+      "entry",
+      "WaveUpdate"
+    ],
+    "CycleUpdate": [
+      "entry",
+      "CycleUpdate"
+    ],
+    "AVReset": [
+      "entry",
+      "AVReset"
+    ],
+    "DirectChangeHP": [
+      "entry",
+      "DirectChangeHP"
+    ],
+    "StatChange": [
+      "entry",
+      "StatChange"
+    ],
+    "EnemyInitialize": [
+      "entry",
+      "EnemyInitialize"
+    ],
+    "CharacterInitialize": [
+      "entry",
+      "CharacterInitialize"
+    ],
+    "FormationUpdate": [
+      "entry",
+      "FormationUpdate"
+    ],
+    "GetProperty": [
+      "method",
+      "GetProperty"
+    ],
+    "GetActualOwnerID": [
+      "method",
+      "GetActualOwnerID"
+    ],
+    "GetTeam": [
+      "method",
+      "GetTeam"
+    ],
+    "GetActualOwner": [
+      "method",
+      "GetActualOwner"
+    ],
+    "GetAvatarID": [
+      "method",
+      "GetAvatarID"
+    ],
+    "GetAvatarName": [
+      "method",
+      "GetAvatarName"
+    ],
+    "GetOwnerWorld": [
+      "method",
+      "GetOwnerWorld"
+    ],
+    "GetEntityManager": [
+      "method",
+      "GetEntityManager"
+    ],
+    "GetEntitySummoner": [
+      "method",
+      "GetEntitySummoner"
+    ],
+    "GetElapsedActionDelay": [
+      "method",
+      "GetElapsedActionDelay"
+    ],
+    "GetWave": [
+      "method",
+      "GetWave"
+    ],
+    "GetComponentOwner": [
+      "method",
+      "GetComponentOwner"
+    ],
+    "GetSkillData": [
+      "method",
+      "GetSkillData"
+    ],
+    "GetObjectType": [
+      "method",
+      "GetObjectType"
+    ],
+    "GetTypeName": [
+      "method",
+      "GetTypeName"
+    ],
+    "GetAvatarSkillName": [
+      "method",
+      "GetAvatarSkillName"
+    ],
+    "GetMonsterSkillName": [
+      "method",
+      "GetMonsterSkillName"
+    ],
+    "GetServantSkillName": [
+      "method",
+      "GetServantSkillName"
+    ],
+    "GetBattleEventSkillName": [
+      "method",
+      "GetBattleEventSkillName"
+    ],
+    "GetText": [
+      "method",
+      "GetText"
+    ],
+    "GetRuntimeID": [
+      "method",
+      "GetRuntimeID"
+    ],
+    "GetTurnOwner": [
+      "method",
+      "GetTurnOwner"
+    ],
+    "GetMaxWave": [
+      "method",
+      "GetMaxWave"
+    ],
+    "GetMaxCycle": [
+      "method",
+      "GetMaxCycle"
+    ],
+    "GetStageID": [
+      "method",
+      "GetStageID"
+    ],
+    "GetCharacterData": [
+      "method",
+      "GetCharacterData"
+    ],
+    "GetCharacterName": [
+      "method",
+      "GetCharacterName"
+    ],
+    "GetMonsterID": [
+      "method",
+      "GetMonsterID"
+    ],
+    "GetMonsterRow": [
+      "method",
+      "GetMonsterRow"
+    ],
+    "GetMonsterNameID": [
+      "method",
+      "GetMonsterNameID"
+    ],
+    "GetMonsterLevel": [
+      "method",
+      "GetMonsterLevel"
+    ],
+    "GetAvatarSkillType": [
+      "method",
+      "GetAvatarSkillType"
+    ],
+    "GetMonsterSkillType": [
+      "method",
+      "GetMonsterSkillType"
+    ],
+    "GetServantSkillType": [
+      "method",
+      "GetServantSkillType"
+    ],
+    "GetBattleEventSkillType": [
+      "method",
+      "GetBattleEventSkillType"
+    ],
+    "EnumNames": [
+      "method",
+      "EnumNames"
+    ],
+    "EnumValues": [
+      "method",
+      "EnumValues"
+    ],
+    "AvatarIconPath": [
+      "method",
+      "AvatarIconPath"
+    ],
+    "MonsterIconPath": [
+      "method",
+      "MonsterIconPath"
+    ],
+    "LoadSprite": [
+      "method",
+      "LoadSprite"
+    ],
+    "SpriteTexture": [
+      "method",
+      "SpriteTexture"
+    ],
+    "TextureWidth": [
+      "method",
+      "TextureWidth"
+    ],
+    "TextureHeight": [
+      "method",
+      "TextureHeight"
+    ],
+    "TemporaryTexture": [
+      "method",
+      "TemporaryTexture"
+    ],
+    "ActiveTexture": [
+      "method",
+      "ActiveTexture"
+    ],
+    "SetActiveTexture": [
+      "method",
+      "SetActiveTexture"
+    ],
+    "ReleaseTexture": [
+      "method",
+      "ReleaseTexture"
+    ],
+    "BlitTexture": [
+      "method",
+      "BlitTexture"
+    ],
+    "TextureConstructor": [
+      "method",
+      "TextureConstructor"
+    ],
+    "ReadPixels": [
+      "method",
+      "ReadPixels"
+    ],
+    "ApplyTexture": [
+      "method",
+      "ApplyTexture"
+    ],
+    "EncodePNG": [
+      "method",
+      "EncodePNG"
+    ],
+    "DestroyObject": [
+      "method",
+      "DestroyObject"
+    ],
+    "ResolveClass": [
+      "method",
+      "ResolveClass"
+    ],
+    "TypeObject": [
+      "method",
+      "TypeObject"
+    ],
+    "AllocateObject": [
+      "method",
+      "AllocateObject"
+    ],
+    "GetFields": [
+      "method",
+      "GetFields"
+    ],
+    "FieldName": [
+      "method",
+      "FieldName"
+    ],
+    "FieldValue": [
+      "method",
+      "FieldValue"
+    ],
+    "PropertyIconRow": [
+      "method",
+      "PropertyIconRow"
+    ]
+  }
+}

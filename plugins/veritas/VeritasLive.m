@@ -5,290 +5,7 @@
 #import "Telemetry.h"
 #import "VeritasProfile.h"
 
-#import "DamageCharts.h"
-#import "OverlayControls.h"
-
-@interface NSObject (VeritasKeyboardMonitor)
-+ (id)addLocalMonitorForEventsMatchingMask:(NSUInteger)mask handler:(id (^)(id))handler;
-- (NSUInteger)modifierFlags;
-- (NSString *)charactersIgnoringModifiers;
-- (BOOL)isARepeat;
-@end
-
-// The charts are read only. Let pointer events reach the game.
-@interface VeritasOverlayWindow : UIWindow
-@property(nonatomic) BOOL editing;
-@end
-@implementation VeritasOverlayWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    if (!self.editing) return nil;
-    UIView *hit = [super hitTest:point withEvent:event];
-    for (UIView *ancestor = hit; ancestor; ancestor = ancestor.superview) {
-        if ([ancestor isKindOfClass:VeritasPanel.class]) return hit;
-    }
-    return nil;
-}
-@end
-
-@interface VeritasOverlay : NSObject
-@property(nonatomic, weak) UIWindow *gameWindow;
-@property(nonatomic, strong) VeritasOverlayWindow *window;
-@property(nonatomic, strong) UILabel *summary;
-@property(nonatomic, strong) VeritasDamageCharts *charts;
-@property(nonatomic, strong) VeritasBattle *battle;
-@property(nonatomic) BOOL connected;
-@property(nonatomic) BOOL shown;
-@property(nonatomic) BOOL editing;
-@property(nonatomic) BOOL inBattle;
-@property(nonatomic, copy) NSArray<VeritasPanel *> *panels;
-@property(nonatomic, strong) UITextView *attackRows;
-@property(nonatomic, strong) UITextView *skillRows;
-@property(nonatomic, strong) UILabel *streamerBanner;
-@end
-
-static NSString * const VeritasLightKey = @"Veritas.Light";
-static NSString * const VeritasOpacityKey = @"Veritas.Opacity";
-static NSString * const VeritasTextSizeKey = @"Veritas.TextSize";
-static NSString * const VeritasAutoHideKey = @"Veritas.AutoHide";
-static NSString * const VeritasStreamerKey = @"Veritas.Streamer";
-static NSString * const VeritasAttackPanelKey = @"Veritas.ShowAttackTypes";
-static NSString * const VeritasSkillPanelKey = @"Veritas.ShowSkills";
-
-@implementation VeritasOverlay
-- (void)updateVisibility {
-    NSUserDefaults *prefs = NSUserDefaults.standardUserDefaults;
-    BOOL autoHide = [prefs boolForKey:VeritasAutoHideKey];
-    BOOL showPanels = self.editing || (self.shown && (!autoHide || self.inBattle));
-    BOOL streamer = [prefs boolForKey:VeritasStreamerKey];
-    self.window.hidden = !showPanels && !streamer;
-    self.streamerBanner.hidden = !streamer;
-    self.panels[0].hidden = !showPanels;
-    self.panels[1].hidden = !showPanels || (!self.editing && ![prefs boolForKey:VeritasAttackPanelKey]);
-    self.panels[2].hidden = !showPanels || (!self.editing && ![prefs boolForKey:VeritasSkillPanelKey]);
-}
-
-- (void)render {
-    VeritasBattle *battle = self.battle;
-    if (!self.connected) {
-        self.summary.text = @"Live capture requires the matching HSR preview build.";
-    } else if (!battle.hits) {
-        self.summary.text = @"Waiting for player damage…";
-    } else {
-        NSMutableArray<NSString *> *details = [NSMutableArray array];
-        if (battle.wave) [details addObject:[NSString stringWithFormat:@"Wave %u", battle.wave]];
-        if (battle.turn) [details addObject:[NSString stringWithFormat:@"Turn %u", battle.turn]];
-        if (battle.actionValue > 0) {
-            [details addObject:[NSString stringWithFormat:@"%.1f damage/AV", battle.total / battle.actionValue]];
-        }
-        NSString *damage = [NSNumberFormatter localizedStringFromNumber:@(llround(battle.total)) numberStyle:NSNumberFormatterDecimalStyle];
-        NSString *overkill = [NSNumberFormatter localizedStringFromNumber:@(llround(battle.overkill)) numberStyle:NSNumberFormatterDecimalStyle];
-        self.summary.text = [NSString stringWithFormat:@"%@ damage  ·  %lu %@\n%@%@",
-            damage, (unsigned long)battle.hits, battle.hits == 1 ? @"hit" : @"hits",
-            [details componentsJoinedByString:@"  ·  "],
-            battle.overkill > 0 ? [NSString stringWithFormat:@"\n%@ overkill", overkill] : @""];
-    }
-    NSDictionary *series = battle.series;
-    NSDictionary *names = series[@"names"];
-    if ([NSUserDefaults.standardUserDefaults boolForKey:VeritasStreamerKey]) {
-        NSMutableDictionary *aliases = [NSMutableDictionary dictionary];
-        NSMutableSet *owners = [NSMutableSet setWithArray:[series[@"avatars"] allKeys]];
-        [owners addObjectsFromArray:[series[@"skills"] valueForKey:@"owner"]];
-        for (NSString *key in [[owners allObjects] sortedArrayUsingSelector:@selector(compare:)]) {
-            aliases[key] = [NSString stringWithFormat:@"Character %lu", (unsigned long)aliases.count + 1];
-        }
-        names = aliases;
-        NSMutableDictionary *privateSeries = [series mutableCopy];
-        privateSeries[@"names"] = names;
-        series = privateSeries;
-    }
-    self.charts.series = series;
-    self.charts.hidden = battle.hits == 0;
-
-    NSDictionary<NSString *, NSDictionary<NSString *, NSNumber *> *> *attackDamage = series[@"attackDamage"];
-    NSMutableArray *attackLines = [NSMutableArray array];
-    for (NSString *key in [[attackDamage allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
-        [attackLines addObject:names[key] ?: key];
-        NSDictionary<NSString *, NSNumber *> *totals = attackDamage[key];
-        for (NSString *label in [totals keysSortedByValueUsingSelector:@selector(compare:)].reverseObjectEnumerator) {
-            NSString *amount = [NSNumberFormatter localizedStringFromNumber:@(llround(totals[label].doubleValue))
-                                                                 numberStyle:NSNumberFormatterDecimalStyle];
-            [attackLines addObject:[NSString stringWithFormat:@"  %@  %@", label, amount]];
-        }
-    }
-    if (battle.unattributedDirectLoss > 0) {
-        NSString *amount = [NSNumberFormatter localizedStringFromNumber:@(llround(battle.unattributedDirectLoss))
-                                                             numberStyle:NSNumberFormatterDecimalStyle];
-        [attackLines addObject:[NSString stringWithFormat:@"Unattributed direct HP loss  %@", amount]];
-    }
-    [self setLines:attackLines inRows:self.attackRows placeholder:@"Waiting for damage…"];
-    NSMutableArray *skillLines = [NSMutableArray array];
-    for (NSDictionary *use in [series[@"skills"] reverseObjectEnumerator]) {
-        NSString *owner = names[use[@"owner"]] ?: use[@"owner"];
-        NSNumber *turn = use[@"turn"];
-        [skillLines addObject:[NSString stringWithFormat:@"Turn %@ · %@ · %@", turn, owner, use[@"skill"]]];
-    }
-    [self setLines:skillLines inRows:self.skillRows placeholder:@"Waiting for a skill…"];
-    [self updateVisibility];
-}
-
-- (void)setLines:(NSArray<NSString *> *)lines inRows:(UITextView *)rows placeholder:(NSString *)placeholder {
-    NSString *text = lines.count ? [lines componentsJoinedByString:@"\n"] : placeholder;
-    if ([text isEqualToString:rows.text]) return;
-    CGPoint offset = rows.contentOffset;
-    rows.text = text;
-    if (self.editing) [rows setContentOffset:offset animated:NO];
-}
-
-- (UIAction *)setting:(NSString *)title key:(NSString *)key value:(id)value {
-    NSUserDefaults *prefs = NSUserDefaults.standardUserDefaults;
-    id previous = [prefs objectForKey:key];
-    BOOL toggle = value == nil;
-    if (toggle) value = @(![prefs boolForKey:key]);
-    __weak VeritasOverlay *weakSelf = self;
-    UIAction *action = [UIAction actionWithTitle:title image:nil identifier:nil handler:^(__unused UIAction *selected) {
-        [prefs setObject:value forKey:key];
-        [weakSelf applySettings];
-    }];
-    BOOL on = toggle ? [previous boolValue] : [previous isEqual:value];
-    action.state = on ? UIMenuElementStateOn : UIMenuElementStateOff;
-    return action;
-}
-
-- (void)applySettings {
-    NSUserDefaults *prefs = NSUserDefaults.standardUserDefaults;
-    BOOL light = [prefs boolForKey:VeritasLightKey];
-    CGFloat opacity = [prefs doubleForKey:VeritasOpacityKey];
-    CGFloat size = [prefs doubleForKey:VeritasTextSizeKey];
-    UIColor *text = light ? UIColor.blackColor : UIColor.whiteColor;
-    UIColor *background = light ? [UIColor colorWithWhite:0.94 alpha:opacity] :
-        [UIColor colorWithRed:0.05 green:0.07 blue:0.12 alpha:opacity];
-    __weak VeritasOverlay *weakSelf = self;
-    UIAction *reset = [UIAction actionWithTitle:@"Reset panel positions and sizes" image:nil identifier:nil
-        handler:^(__unused UIAction *action) {
-            for (VeritasPanel *panel in weakSelf.panels) [prefs removeObjectForKey:panel.identifier];
-            [weakSelf.window.rootViewController.view setNeedsLayout];
-        }];
-    NSArray *menus = @[
-        [UIMenu menuWithTitle:@"Theme" children:@[
-            [self setting:@"Dark" key:VeritasLightKey value:@NO],
-            [self setting:@"Light" key:VeritasLightKey value:@YES]]],
-        [UIMenu menuWithTitle:@"Opacity" children:@[
-            [self setting:@"60%" key:VeritasOpacityKey value:@0.6],
-            [self setting:@"80%" key:VeritasOpacityKey value:@0.8],
-            [self setting:@"100%" key:VeritasOpacityKey value:@1.0]]],
-        [UIMenu menuWithTitle:@"Text size" children:@[
-            [self setting:@"Small" key:VeritasTextSizeKey value:@11],
-            [self setting:@"Medium" key:VeritasTextSizeKey value:@13],
-            [self setting:@"Large" key:VeritasTextSizeKey value:@16]]],
-        [self setting:@"Hide outside battle" key:VeritasAutoHideKey value:nil],
-        [self setting:@"Streamer mode" key:VeritasStreamerKey value:nil],
-        [self setting:@"Show attack types" key:VeritasAttackPanelKey value:nil],
-        [self setting:@"Show skill history" key:VeritasSkillPanelKey value:nil],
-        reset,
-    ];
-    self.summary.textColor = text;
-    self.summary.font = [UIFont monospacedDigitSystemFontOfSize:size weight:UIFontWeightRegular];
-    self.charts.textColor = text;
-    self.charts.textSize = size;
-    for (UITextView *rows in @[self.attackRows, self.skillRows]) {
-        rows.textColor = text;
-        rows.font = [UIFont monospacedDigitSystemFontOfSize:size weight:UIFontWeightRegular];
-    }
-    for (VeritasPanel *panel in self.panels) {
-        panel.backgroundColor = background;
-        panel.title.textColor = text;
-        panel.title.font = [UIFont boldSystemFontOfSize:size + 3];
-        panel.settings.menu = [UIMenu menuWithTitle:@"Veritas" children:menus];
-    }
-    [self render];
-}
-
-- (UITextView *)newRowsForPanel:(VeritasPanel *)panel {
-    UITextView *rows = [UITextView new];
-    rows.backgroundColor = UIColor.clearColor;
-    rows.editable = NO;
-    rows.selectable = NO;
-    rows.textContainerInset = UIEdgeInsetsZero;
-    rows.textContainer.lineFragmentPadding = 0;
-    [panel.stack addArrangedSubview:rows];
-    [rows.heightAnchor constraintEqualToAnchor:panel.heightAnchor constant:-60].active = YES;
-    return rows;
-}
-
-- (void)attachToWindow:(UIWindow *)gameWindow {
-    UIWindowScene *scene = gameWindow.windowScene;
-    if (!scene || [gameWindow isKindOfClass:VeritasOverlayWindow.class]) return;
-    self.gameWindow = gameWindow;
-    if (self.window.windowScene == scene) return;
-    self.window.hidden = YES;
-    VeritasOverlayWindow *window = [[VeritasOverlayWindow alloc] initWithWindowScene:scene];
-    window.windowLevel = MAX(UIWindowLevelNormal, gameWindow.windowLevel) + 1;
-    VeritasOverlayLayout *controller = [VeritasOverlayLayout new];
-    window.rootViewController = controller;
-    UIView *root = controller.view;
-    root.backgroundColor = UIColor.clearColor;
-    self.window = window;
-
-    self.streamerBanner = [UILabel new];
-    self.streamerBanner.text = @"  Veritas";
-    self.streamerBanner.font = [UIFont boldSystemFontOfSize:12];
-    self.streamerBanner.backgroundColor = UIColor.blackColor;
-    self.streamerBanner.textColor = UIColor.whiteColor;
-    self.streamerBanner.translatesAutoresizingMaskIntoConstraints = NO;
-    [root addSubview:self.streamerBanner];
-    [NSLayoutConstraint activateConstraints:@[
-        [self.streamerBanner.leadingAnchor constraintEqualToAnchor:root.leadingAnchor],
-        [self.streamerBanner.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
-        [self.streamerBanner.bottomAnchor constraintEqualToAnchor:root.bottomAnchor],
-        [self.streamerBanner.heightAnchor constraintEqualToConstant:28],
-    ]];
-    VeritasPanel *overview = [[VeritasPanel alloc] initWithTitle:@"Battle damage" identifier:@"Veritas.OverviewFrame"];
-    VeritasPanel *types = [[VeritasPanel alloc] initWithTitle:@"Damage by attack type" identifier:@"Veritas.TypesFrame"];
-    VeritasPanel *skills = [[VeritasPanel alloc] initWithTitle:@"Skill history" identifier:@"Veritas.SkillsFrame"];
-    self.panels = @[overview, types, skills];
-    for (VeritasPanel *panel in self.panels) [root addSubview:panel];
-    self.summary = [UILabel new];
-    self.summary.numberOfLines = 0;
-    self.charts = [VeritasDamageCharts new];
-    self.charts.opaque = NO;
-    self.charts.backgroundColor = UIColor.clearColor;
-    [overview.stack addArrangedSubview:self.summary];
-    [overview.stack addArrangedSubview:self.charts];
-    [self.summary setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
-    NSLayoutConstraint *chartHeight = [self.charts.heightAnchor constraintEqualToConstant:364];
-    chartHeight.priority = UILayoutPriorityDefaultHigh;
-    chartHeight.active = YES;
-    self.attackRows = [self newRowsForPanel:types];
-    self.skillRows = [self newRowsForPanel:skills];
-    __weak UIView *weakRoot = root;
-    controller.updatePanels = ^(CGRect bounds) {
-        if (!weakRoot || CGRectIsEmpty(bounds)) return;
-        CGFloat y = CGRectGetMinY(bounds) + 12;
-        CGFloat width = MIN(320, MAX(200, (bounds.size.width - 36) * 0.5));
-        CGFloat right = CGRectGetMaxX(bounds) - width - 12;
-        CGFloat left = MAX(CGRectGetMinX(bounds), right - width - 12);
-        [overview layoutWithin:bounds defaultFrame:CGRectMake(right, y, width, 475)];
-        [types layoutWithin:bounds defaultFrame:CGRectMake(left, y, width, 260)];
-        [skills layoutWithin:bounds defaultFrame:CGRectMake(left, y + 272, width, 203)];
-    };
-    window.editing = self.editing;
-    for (VeritasPanel *panel in self.panels) panel.editing = self.editing;
-    [self applySettings];
-}
-
-- (void)toggle {
-    self.shown = !self.shown;
-    [self updateVisibility];
-}
-
-- (void)toggleEditing {
-    self.editing = !self.editing;
-    self.window.editing = self.editing;
-    for (VeritasPanel *panel in self.panels) panel.editing = self.editing;
-    [self updateVisibility];
-}
-
-@end
+#import "Overlay.h"
 
 typedef uintptr_t (*DamageRoutine)(void *, void *, const void *, void *, void *,
                                    void *, void *, void *, bool, void *);
@@ -300,26 +17,56 @@ static _Atomic(unsigned) activeBattle;
 static _Atomic(unsigned) nextBattle;
 static unsigned displayedBattle;
 static _Thread_local unsigned damageDepth;
+static void ObserveAbility(void *, BOOL, int);
+static NSDictionary<NSNumber *, NSString *> *propertyNames;
+static BOOL InitializeEnums(void) {
+    @synchronized (overlay) {
+        if (propertyNames) return YES;
+        NSDictionary *properties = VeritasReadEnumNames(unity, VeritasTypeAbilityProperty);
+        NSDictionary *attacks = VeritasReadEnumNames(unity, VeritasTypeAttackType);
+        if (![properties[@(VeritasPropertyCurrentHP)] isEqual:@"CurrentHP"] ||
+            ![properties[@(VeritasPropertyMaxHP)] isEqual:@"MaxHP"] ||
+            ![properties[@(VeritasPropertySpeed)] isEqual:@"Speed"] ||
+            ![properties[@(VeritasPropertyActionDelay)] isEqual:@"ActionDelay"] || !attacks.count) return NO;
+        propertyNames = properties; VeritasNativeAttackNames = attacks;
+        return YES;
+    }
+}
 
 static void BattleBegin(void *mode, void *method) {
-    const unsigned id = ++nextBattle;
-    atomic_store(&activeBattle, id);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        displayedBattle = id;
-        overlay.inBattle = YES;
-        [overlay.battle reset];
-        [overlay render];
-    });
+    if (!InitializeEnums()) { ((BattleRoutine)(unity + VeritasBattleBeginOriginal))(mode, method); return; }
+    unsigned id = atomic_load(&activeBattle);
+    if (!id) { id = ++nextBattle; atomic_store(&activeBattle, id); }
+    const unsigned battleID = id;
     ((BattleRoutine)(unity + VeritasBattleBeginOriginal))(mode, method);
+    unsigned (*maxWave)(void *) = (void *)(unity + VeritasGetMaxWave);
+    unsigned (*maxCycle)(void *) = (void *)(unity + VeritasGetMaxCycle);
+    unsigned (*stage)(void *) = (void *)(unity + VeritasGetStageID);
+    unsigned waves = maxWave(mode), cycles = maxCycle(mode), stageID = stage(mode);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (displayedBattle != battleID) [overlay.battle reset];
+        displayedBattle = battleID;
+        overlay.selectedBattle = nil;
+        overlay.inBattle = YES;
+        overlay.battle.maxWave = waves; overlay.battle.maxCycle = cycles; overlay.battle.stage = stageID;
+        [overlay.server publish:@"OnBattleBegin" data:@{@"max_waves": @(waves), @"max_cycles": @(cycles), @"stage_id": @(stageID)}];
+        [overlay requestRender];
+    });
 }
 
 static void BattleEnd(void *mode, void *method) {
+    unsigned finished = atomic_load(&activeBattle);
     ((BattleRoutine)(unity + VeritasBattleEndOriginal))(mode, method);
-    unsigned finished = atomic_exchange(&activeBattle, 0);
+    if (!finished) return;
+    unsigned expected = finished;
+    atomic_compare_exchange_strong(&activeBattle, &expected, 0);
     dispatch_async(dispatch_get_main_queue(), ^{
         if (displayedBattle != finished) return;
         overlay.inBattle = NO;
-        [overlay render];
+        [overlay archiveBattle];
+        NSDictionary *summary = overlay.battle.snapshot;
+        [overlay.server publish:@"OnBattleEnd" data:@{@"avatars": summary[@"lineup"], @"turn_history": summary[@"turn_history"], @"av_history": summary[@"av_history"], @"turn_count": summary[@"turn_count"], @"total_damage": summary[@"total_damage"], @"action_value": summary[@"action_value"], @"cycle": summary[@"cycle"], @"wave": summary[@"wave"], @"stage_id": summary[@"stage_id"]}];
+        [overlay requestRender];
     });
 }
 
@@ -331,10 +78,18 @@ static void TurnBegin(void *mode, void *method) {
     unsigned (*waveNumber)(void *) = (void *)(unity + VeritasGetWave);
     double actionValue = VeritasFixPoint(elapsed(mode)) * 10;
     unsigned wave = waveNumber(mode);
+    void *(*turnOwner)(void *) = (void *)(unity + VeritasGetTurnOwner);
+    void *entity = turnOwner(mode);
+    int (*team)(void *) = (void *)(unity + VeritasGetTeam);
+    uint32_t (*runtimeID)(void *) = (void *)(unity + VeritasGetRuntimeID);
+    uint32_t (*avatarID)(void *) = (void *)(unity + VeritasGetAvatarID);
+    BOOL player = entity && team(entity) == 1;
+    NSDictionary *owner = entity ? VeritasEntity(player ? avatarID(entity) : runtimeID(entity), player) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (displayedBattle != battle) return;
         [overlay.battle beginTurnAtActionValue:actionValue wave:wave];
-        [overlay render];
+        [overlay.battle setTurnOwner:owner];
+        [overlay requestRender];
     });
 }
 
@@ -350,15 +105,16 @@ static uint32_t AvatarID(void *attacker) {
     void *(*summoner)(void *, void *) = (void *)(unity + VeritasGetEntitySummoner);
     void *world = ownerWorld(attacker);
     void *manager = world ? entityManager(world) : NULL;
-    return manager ? idForEntity(summoner(manager, attacker)) : 0;
+    void *source = manager ? summoner(manager, attacker) : NULL;
+    return source ? idForEntity(source) : 0;
 }
 
 static NSString *GameString(const char *string) {
     if (!string) return nil;
     int32_t length;
-    memcpy(&length, string + 16, sizeof(length));
+    memcpy(&length, string + VeritasStringLength, sizeof(length));
     if (length <= 0 || length > 256) return nil;
-    NSString *name = [[NSString alloc] initWithCharacters:(const unichar *)(string + 20) length:(NSUInteger)length];
+    NSString *name = [[NSString alloc] initWithCharacters:(const unichar *)(string + VeritasStringCharacters) length:(NSUInteger)length];
     return [[name stringByReplacingOccurrencesOfString:@"<ub>" withString:@""]
         stringByReplacingOccurrencesOfString:@"</ub>" withString:@""];
 }
@@ -368,10 +124,11 @@ static NSString *AvatarName(uint32_t avatar) {
     return avatar ? GameString(avatarName(avatar)) : nil;
 }
 
-static NSString *SkillName(void *component, int index, int variant) {
+static NSString *SkillName(void *component, int index, int variant, int32_t *attackType, uint32_t *configID) {
     void *(*skillData)(void *, int, int) = (void *)(unity + VeritasGetSkillData);
     void *skill = skillData(component, index, variant);
     if (!skill) return nil;
+    *configID = VeritasReadSkillID(unity, skill);
     void *row;
     memcpy(&row, (const char *)skill + VeritasSkillRowField, sizeof(row));
     if (!row) return nil;
@@ -379,12 +136,13 @@ static NSString *SkillName(void *component, int index, int variant) {
     const char *(*typeName)(void *) = (void *)(unity + VeritasGetTypeName);
     void *type = objectType(row);
     NSString *name = type ? GameString(typeName(type)) : nil;
-    uintptr_t getter = 0;
-    if ([name isEqualToString:@"AvatarSkillRowData"]) getter = VeritasGetAvatarSkillName;
-    else if ([name isEqualToString:@"ServantSkillRowData"]) getter = VeritasGetServantSkillName;
-    else if ([name isEqualToString:@"MonsterSkillRowData"]) getter = VeritasGetMonsterSkillName;
-    else if ([name isEqualToString:@"BattleEventSkillRowData"]) getter = VeritasGetBattleEventSkillName;
+    uintptr_t getter = 0, typeGetter = 0;
+    if ([name isEqualToString:@"AvatarSkillRowData"]) { getter = VeritasGetAvatarSkillName; typeGetter = VeritasGetAvatarSkillType; }
+    else if ([name isEqualToString:@"ServantSkillRowData"]) { getter = VeritasGetServantSkillName; typeGetter = VeritasGetServantSkillType; }
+    else if ([name isEqualToString:@"MonsterSkillRowData"]) { getter = VeritasGetMonsterSkillName; typeGetter = VeritasGetMonsterSkillType; }
+    else if ([name isEqualToString:@"BattleEventSkillRowData"]) { getter = VeritasGetBattleEventSkillName; typeGetter = VeritasGetBattleEventSkillType; }
     if (!getter) return nil;
+    *attackType = ((int32_t (*)(void *))(unity + typeGetter))(row);
     typedef struct { int32_t hash; uint64_t hash64; } TextID;
     TextID (*getName)(void *) = (void *)(unity + getter);
     const char *(*getText)(TextID, void *) = (void *)(unity + VeritasGetText);
@@ -403,7 +161,8 @@ static bool UseSkill(void *component, int index, void *cursor, bool alternate,
     void *entity = owner(component);
     if (!entity || team(entity) != 1) return used;
     @autoreleasepool {
-        NSString *skill = SkillName(component, index, variant);
+        int32_t attackType = 0; uint32_t configID = 0;
+        NSString *skill = SkillName(component, index, variant, &attackType, &configID);
         if (!skill.length) skill = [NSString stringWithFormat:@"Skill slot %d", index + 1];
         uint32_t avatar = AvatarID(entity);
         uint32_t (*runtimeOwner)(void *) = (void *)(unity + VeritasGetActualOwnerID);
@@ -411,8 +170,8 @@ static bool UseSkill(void *component, int index, void *cursor, bool alternate,
         NSString *name = AvatarName(avatar);
         dispatch_async(dispatch_get_main_queue(), ^{
             if (displayedBattle != battle) return;
-            [overlay.battle recordSkill:skill owner:identifier name:name];
-            [overlay render];
+            [overlay.battle recordSkill:skill type:attackType configID:configID owner:identifier name:name];
+            [overlay requestRender];
         });
     }
     return used;
@@ -428,14 +187,17 @@ static uintptr_t Damage(void *context, void *specification, const void *info,
     bool track = battle && info && attacker && defender && defenderAbility &&
                  team(attacker) == 1 && team(defender) != 1;
     uint32_t owner = track ? ownerID(attacker) : 0;
-    double before = owner ? VeritasFixPoint(property(defenderAbility, 1)) : 0;
+    double before = owner ? VeritasFixPoint(property(defenderAbility, VeritasPropertyCurrentHP)) : 0;
     damageDepth++;
-    uintptr_t result = ((DamageRoutine)(unity + VeritasDamageOriginal))(
-        context, specification, info, attackerAbility, defenderAbility,
-        attacker, defender, singleTarget, flag, method);
-    damageDepth--;
+    uintptr_t result;
+    @try {
+        result = ((DamageRoutine)(unity + VeritasDamageOriginal))(
+            context, specification, info, attackerAbility, defenderAbility,
+            attacker, defender, singleTarget, flag, method);
+    } @finally { damageDepth--; }
+    if (battle && atomic_load(&activeBattle) == battle) ObserveAbility(defenderAbility, NO, VeritasPropertyCurrentHP);
     if (owner && atomic_load(&activeBattle) == battle) {
-        double after = VeritasFixPoint(property(defenderAbility, 1));
+        double after = VeritasFixPoint(property(defenderAbility, VeritasPropertyCurrentHP));
         int64_t fields[4];
         for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); i++)
             memcpy(&fields[i], (const char *)info + VeritasDamageFields[i], sizeof(fields[i]));
@@ -451,7 +213,7 @@ static uintptr_t Damage(void *context, void *specification, const void *info,
                     if (displayedBattle != battle) return;
                     [overlay.battle record:damage overkill:overkill owner:avatar ?: owner name:name];
                     [overlay.battle recordAttackType:attackType damage:damage owner:avatar ?: owner];
-                    [overlay render];
+                    [overlay requestRender];
                 });
             }
         }
@@ -459,9 +221,11 @@ static uintptr_t Damage(void *context, void *specification, const void *info,
     return result;
 }
 
-static uintptr_t DirectDamage(void *component, int64_t amount, int lockStrength, void *context,
-                              void *resultAmount, void *modifier, int integerization, void *method) {
-    typedef uintptr_t (*Routine)(void *, int64_t, int, void *, void *, void *, int, void *);
+typedef struct { uint64_t hasValue; int64_t value; } VeritasNullableFixPoint;
+_Static_assert(sizeof(VeritasNullableFixPoint) == 16, "Nullable FixPoint ABI");
+static void DirectDamage(void *component, int64_t amount, int lockStrength, void *context,
+                              void *resultAmount, VeritasNullableFixPoint modifier, int integerization, void *method) {
+    typedef void (*Routine)(void *, int64_t, int, void *, void *, VeritasNullableFixPoint, int, void *);
     unsigned battle = atomic_load(&activeBattle);
     int64_t (*property)(void *, int) = (void *)(unity + VeritasGetProperty);
     bool observe = false;
@@ -471,22 +235,217 @@ static uintptr_t DirectDamage(void *component, int64_t amount, int lockStrength,
         void *target = owner(component);
         observe = target && team(target) == 2;
     }
-    double before = observe ? VeritasFixPoint(property(component, 1)) : 0;
+    double before = observe ? VeritasFixPoint(property(component, VeritasPropertyCurrentHP)) : 0;
     damageDepth++;
-    uintptr_t result = ((Routine)(unity + VeritasDirectDamageOriginal))(
-        component, amount, lockStrength, context, resultAmount, modifier, integerization, method);
-    damageDepth--;
+    @try {
+        ((Routine)(unity + VeritasDirectDamageOriginal))(
+            component, amount, lockStrength, context, resultAmount, modifier, integerization, method);
+    } @finally { damageDepth--; }
+    if (battle && atomic_load(&activeBattle) == battle) ObserveAbility(component, NO, VeritasPropertyCurrentHP);
     if (observe && atomic_load(&activeBattle) == battle) {
-        double loss = before - VeritasFixPoint(property(component, 1));
+        double loss = before - VeritasFixPoint(property(component, VeritasPropertyCurrentHP));
         if (loss > 0) dispatch_async(dispatch_get_main_queue(), ^{
             if (displayedBattle != battle) return;
             [overlay.battle recordUnattributedDirectLoss:loss];
-            [overlay render];
+            [overlay requestRender];
         });
     }
-    return result;
 }
 
+static void *ReadPointer(const void *object, unsigned offset) {
+    void *value = NULL; if (object) memcpy(&value, (const char *)object + offset, sizeof(value)); return value;
+}
+static uint32_t ReadUInt(const void *object, unsigned offset) {
+    uint32_t value = 0; if (object) memcpy(&value, (const char *)object + offset, sizeof(value)); return value;
+}
+static NSString *PropertyLabel(int property) {
+    if (propertyNames[@(property)]) return propertyNames[@(property)];
+    switch (property) {
+        case VeritasPropertyCurrentHP: return @"CurrentHP";
+        case VeritasPropertyMaxHP: return @"MaxHP";
+        case VeritasPropertyAttack: return @"Attack";
+        case VeritasPropertyDefence: return @"Defence";
+        case VeritasPropertySpeed: return @"Speed";
+        case VeritasPropertyActionDelay: return @"ActionDelay";
+        default: return [NSString stringWithFormat:@"Property#%d", property];
+    }
+}
+static NSDictionary *EntityIdentity(void *entity) {
+    if (!entity) return nil;
+    int (*team)(void *) = (void *)(unity + VeritasGetTeam);
+    uint32_t (*runtimeID)(void *) = (void *)(unity + VeritasGetRuntimeID);
+    BOOL player = team(entity) == 1;
+    uint32_t uid = player ? AvatarID(entity) : runtimeID(entity);
+    return uid ? VeritasEntity(uid, player) : nil;
+}
+static NSDictionary *ReadStats(void *component) {
+    NSMutableDictionary *stats = [NSMutableDictionary dictionary];
+    void *properties = ReadPointer(component, VeritasAbilityProperties);
+    uint32_t count = ReadUInt(properties, VeritasArrayLength);
+    if (count > 1024) return stats;
+    for (unsigned index = 0; index < count; index++) {
+        void *property = ReadPointer(properties, VeritasArrayItems + index * sizeof(void *));
+        if (!property) continue;
+        int64_t raw; memcpy(&raw, (const char *)property + VeritasPropertyValue, sizeof(raw));
+        double value = VeritasFixPoint(raw) * (index == VeritasPropertyActionDelay ? 10 : 1);
+        if (isfinite(value)) stats[PropertyLabel(index)] = @(value);
+    }
+    return stats;
+}
+static void ObserveAbility(void *component, BOOL all, int propertyID) {
+    @autoreleasepool {
+    unsigned battle = atomic_load(&activeBattle);
+    if (!battle || !component) return;
+    void *(*owner)(void *) = (void *)(unity + VeritasGetComponentOwner);
+    void *entity = owner(component);
+    NSDictionary *identity = EntityIdentity(entity);
+    if (!identity) return;
+    NSString *name = [identity[@"team"] isEqual:@"Player"] ? AvatarName([identity[@"uid"] unsignedIntValue]) : nil;
+    NSDictionary *stats;
+    if (all) stats = ReadStats(component);
+    else {
+        int64_t (*property)(void *, int) = (void *)(unity + VeritasGetProperty);
+        double value = VeritasFixPoint(property(component, propertyID)) * (propertyID == VeritasPropertyActionDelay ? 10 : 1);
+        stats = isfinite(value) ? @{PropertyLabel(propertyID): @(value)} : @{};
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (displayedBattle != battle) return;
+        [overlay.battle updateEntity:identity name:name stats:stats]; [overlay requestRender];
+    });
+    }
+}
+static void SetLineup(void *instance, void *configuration, void *lineup, int stage, uint32_t seed, bool flag, void *method) {
+    typedef void (*Routine)(void *, void *, void *, int, uint32_t, bool, void *);
+    if (!InitializeEnums()) {
+        atomic_store(&activeBattle, 0);
+        ((Routine)(unity + VeritasSetLineupOriginal))(instance, configuration, lineup, stage, seed, flag, method);
+        dispatch_async(dispatch_get_main_queue(), ^{ [overlay log:@"Combat capture disabled: runtime enum validation failed"]; });
+        return;
+    }
+    unsigned battle = ++nextBattle; atomic_store(&activeBattle, battle);
+    @autoreleasepool {
+        NSMutableArray *avatars = [NSMutableArray array];
+        NSMutableDictionary *portraits = [NSMutableDictionary dictionary];
+        void *team = ReadPointer(lineup, VeritasLineupLightTeam);
+        uint32_t count = ReadUInt(team, VeritasArrayLength);
+        if (count <= 32) for (unsigned index = 0; index < count; index++) {
+            void *character = ReadPointer(team, VeritasArrayItems + index * sizeof(void *));
+            uint32_t uid = ReadUInt(character, VeritasLineupCharacterID);
+            if (uid) {
+                [avatars addObject:@{@"id": @(uid), @"name": AvatarName(uid) ?: [@(uid) stringValue]}];
+                NSString *key = [NSString stringWithFormat:@"avatars/%u", uid];
+                NSData *png = VeritasCachedPortrait(key) ? nil : VeritasCaptureAvatar(unity, uid);
+                if (png) portraits[key] = png;
+            }
+        }
+        NSArray *extra = VeritasExtraLineup(unity, lineup);
+        for (NSNumber *number in extra) {
+            uint32_t uid = number.unsignedIntValue;
+            if ([[avatars valueForKey:@"id"] containsObject:number]) continue;
+            [avatars addObject:@{@"id": number, @"name": AvatarName(uid) ?: number.stringValue}];
+            NSString *key = [NSString stringWithFormat:@"avatars/%u", uid];
+            NSData *png = VeritasCachedPortrait(key) ? nil : VeritasCaptureAvatar(unity, uid);
+            if (png) portraits[key] = png;
+        }
+        NSData *hp = VeritasCachedPortrait(@"properties/BaseHP") ? nil : VeritasCapturePropertyIcon(unity, @"BaseHP");
+        if (hp) portraits[@"properties/BaseHP"] = hp;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!extra) [overlay log:@"ExtraTeam reflection unavailable; additional characters will appear when initialized"];
+            for (NSString *key in portraits) VeritasCachePortrait(key, portraits[key]);
+            displayedBattle = battle; overlay.selectedBattle = nil;
+            [overlay.battle reset]; [overlay.battle setLineup:avatars]; [overlay requestRender];
+        });
+    }
+    ((Routine)(unity + VeritasSetLineupOriginal))(instance, configuration, lineup, stage, seed, flag, method);
+}
+static void TurnEnd(void *component, int turn, void *method) {
+    unsigned battle = atomic_load(&activeBattle);
+    dispatch_async(dispatch_get_main_queue(), ^{ if (battle && displayedBattle == battle) { [overlay.battle endTurn]; [overlay requestRender]; } });
+    ((void (*)(void *, int, void *))(unity + VeritasTurnEndOriginal))(component, turn, method);
+}
+static void WaveUpdate(void *mode, void *method) {
+    ((BattleRoutine)(unity + VeritasWaveUpdateOriginal))(mode, method);
+    unsigned battle = atomic_load(&activeBattle);
+    unsigned (*get)(void *) = (void *)(unity + VeritasGetWave); unsigned wave = get(mode);
+    dispatch_async(dispatch_get_main_queue(), ^{ if (battle && displayedBattle == battle) {
+        overlay.battle.wave = wave; [overlay.server publish:@"OnUpdateWave" data:@{@"wave": @(wave)}]; [overlay requestRender];
+    } });
+}
+static unsigned CycleUpdate(void *mode, void *method) {
+    unsigned result = ((unsigned (*)(void *, void *))(unity + VeritasCycleUpdateOriginal))(mode, method);
+    unsigned battle = atomic_load(&activeBattle);
+    dispatch_async(dispatch_get_main_queue(), ^{ if (battle && displayedBattle == battle && overlay.battle.cycle != result) {
+        overlay.battle.cycle = result; [overlay.server publish:@"OnUpdateCycle" data:@{@"cycle": @(result)}]; [overlay requestRender];
+    } });
+    return result;
+}
+static void AVReset(void *mode, void *method) {
+    ((BattleRoutine)(unity + VeritasAVResetOriginal))(mode, method);
+    unsigned battle = atomic_load(&activeBattle);
+    int64_t (*elapsed)(void *) = (void *)(unity + VeritasGetElapsedActionDelay); double av = VeritasFixPoint(elapsed(mode)) * 10;
+    dispatch_async(dispatch_get_main_queue(), ^{ if (battle && displayedBattle == battle) [overlay.battle resetAV:av]; });
+}
+static void DirectChangeHP(void *component, int function, int64_t amount, void *context, int strength, void *method) {
+    ((void (*)(void *, int, int64_t, void *, int, void *))(unity + VeritasDirectChangeHPOriginal))(component, function, amount, context, strength, method);
+    ObserveAbility(component, NO, VeritasPropertyCurrentHP);
+}
+static bool StatChange(void *component, int property, int function, int64_t value, void *context, void *method) {
+    bool result = ((bool (*)(void *, int, int, int64_t, void *, void *))(unity + VeritasStatChangeOriginal))(component, property, function, value, context, method);
+    if (property >= 0 && property < 1024) ObserveAbility(component, NO, property);
+    return result;
+}
+static void CharacterInitialize(void *component, void *ability, void *method) {
+    ((void (*)(void *, void *, void *))(unity + VeritasCharacterInitializeOriginal))(component, ability, method);
+    ObserveAbility(ability, YES, 0);
+}
+static void EnemyInitialize(void *component, void *ability, void *method) {
+    ((void (*)(void *, void *, void *))(unity + VeritasEnemyInitializeOriginal))(component, ability, method);
+    unsigned battle = atomic_load(&activeBattle);
+    if (!battle || !ability) return;
+    void *(*owner)(void *) = (void *)(unity + VeritasGetComponentOwner);
+    uint32_t (*runtimeID)(void *) = (void *)(unity + VeritasGetRuntimeID);
+    unsigned (*monsterID)(void *) = (void *)(unity + VeritasGetMonsterID);
+    void *(*rowFor)(void *) = (void *)(unity + VeritasGetMonsterRow);
+    void *entity = owner(component), *row = rowFor(component);
+    if (!entity || !row) return;
+    typedef struct { int32_t hash; uint64_t hash64; } TextID;
+    TextID (*nameID)(void *) = (void *)(unity + VeritasGetMonsterNameID);
+    const char *(*text)(TextID, void *) = (void *)(unity + VeritasGetText);
+    unsigned (*levelFor)(void *) = (void *)(unity + VeritasGetMonsterLevel);
+    @autoreleasepool {
+        uint32_t uid = runtimeID(entity), templateID = monsterID(component);
+        NSString *name = GameString(text(nameID(row), NULL)) ?: [NSString stringWithFormat:@"Enemy %u", templateID];
+        NSMutableDictionary *stats = [ReadStats(ability) mutableCopy]; stats[@"Level"] = @(levelFor(row));
+        int64_t maxHP; memcpy(&maxHP, (const char *)component + VeritasEnemyDefaultHP, sizeof(maxHP));
+        stats[@"MaxHP"] = @(VeritasFixPoint(maxHP));
+        NSData *png = VeritasCaptureEnemy(unity, row);
+        NSDictionary *enemy = @{@"id": @(templateID), @"uid": @(uid), @"name": name, @"base_stats": @{@"properties": stats}};
+        dispatch_async(dispatch_get_main_queue(), ^{ if (displayedBattle == battle) { [overlay.battle initializeEnemy:enemy]; if (png) VeritasCachePortrait([NSString stringWithFormat:@"enemies/%u", templateID], png); [overlay requestRender]; } });
+    }
+}
+static void FormationUpdate(void *component, void *method) {
+    ((BattleRoutine)(unity + VeritasFormationUpdateOriginal))(component, method);
+    unsigned battle = atomic_load(&activeBattle);
+    if (!battle || VeritasFormationTeam(unity, component) != 2) return;
+    void *list = ReadPointer(component, VeritasFormationList), *items = ReadPointer(list, VeritasListItems);
+    uint32_t count = ReadUInt(list, VeritasListCount), capacity = ReadUInt(items, VeritasArrayLength);
+    if (count > 64 || count > capacity) return;
+    @autoreleasepool {
+        NSMutableArray *enemies = [NSMutableArray array];
+        for (unsigned index = 0; index < count; index++) {
+            void *formation = ReadPointer(items, VeritasArrayItems + index * sizeof(void *));
+            NSDictionary *entity = EntityIdentity(ReadPointer(formation, VeritasComponentOwner));
+            if ([entity[@"team"] isEqual:@"Enemy"]) [enemies addObject:entity];
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{ if (displayedBattle == battle) [overlay.battle setFormation:enemies player:NO]; });
+    }
+}
+
+static BOOL MatchesSignature(uintptr_t address, const uint8_t *pattern, const uint8_t *mask, size_t length) {
+    const uint8_t *actual = (const uint8_t *)address;
+    for (size_t index = 0; index < length; index++) if ((actual[index] & mask[index]) != (pattern[index] & mask[index])) return NO;
+    return YES;
+}
 static BOOL ConnectDamageHooks(void) {
     const char *suffix = "/UnityFramework.framework/UnityFramework";
     size_t length = strlen(suffix);
@@ -494,21 +453,22 @@ static BOOL ConnectDamageHooks(void) {
         const char *name = _dyld_get_image_name(i);
         if (!name || strlen(name) < length || strcmp(name + strlen(name) - length, suffix)) continue;
         uintptr_t image = (uintptr_t)_dyld_get_image_header(i);
-        if (memcmp((const void *)(image + VeritasDamageEntry), VeritasDamageJump, sizeof(VeritasDamageJump)) ||
-            memcmp((const void *)(image + VeritasBattleBeginEntry), VeritasBattleBeginJump, sizeof(VeritasBattleBeginJump)) ||
-            memcmp((const void *)(image + VeritasBattleEndEntry), VeritasBattleEndJump, sizeof(VeritasBattleEndJump)) ||
-            memcmp((const void *)(image + VeritasTurnBeginEntry), VeritasTurnBeginJump, sizeof(VeritasTurnBeginJump)) ||
-            memcmp((const void *)(image + VeritasUseSkillEntry), VeritasUseSkillJump, sizeof(VeritasUseSkillJump)) ||
-            memcmp((const void *)(image + VeritasDirectDamageEntry), VeritasDirectDamageJump, sizeof(VeritasDirectDamageJump))) {
-            return NO;
-        }
+        // Validate the entire contract before publishing any callback.
+#define VALIDATE_HOOK(name) \
+        if (memcmp((const void *)(image + Veritas##name##Entry), Veritas##name##Jump, sizeof(Veritas##name##Jump)) || \
+            memcmp((const void *)(image + Veritas##name##Stub), Veritas##name##Code, sizeof(Veritas##name##Code)) || \
+            atomic_load((_Atomic(uintptr_t) *)(image + Veritas##name##Slot))) return NO;
+        VERITAS_HOOKS(VALIDATE_HOOK)
+#undef VALIDATE_HOOK
+#define VALIDATE_METHOD(name) \
+        if (!MatchesSignature(image + Veritas##name, Veritas##name##Expected, Veritas##name##Mask, sizeof(Veritas##name##Expected))) return NO;
+        VERITAS_METHODS(VALIDATE_METHOD)
+#undef VALIDATE_METHOD
         unity = image;
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasBattleBeginSlot), (uintptr_t)BattleBegin, memory_order_release);
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasBattleEndSlot), (uintptr_t)BattleEnd, memory_order_release);
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasTurnBeginSlot), (uintptr_t)TurnBegin, memory_order_release);
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasUseSkillSlot), (uintptr_t)UseSkill, memory_order_release);
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasDirectDamageSlot), (uintptr_t)DirectDamage, memory_order_release);
-        atomic_store_explicit((_Atomic(uintptr_t) *)(image + VeritasDamageSlot), (uintptr_t)Damage, memory_order_release);
+#define PUBLISH_HOOK(name) \
+        atomic_store_explicit((_Atomic(uintptr_t) *)(image + Veritas##name##Slot), (uintptr_t)name, memory_order_release);
+        VERITAS_HOOKS(PUBLISH_HOOK)
+#undef PUBLISH_HOOK
         return YES;
     }
     return NO;
@@ -524,10 +484,14 @@ static void StartVeritasOverlay(void) {
             overlay = reports;
             reports.battle = [VeritasBattle new];
             [NSUserDefaults.standardUserDefaults registerDefaults:@{
-                VeritasOpacityKey: @0.8, VeritasTextSizeKey: @13,
-                VeritasAttackPanelKey: @YES, VeritasSkillPanelKey: @YES,
+                @"Veritas.Opacity": @0.6, @"Veritas.TextSize": @13, @"Veritas.Theme": @"Egui",
+                @"Veritas.Pie": @YES, @"Veritas.Table": @YES, @"Veritas.Legend": @YES,
+                @"Veritas.characters.Visible": @YES, @"Veritas.metrics.Visible": @YES,
+                @"Veritas.DateFolders": @YES, @"Veritas.BreakdownOwner": @"", @"Veritas.Shown": @YES, @"Veritas.Locale": @"en",
             }];
-            reports.shown = YES;
+            [reports.server start];
+            reports.battle.eventSink = ^(NSString *name, NSDictionary *data) { [overlay.server publish:name data:data]; };
+            reports.shown = [NSUserDefaults.standardUserDefaults boolForKey:@"Veritas.Shown"];
             reports.connected = ConnectDamageHooks();
             NSLog(@"[Veritas] %@", reports.connected ? @"Live combat hooks ready" : @"Live combat hooks unavailable");
             [NSNotificationCenter.defaultCenter addObserverForName:UIWindowDidBecomeKeyNotification object:nil
@@ -554,7 +518,7 @@ static void StartVeritasOverlay(void) {
             attachToActiveScene();
             [(id)NSClassFromString(@"NSEvent") addLocalMonitorForEventsMatchingMask:1UL << 10 handler:^id(id event) {
                 NSUInteger modifiers = [event modifierFlags];
-                if ((modifiers & 0x1e0000) != 0x120000 || !reports.gameWindow.isKeyWindow) return event;
+                if ((modifiers & 0x1e0000) != 0x120000 || (!reports.gameWindow.isKeyWindow && !reports.window.isKeyWindow)) return event;
                 NSString *key = [[event charactersIgnoringModifiers] lowercaseString];
                 BOOL visibility = [key isEqualToString:@"d"];
                 if (!visibility && ![key isEqualToString:@"e"]) return event;

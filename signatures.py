@@ -197,7 +197,7 @@ class HsrMethods:
         strings = 0x208 + struct.unpack_from('<I', image.data, image.file(locations['strings'], 4))[0]
         require(strings < len(data), 'Invalid HSR string table bounds')
         pointers = struct.unpack_from('<Q', image.data, image.file(locations['pointers'], 8))[0]
-        self.image, self.index = image, {}
+        self.image, self.index, self.classes, self.class_methods = image, {}, {}, {}
 
         def name(token):
             if token == 0xffffffff:
@@ -222,6 +222,7 @@ class HsrMethods:
             cls = name(struct.unpack_from('<I', data, row)[0] ^ 0x6aec8c0d)
             if cls not in wanted:
                 continue
+            self.classes.setdefault(cls, []).append(i)
             first = struct.unpack_from('<I', data, row + 0x24)[0] ^ 0x37105e01
             count = (struct.unpack_from('<H', data, row + 0x36)[0] - 0x4abf) & 0xffff
             require(not count or first + count <= method_count, f'Invalid HSR method range for {cls}')
@@ -233,6 +234,14 @@ class HsrMethods:
                     entry = image.file(pointers + j * 8, 8, '__DATA_CONST')
                     address = struct.unpack_from('<Q', image.data, entry)[0]
                     self.index.setdefault((cls, method), []).append(address)
+                    self.class_methods.setdefault(i, {}).setdefault(method, []).append(address)
+
+    def type_index(self, rule, functions):
+        candidates = self.classes.get(rule['class'], [])
+        if 'method' in rule:
+            candidates = [index for index in candidates
+                          if functions[rule['function']] in self.class_methods.get(index, {}).get(rule['method'], [])]
+        return unique(candidates, 'IL2CPP type ' + rule['class'])
 
     def address(self, rule):
         candidates = []
@@ -241,6 +250,12 @@ class HsrMethods:
             if not address:
                 continue
             body = self.image.body(address)
+            if 'verify' in rule:
+                check = rule['verify']
+                offset = check.get('offset', 0)
+                pattern, mask = rule_bytes(check)
+                if not matches(body[offset:offset + len(pattern)], pattern, mask):
+                    continue
             if rule.get('tail_calls_overload'):
                 if len(body) < 8:
                     continue

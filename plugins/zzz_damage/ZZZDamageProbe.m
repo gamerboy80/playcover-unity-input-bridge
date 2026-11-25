@@ -44,13 +44,15 @@ static double gameClock;
 static UIWindow *meterWindow;
 static UILabel *meterLabel;
 static BOOL meterVisible = YES;
+static UIMenu *MeterMenu(void);
 
 @interface ZZZMeterWindow : UIWindow
+@property(nonatomic, weak) UIButton *settings;
 @end
 @implementation ZZZMeterWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    (void)point;
-    (void)event;
+    UIView *hit = [super hitTest:point withEvent:event];
+    for (UIView *view = hit; view; view = view.superview) if (view == self.settings) return hit;
     return nil;
 }
 @end
@@ -160,7 +162,6 @@ static void RefreshMeter(void) {
         meterWindow.hidden = YES;
         meterWindow = [[ZZZMeterWindow alloc] initWithWindowScene:game.windowScene];
         meterWindow.windowLevel = game.windowLevel + 1;
-        meterWindow.userInteractionEnabled = NO;
         meterWindow.rootViewController = [UIViewController new];
         UIView *root = meterWindow.rootViewController.view;
         root.backgroundColor = UIColor.clearColor;
@@ -175,15 +176,28 @@ static void RefreshMeter(void) {
         meterLabel.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightMedium];
         meterLabel.textColor = UIColor.whiteColor;
         [panel addSubview:meterLabel];
+        UIButton *settings = [UIButton buttonWithType:UIButtonTypeSystem];
+        settings.translatesAutoresizingMaskIntoConstraints = NO;
+        settings.tintColor = UIColor.whiteColor;
+        [settings setImage:[UIImage systemImageNamed:@"gearshape"] forState:UIControlStateNormal];
+        settings.accessibilityLabel = @"Damage meter settings";
+        settings.menu = MeterMenu();
+        settings.showsMenuAsPrimaryAction = YES;
+        ((ZZZMeterWindow *)meterWindow).settings = settings;
+        [panel addSubview:settings];
         UILayoutGuide *safe = root.safeAreaLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[
             [panel.topAnchor constraintEqualToAnchor:safe.topAnchor constant:14],
             [panel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-14],
             [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:14],
             [meterLabel.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:12],
-            [meterLabel.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-12],
+            [meterLabel.trailingAnchor constraintEqualToAnchor:settings.leadingAnchor constant:-6],
             [meterLabel.topAnchor constraintEqualToAnchor:panel.topAnchor constant:9],
             [meterLabel.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-9],
+            [settings.topAnchor constraintEqualToAnchor:panel.topAnchor constant:4],
+            [settings.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-4],
+            [settings.widthAnchor constraintEqualToConstant:28],
+            [settings.heightAnchor constraintEqualToConstant:28],
         ]];
     }
     meterWindow.hidden = NO;
@@ -240,6 +254,40 @@ static void ResetMeter(NSString *reason, BOOL resume) {
     os_unfair_lock_unlock(&meterLock);
     dispatch_async(dispatch_get_main_queue(), ^{ [avatarNames removeAllObjects]; });
     dispatch_async(writer, ^{ Write(@{@"type": @"meter_reset", @"reason": reason, @"time": @(time)}); });
+}
+
+static void ToggleMeter(void) {
+    meterVisible = !meterVisible;
+    meterWindow.hidden = !meterVisible;
+    RefreshMeter();
+}
+
+static void ResetMeterManually(void) {
+    ResetMeter(@"manual", YES);
+    RefreshMeter();
+}
+
+static BOOL MarkPhase(unsigned value) {
+    if (atomic_fetch_add(&markers, 1) >= 64) return NO;
+    atomic_store(&phase, value);
+    double time = Now();
+    dispatch_async(writer, ^{ Write(@{@"type": @"marker", @"phase": @(value), @"time": @(time)}); });
+    NSLog(@"[ZZZDamageProbe] Training phase %u", value);
+    return YES;
+}
+
+static UIMenu *MeterMenu(void) {
+    NSArray *phaseTitles = @[@"Unlabelled", @"Agent A", @"Agent B", @"A hits after switching to B", @"Other sources"];
+    NSMutableArray<UIAction *> *phases = [NSMutableArray array];
+    for (unsigned value = 0; value < phaseTitles.count; value++) {
+        NSString *title = [NSString stringWithFormat:@"%@ (⌃⌘%u)", phaseTitles[value], value];
+        [phases addObject:[UIAction actionWithTitle:title image:nil identifier:nil handler:^(__unused UIAction *action) { MarkPhase(value); }]];
+    }
+    return [UIMenu menuWithTitle:@"ZZZ Damage Meter" children:@[
+        [UIAction actionWithTitle:@"Toggle meter (⌃⌘D)" image:nil identifier:nil handler:^(__unused UIAction *action) { ToggleMeter(); }],
+        [UIAction actionWithTitle:@"Reset meter (⌃⌘R)" image:nil identifier:nil handler:^(__unused UIAction *action) { ResetMeterManually(); }],
+        [UIMenu menuWithTitle:@"Training markers" children:phases],
+    ]];
 }
 
 static void BattleStart(void *subsystem, void *method) {
@@ -473,24 +521,14 @@ static void StartProbe(void) {
                     unsigned short key = [keyEvent keyCode];
                     if (ProbeMeterShortcut(modifiers) && (key == 2 || key == 15)) {
                         if ([keyEvent isARepeat]) return nil;
-                        if (key == 2) {
-                            meterVisible = !meterVisible;
-                            meterWindow.hidden = !meterVisible;
-                        } else {
-                            ResetMeter(@"manual", YES);
-                        }
-                        RefreshMeter();
+                        if (key == 2) ToggleMeter();
+                        else ResetMeterManually();
                         return nil;
                     }
                     int value = ProbePhaseForKey(modifiers, key);
                     if (value < 0) return event;
                     if ([keyEvent isARepeat]) return nil;
-                    if (atomic_fetch_add(&markers, 1) >= 64) return event;
-                    atomic_store(&phase, value);
-                    double time = Now();
-                    dispatch_async(writer, ^{ Write(@{@"type": @"marker", @"phase": @(value), @"time": @(time)}); });
-                    NSLog(@"[ZZZDamageProbe] Training phase %d", value);
-                    return nil;
+                    return MarkPhase((unsigned)value) ? nil : event;
                 }];
         });
     }

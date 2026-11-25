@@ -9,12 +9,13 @@
 
 @implementation VeritasPanel {
     CGRect _gestureStart;
+    UIPanGestureRecognizer *_moveGesture;
 }
 
 - (instancetype)initWithTitle:(NSString *)title identifier:(NSString *)identifier {
     if (!(self = [super initWithFrame:CGRectZero])) return nil;
     self.identifier = identifier;
-    self.layer.cornerRadius = 14;
+    self.layer.cornerRadius = 10;
     self.clipsToBounds = YES;
     self.title = [UILabel new];
     self.title.text = title;
@@ -24,17 +25,18 @@
     self.settings.showsMenuAsPrimaryAction = YES;
     UIStackView *heading = [[UIStackView alloc] initWithArrangedSubviews:@[self.title, self.settings]];
     heading.alignment = UIStackViewAlignmentCenter;
-    [heading addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)]];
+    _moveGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
+    [heading addGestureRecognizer:_moveGesture];
     self.stack = [[UIStackView alloc] initWithArrangedSubviews:@[heading]];
     self.stack.axis = UILayoutConstraintAxisVertical;
-    self.stack.spacing = 8;
+    self.stack.spacing = 6;
     self.stack.translatesAutoresizingMaskIntoConstraints = NO;
     [self addSubview:self.stack];
     [NSLayoutConstraint activateConstraints:@[
-        [self.stack.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12],
-        [self.stack.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-12],
+        [self.stack.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:8],
+        [self.stack.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-8],
         [self.stack.topAnchor constraintEqualToAnchor:self.topAnchor constant:10],
-        [self.stack.bottomAnchor constraintLessThanOrEqualToAnchor:self.bottomAnchor constant:-14],
+        [self.stack.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-10],
     ]];
     self.resize = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.resize setImage:[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"] forState:UIControlStateNormal];
@@ -54,9 +56,8 @@
 
 - (void)setEditing:(BOOL)editing {
     _editing = editing;
-    self.settings.hidden = !editing;
     self.resize.hidden = !editing;
-    self.userInteractionEnabled = editing;
+    _moveGesture.enabled = editing;
 }
 
 - (void)applyPan:(UIPanGestureRecognizer *)pan resize:(BOOL)resize {

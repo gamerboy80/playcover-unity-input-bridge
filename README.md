@@ -199,6 +199,9 @@ PlayTools patch remains under its upstream AGPL-3.0 license in
 ## PlayCover plugins
 
 PlayCover builds with **Custom Plugins** support can load native dylibs through
-PlayTools. The [Veritas Live preview](plugins/veritas/README.md) charts live Honkai: Star Rail damage from combat events.
+PlayTools. The [Veritas port](plugins/veritas/README.md) provides Honkai: Star Rail combat
+meters, portraits, stats, turn/AV charts, exports and a local event API. Both
+plugin stagers use managed-name lookup plus native signature validation.
+Expanded Veritas features still require live gameplay verification.
 The [ZZZ live damage preview](plugins/zzz_damage/README.md) shows damage and DPS
 by source entity and includes a diagnostic capture for attribution checks.

@@ -15,18 +15,21 @@ sys.path.insert(0, str(ROOT))
 
 from macho import _commands
 from patch import clone_app, closed, digest, read_app_info, require, run
-from plugins.veritas.stage import address_in_x16, words
+from plugins.veritas.stage import address_in_x16, validate_prologue, words
 from signatures import Image
+from plugins.signature_resolver import resolve_app, save_evidence
 
 PROFILE = json.loads(Path(__file__).with_name('zzz-3.3.1.json').read_text())
 FRAMEWORK = Path('Frameworks/UnityFramework.framework')
 PLUGIN = 'ZZZDamageProbe.dylib'
+CONTRACT = Path(__file__).with_name('signatures.json')
 
 
 def detours(profile=PROFILE):
     for index, (name, entry) in enumerate(profile['entries'].items()):
         address = int(entry['address'], 16)
         expected = bytes.fromhex(entry['expected'])
+        validate_prologue(expected)
         stub = int(profile['code_padding'], 16) + index * 48
         slot = int(profile['data_padding'], 16) + index * 8
         require(address % 4 == stub % 4 == slot % 8 == 0 and len(expected) == 12,
@@ -144,14 +147,18 @@ def stage(app, output):
             'Unsupported ZZZ metadata hash')
     plugin = ROOT / 'build/plugins' / PLUGIN
     require(plugin.is_file(), 'Build the probe first with sh plugins/zzz_damage/build.sh')
+    evidence, resolved, evidence_path = None, PROFILE, None
+    if PROFILE.get("signature_contract"):
+        resolved, evidence = resolve_app(app, PROFILE, CONTRACT)
+        evidence_path = save_evidence(evidence, PROFILE)
     original = source.read_bytes()
-    patched = instrument(original)
+    patched = instrument(original, resolved) if PROFILE.get("signature_contract") else instrument(original)
     output.parent.mkdir(parents=True, exist_ok=True)
     plan = output.with_suffix('.plan.json')
     require(not plan.exists(), 'A probe plan already exists at this output path')
     record = {'source_framework_sha256': hashlib.sha256(original).hexdigest(),
               'planned_unsigned_framework_sha256': hashlib.sha256(patched).hexdigest(),
-              'plugin_sha256': digest(plugin), 'status': 'prepared'}
+              'plugin_sha256': digest(plugin), 'status': 'prepared', 'resolution_report': str(evidence_path) if evidence_path else None}
     plan.write_text(json.dumps(record, indent=2) + '\n')
     with tempfile.TemporaryDirectory(dir=output.parent) as temporary:
         staged = Path(temporary) / output.name
@@ -181,12 +188,20 @@ def stage(app, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--header', type=Path)
+    parser.add_argument('--resolve', action='store_true', help='Print signature evidence without modifying the app')
     parser.add_argument('--app', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    if args.header and not (args.app or args.output):
+    if args.header and not (args.app or args.output or args.resolve):
         write_header(args.header)
-    elif args.app and args.output and not args.header:
+    elif (args.header or args.resolve) and not args.output:
+        app = args.app or Path.home() / 'Library/Containers/io.playcover.PlayCover/Applications' / (PROFILE['bundle_id'] + '.app')
+        _, evidence = resolve_app(app, PROFILE, CONTRACT)
+        if args.header: write_header(args.header)
+        else:
+            save_evidence(evidence, PROFILE)
+            print(json.dumps(evidence, indent=2))
+    elif args.app and args.output and not (args.header or args.resolve):
         stage(args.app.resolve(), args.output.resolve())
     else:
         parser.error('Use --header, or --app and --output')
