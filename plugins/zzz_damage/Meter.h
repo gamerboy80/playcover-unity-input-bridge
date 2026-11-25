@@ -2,6 +2,9 @@
 #include "Probe.h"
 
 enum { MeterNameCapacity = 65 };
+enum { MeterTimelineCapacity = 512 };
+
+typedef struct { double time, total; } MeterPoint;
 
 typedef struct {
     uint32_t id, avatarID;
@@ -12,7 +15,9 @@ typedef struct {
 typedef struct {
     double resetAt, first, last, total, other;
     unsigned count;
-    bool frozen;
+    unsigned hits, pointCount, pointStart;
+    MeterPoint points[MeterTimelineCapacity];
+    bool frozen, timelineTruncated;
     MeterSource latestSource;
     MeterSource sources[64];
 } DamageMeter;
@@ -50,6 +55,20 @@ static inline void MeterRecord(DamageMeter *meter, MeterSource hit, double realT
         meter->latestSource = hit;
     }
     meter->total += hit.damage;
+    meter->hits++;
+    double elapsed = fmax(0, time - meter->first);
+    unsigned last = (meter->pointStart + meter->pointCount + MeterTimelineCapacity - 1) % MeterTimelineCapacity;
+    if (meter->pointCount && floor(meter->points[last].time) == floor(elapsed)) {
+        meter->points[last] = (MeterPoint){elapsed, meter->total};
+    } else {
+        unsigned next = (meter->pointStart + meter->pointCount) % MeterTimelineCapacity;
+        meter->points[next] = (MeterPoint){elapsed, meter->total};
+        if (meter->pointCount < MeterTimelineCapacity) meter->pointCount++;
+        else {
+            meter->pointStart = (meter->pointStart + 1) % MeterTimelineCapacity;
+            meter->timelineTruncated = true;
+        }
+    }
     for (unsigned i = 0; i < meter->count; ++i) {
         MeterSource *source = &meter->sources[i];
         bool same = hit.avatarID ? source->avatarID == hit.avatarID :

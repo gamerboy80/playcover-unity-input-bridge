@@ -331,6 +331,72 @@ class RecoveryTests(unittest.TestCase):
             module.restore(self.app, self.state(), self.profile, self.local)
         self.assertEqual(signature.read_bytes(), b'independent change')
 
+    def resign_with_plugin(self):
+        main = self.app / self.profile['executable']
+        main.write_bytes(fixtures.PatchTests().signed_executable(b'original signature'))
+        self.install()
+        plugin = self.app / 'Frameworks/UserPlugins/Example.dylib'
+        plugin.parent.mkdir()
+        plugin.write_bytes(b'custom plugin')
+        main.write_bytes(module.link_library(
+            fixtures.PatchTests().signed_executable(b'new plugin signature, different size')))
+        (self.app / '_CodeSignature/CodeResources').write_bytes(b'plugin resource seal')
+        return plugin
+
+    def test_plugin_resigning_allows_status_update_restore_and_reapply(self):
+        plugin = self.resign_with_plugin()
+        main = self.profile['executable']
+        registry_root = module.bridge_registry._root(self.app, self.profile['bundle_id'], self.profile['version'])
+        with patch.object(module.bridge_registry.subprocess, 'run',
+                          return_value=subprocess.CompletedProcess([], 0)) as verify:
+            module.check_installed(self.app, self.state(), self.profile)
+            verify.assert_called_once_with(
+                ['/usr/bin/codesign', '--verify', '--strict', '--ignore-resources', str(self.app)],
+                capture_output=True)
+            registry = json.loads((registry_root / 'state.json').read_text())
+            self.assertEqual(registry['current']['main_sha256'], module.digest(self.app / main))
+            self.bridge.write_bytes(b'bridge-v2')
+            module.update(self.app, self.state(), self.profile, self.local)
+            module.restore(self.app, self.state(), self.profile, self.local)
+            self.assertEqual(plugin.read_bytes(), b'custom plugin')
+            self.assertFalse(module.has_dylib((self.app / main).read_bytes(), module.LOAD_PATH))
+            self.install()
+            module.check_installed(self.app, self.state(), self.profile)
+        self.assertEqual(plugin.read_bytes(), b'custom plugin')
+
+    def test_restore_after_plugin_removal_reseals_the_staged_app(self):
+        plugin = self.resign_with_plugin()
+        plugin.unlink()
+        fixtures.shutil.rmtree(plugin.parent)
+        with patch.object(module.bridge_registry.subprocess, 'run',
+                          return_value=subprocess.CompletedProcess([], 0)):
+            module.restore(self.app, self.state(), self.profile, self.local)
+        self.assertFalse(plugin.exists())
+        signs = [call.args for call in module.run.call_args_list if '--force' in call.args]
+        self.assertEqual(Path(signs[-1][-1]).name, self.app.name)
+        self.assertNotEqual(Path(signs[-1][-1]), self.app)
+        self.assertEqual(self.state()['status'], 'restored')
+
+    def test_resigning_does_not_accept_changed_code_load_commands_or_invalid_signature(self):
+        self.resign_with_plugin()
+        main = self.app / self.profile['executable']
+        resigned = main.read_bytes()
+        registry_root = module.bridge_registry._root(self.app, self.profile['bundle_id'], self.profile['version'])
+        record = (registry_root / 'state.json').read_bytes()
+        changed_code = bytearray(resigned)
+        changed_code[600] ^= 1
+        changed_loads = module.add_dylib(bytearray(resigned), '@executable_path/unknown.dylib')
+        for contents, valid_signature in ((changed_code, True), (changed_loads, True), (resigned, False)):
+            with self.subTest(valid_signature=valid_signature, contents=contents[:32]):
+                main.write_bytes(contents)
+                with patch.object(module.bridge_registry.subprocess, 'run',
+                                  return_value=subprocess.CompletedProcess([], 0 if valid_signature else 1)):
+                    with self.assertRaises(RuntimeError):
+                        module.restore(self.app, self.state(), self.profile, self.local)
+                self.assertEqual(main.read_bytes(), contents)
+                self.assertEqual((registry_root / 'state.json').read_bytes(), record)
+                self.assertEqual(self.state()['status'], 'installed')
+
     def test_partial_restore_can_resume_but_rejects_unrelated_changes(self):
         self.install()
         real_replace = module.replace_file

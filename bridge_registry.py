@@ -3,10 +3,11 @@ import hashlib
 import json
 import os
 import fcntl
+import subprocess
 from pathlib import Path
 import tempfile
 
-from macho import add_dylib, dylibs, remove_dylib
+from macho import add_dylib, dylibs, executable_content, remove_dylib
 
 OWNERS = {
     'native-input': '@executable_path/Frameworks/NativeInputBridge.dylib',
@@ -102,6 +103,38 @@ def _state_allowed(actual, state):
                 for name in names))
 
 
+def _refresh_resigned(app, actual, registry):
+    previous = registry['current']
+    if registry.get('pending') or actual['main_sha256'] == previous['main_sha256']:
+        return False
+    # Only the app seal may change; nested bundle signatures remain independently owned.
+    nested = lambda state: {p: h for p, h in state['signatures'].items()
+                            if p != '_CodeSignature/CodeResources'}
+    if nested(actual) != nested(previous):
+        return False
+    if executable_content((app / registry['main_relative']).read_bytes()) != executable_content(
+            compose(registry, registry['owners'])):
+        return False
+    # PlayCover can leave resource entries for removed plugins. Check signed code here;
+    # installers retain their binary hash guards and re-seal resources in the staged app.
+    result = subprocess.run(['/usr/bin/codesign', '--verify', '--strict', '--ignore-resources', str(app)],
+                            capture_output=True)
+    if result.returncode:
+        return False
+    descriptor = _lock(registry['root'])
+    try:
+        latest = json.loads((Path(registry['root']) / 'state.json').read_text(encoding='utf-8'))
+        if (latest != {key: value for key, value in registry.items() if key != 'root'} or
+                actual != _capture(app, registry['main_relative'])):
+            raise RuntimeError('The app or bridge registry changed during signature validation. Retry the operation.')
+        registry['current'] = actual
+        _save(registry)
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+    return True
+
+
 def load(app, bundle_id, version, main_relative, create=True):
     app = Path(app).resolve()
     root = _root(app, bundle_id, version)
@@ -151,7 +184,7 @@ def load(app, bundle_id, version, main_relative, create=True):
         signature_names.update(pending.get('planned', {}).get('signatures', {}))
         if set(actual['signatures']) - signature_names:
             raise RuntimeError('Unrecognized signature resources were found.')
-        if not _state_allowed(actual, data):
+        if not _state_allowed(actual, data) and not _refresh_resigned(app, actual, data):
             raise RuntimeError('Game executable or signature changed outside a registered bridge install.')
         return data
 

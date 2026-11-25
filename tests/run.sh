@@ -16,6 +16,9 @@ python3 plugins/zzz_damage/stage.py --header build/plugins/ZZZDamageProfile.h
 xcrun clang -I build/plugins -I plugins/zzz_damage -Wall -Wextra -Werror \
     plugins/zzz_damage/test-probe.c -o build/test-zzz-damage
 build/test-zzz-damage
+xcrun clang -I plugins/zzz_damage -fobjc-arc -Wall -Wextra -Werror -framework Foundation \
+    plugins/zzz_damage/test-dashboard.m -o build/test-zzz-dashboard
+build/test-zzz-dashboard
 python3 plugins/veritas/stage.py --header build/plugins/VeritasProfile.h
 xcrun clang -I plugins/veritas -fobjc-arc -Wall -Wextra -Werror -framework Foundation \
     plugins/veritas/test-live.m -o build/test-veritas

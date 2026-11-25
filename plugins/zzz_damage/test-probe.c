@@ -112,6 +112,17 @@ int main(void) {
     MeterFreeze(&slowed, clock + 100);
     assert(MeterElapsed(&slowed, clock + 200) == 2.25);
     assert(slowed.total == 200);
+    assert(slowed.hits == 2 && slowed.pointCount == 1);
+    assert(slowed.points[0].total == 200);
+    DamageMeter timeline = {0};
+    for (unsigned i = 0; i < MeterTimelineCapacity + 10; i++)
+        MeterRecord(&timeline, (MeterSource){.id = 1, .damage = 2}, i, i);
+    assert(timeline.hits == MeterTimelineCapacity + 10);
+    assert(timeline.pointCount == MeterTimelineCapacity && timeline.pointStart == 10);
+    assert(timeline.timelineTruncated);
+    assert(timeline.points[timeline.pointStart].time == 10);
+    unsigned end = (timeline.pointStart + timeline.pointCount - 1) % MeterTimelineCapacity;
+    assert(timeline.points[end].total == timeline.total);
     MeterReset(&slowed, 111);
     MeterRecord(&slowed, (MeterSource){.id = 1, .damage = 100}, 110, clock);
     assert(slowed.total == 0);

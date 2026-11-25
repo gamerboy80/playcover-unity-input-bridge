@@ -6,20 +6,42 @@ filters and formatting. It records the candidate amount, source/target runtime
 entity IDs, and matching entity lookups made by the original game code. It does
 not assign damage to the active agent or guess agent names from entity IDs.
 
-The preview shows raw damage-display totals, their average rate, the latest
-source, and share by agent or source. The gear menu lists the meter shortcuts
-and all five training markers. Use **Control+Command+D** to show or hide it and
-**Control+Command+R** to reset manually. The meter also resets when the game's
-battle-statistics session begins. This hook still needs a live check across
-battle modes. Use the manual reset for training comparisons.
-The session-exit hook freezes the totals, source shares and DPS at battle end.
-Result-screen entry also freezes game seconds and DPS. Manual reset clears the
-result and resumes counting. The battle-start hook also resets and resumes.
-DPS refreshes on hits and every 100 ms, using scaled game time from the first
-counted hit through the current tick, including
-gaps between hits. The clock accumulates the time-slow manager's scaled frame
-delta. The panel keeps the final values until reset. Chain-attack and ultimate
-timing still need comparison against the live game clock.
+The dashboard provides raw damage totals, game-time DPS and hit counts, colored
+damage bars, a damage-share pie, a cumulative damage timeline and a scrollable
+list of all captured sources. It uses the Veritas port's movable/resizable panels
+and compact dark style. Gear buttons remain clickable during normal play.
+
+The gear menu lists all shortcuts and training markers. **⌃⌘D** toggles the
+dashboard, **⌃⌘R** resets the session, and **⌃⌘E** enables layout editing.
+In edit mode, drag panel titles, resize corners and scroll the full source list.
+The menus support hiding individual charts, light/dark appearance, text size,
+opacity and streamer aliases. Appearance, visibility and panel layout survive
+restarts. Streamer aliases affect the displayed source labels. Exports retain
+the captured labels and IDs.
+
+Completed sessions and sessions ended by reset are retained in a local history
+of 20 results. Select a saved result from the History menu, or return to Live
+session. JSON exports include the totals, source identities and timeline.
+CSV exports include each source's damage, share and DPS. Export uses the native
+share sheet and saves files under `Documents/ZZZDamage/Exports/YYYY-MM-DD/`.
+Optional autosave writes both formats when a result is archived. History is
+stored in `Documents/ZZZDamage/history.json`.
+
+The timeline keeps one cumulative sample per game-second containing hits, up to
+512 samples. Older samples roll out explicitly, with `timeline_truncated` in
+JSON. Source totals and hit counts continue accumulating. The full source list
+includes up to 64 distinct source groups, with excess groups counted under Other.
+
+The meter resets when the game's battle-statistics session begins. Session exit
+and result-screen entry freeze totals and game-time DPS. Manual reset resumes
+counting. DPS includes gaps between hits, from the first counted hit to the
+current game tick. The clock uses the time-slow manager's scaled frame delta.
+Battle-mode boundaries, chain attacks and ultimate timing still need comparison
+against a live session.
+
+HP, effective damage, overkill, skill categories and automatic portraits require
+additional reviewed native bindings. The dashboard represents the existing
+damage-display feed.
 
 The meter groups resolved agents by roster ID across changes to their runtime
 source IDs. It reads the character-name key from the game's role configuration
@@ -31,8 +53,8 @@ include `source_avatar_id`, with 0 for an unresolved source.
 Icon paths and untranslated keys fall back to the roster ID.
 The meter counts positive, visible
 events with matching source and target lookups and the entity kinds observed
-for agent-to-enemy hits in training. It shows the five largest sources and
-groups the rest under Other. Summon ownership, anomaly/disorder attribution,
+for agent-to-enemy hits in training. The charts show the sources that fit their panel size, while the full source list
+can be scrolled in edit mode. Summon ownership, anomaly/disorder attribution,
 full event coverage and effective HP loss still need verification. See the
 [native analysis](../../docs/games/zzz-damage-probe.md).
 

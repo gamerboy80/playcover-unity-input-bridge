@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 #import "Meter.h"
+#import "Dashboard.h"
 
 @interface NSObject (ProbeKeyboardMonitor)
 + (id)addLocalMonitorForEventsMatchingMask:(NSUInteger)mask handler:(id (^)(id))handler;
@@ -41,21 +42,9 @@ static id keyboardMonitor;
 static os_unfair_lock meterLock = OS_UNFAIR_LOCK_INIT;
 static DamageMeter meter;
 static double gameClock;
-static UIWindow *meterWindow;
-static UILabel *meterLabel;
+static ZZZDashboard *dashboard;
 static BOOL meterVisible = YES;
 static UIMenu *MeterMenu(void);
-
-@interface ZZZMeterWindow : UIWindow
-@property(nonatomic, weak) UIButton *settings;
-@end
-@implementation ZZZMeterWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hit = [super hitTest:point withEvent:event];
-    for (UIView *view = hit; view; view = view.superview) if (view == self.settings) return hit;
-    return nil;
-}
-@end
 
 static double Now(void) {
     struct timespec time;
@@ -67,10 +56,6 @@ static int MostDamageFirst(const void *a, const void *b) {
     const MeterSource *left = a, *right = b;
     if (left->damage != right->damage) return left->damage > right->damage ? -1 : 1;
     return (left->id > right->id) - (left->id < right->id);
-}
-
-static NSString *Amount(double amount) {
-    return [NSNumberFormatter localizedStringFromNumber:@(round(amount)) numberStyle:NSNumberFormatterDecimalStyle];
 }
 
 static NSString *GameString(const char *value) {
@@ -143,88 +128,50 @@ static void ReadSourceName(void *entity, uint16_t *out) {
     MeterCopyName(out, (const uint16_t *)(name + ProbeStringCharacters), length);
 }
 
+static NSDictionary *MeterSnapshot(DamageMeter snapshot, double clock) {
+    static NSString *launchID;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ launchID = NSUUID.UUID.UUIDString; });
+    qsort(snapshot.sources, snapshot.count, sizeof(snapshot.sources[0]), MostDamageFirst);
+    NSMutableArray *sources = [NSMutableArray array], *points = [NSMutableArray array];
+    for (unsigned i = 0; i < snapshot.count; i++) {
+        MeterSource source = snapshot.sources[i];
+        [sources addObject:@{@"id": @(source.id), @"avatar_id": @(source.avatarID),
+            @"name": SourceLabel(source), @"damage": @(source.damage)}];
+    }
+    if (snapshot.other > 0) [sources addObject:@{@"id": @0, @"avatar_id": @0, @"name": @"Other", @"damage": @(snapshot.other)}];
+    for (unsigned i = 0; i < snapshot.pointCount; i++) {
+        MeterPoint point = snapshot.points[(snapshot.pointStart + i) % MeterTimelineCapacity];
+        [points addObject:@{@"time": @(point.time), @"total": @(point.total)}];
+    }
+    return @{@"schema": @1, @"session": [NSString stringWithFormat:@"%@/%.9f", launchID, snapshot.resetAt],
+        @"saved_at": [NSISO8601DateFormatter.new stringFromDate:NSDate.date],
+        @"measurement": @"raw damage-display events", @"sources": sources, @"timeline": points,
+        @"timeline_capacity": @(MeterTimelineCapacity), @"timeline_truncated": @(snapshot.timelineTruncated),
+        @"total": @(snapshot.total), @"hits": @(snapshot.hits), @"frozen": @(snapshot.frozen),
+        @"seconds": @(MeterElapsed(&snapshot, clock))};
+}
+
 static void RefreshMeter(void) {
-    if (!meterVisible) return;
     UIWindow *game = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class] ||
             scene.activationState != UISceneActivationStateForegroundActive) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            if (window.isKeyWindow && ![window isKindOfClass:ZZZMeterWindow.class]) {
-                game = window;
-                break;
-            }
+            if ((window.isKeyWindow || !window.hidden) && window.windowLevel == UIWindowLevelNormal &&
+                ![window isKindOfClass:ZZZDashboardWindow.class]) { game = window; break; }
         }
         if (game) break;
     }
     if (!game) return;
-    if (meterWindow.windowScene != game.windowScene) {
-        meterWindow.hidden = YES;
-        meterWindow = [[ZZZMeterWindow alloc] initWithWindowScene:game.windowScene];
-        meterWindow.windowLevel = game.windowLevel + 1;
-        meterWindow.rootViewController = [UIViewController new];
-        UIView *root = meterWindow.rootViewController.view;
-        root.backgroundColor = UIColor.clearColor;
-        UIView *panel = [UIView new];
-        panel.backgroundColor = [UIColor colorWithWhite:0.07 alpha:0.86];
-        panel.layer.cornerRadius = 10;
-        panel.translatesAutoresizingMaskIntoConstraints = NO;
-        [root addSubview:panel];
-        meterLabel = [UILabel new];
-        meterLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        meterLabel.numberOfLines = 0;
-        meterLabel.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightMedium];
-        meterLabel.textColor = UIColor.whiteColor;
-        [panel addSubview:meterLabel];
-        UIButton *settings = [UIButton buttonWithType:UIButtonTypeSystem];
-        settings.translatesAutoresizingMaskIntoConstraints = NO;
-        settings.tintColor = UIColor.whiteColor;
-        [settings setImage:[UIImage systemImageNamed:@"gearshape"] forState:UIControlStateNormal];
-        settings.accessibilityLabel = @"Damage meter settings";
-        settings.menu = MeterMenu();
-        settings.showsMenuAsPrimaryAction = YES;
-        ((ZZZMeterWindow *)meterWindow).settings = settings;
-        [panel addSubview:settings];
-        UILayoutGuide *safe = root.safeAreaLayoutGuide;
-        [NSLayoutConstraint activateConstraints:@[
-            [panel.topAnchor constraintEqualToAnchor:safe.topAnchor constant:14],
-            [panel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-14],
-            [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:14],
-            [meterLabel.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:12],
-            [meterLabel.trailingAnchor constraintEqualToAnchor:settings.leadingAnchor constant:-6],
-            [meterLabel.topAnchor constraintEqualToAnchor:panel.topAnchor constant:9],
-            [meterLabel.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-9],
-            [settings.topAnchor constraintEqualToAnchor:panel.topAnchor constant:4],
-            [settings.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-4],
-            [settings.widthAnchor constraintEqualToConstant:28],
-            [settings.heightAnchor constraintEqualToConstant:28],
-        ]];
-    }
-    meterWindow.hidden = NO;
     os_unfair_lock_lock(&meterLock);
     DamageMeter snapshot = meter;
-    double currentGameTime = gameClock;
+    double clock = gameClock;
     os_unfair_lock_unlock(&meterLock);
-    NSMutableString *display = [NSMutableString stringWithString:@"ZZZ · Damage display events"];
-    if (!snapshot.total) {
-        [display appendString:@"\nWaiting for damage"];
-    } else {
-        double elapsed = MeterElapsed(&snapshot, currentGameTime);
-        [display appendFormat:@"\n%@ raw total", Amount(snapshot.total)];
-        if (elapsed > 0) [display appendFormat:@"  ·  %@ raw/s  ·  %.1f game s", Amount(snapshot.total / elapsed), elapsed];
-        [display appendFormat:@"\nLatest: %@", SourceLabel(snapshot.latestSource)];
-        qsort(snapshot.sources, snapshot.count, sizeof(snapshot.sources[0]), MostDamageFirst);
-        double remaining = snapshot.other;
-        for (unsigned i = 0; i < snapshot.count; ++i) {
-            MeterSource source = snapshot.sources[i];
-            if (i < 5) {
-                [display appendFormat:@"\n%@   %@   %.1f%%", SourceLabel(source), Amount(source.damage),
-                                      100 * source.damage / snapshot.total];
-            } else remaining += source.damage;
-        }
-        if (remaining > 0) [display appendFormat:@"\nOther      %@   %.1f%%", Amount(remaining), 100 * remaining / snapshot.total];
+    if (!dashboard) {
+        dashboard = [ZZZDashboard new]; dashboard.controls = MeterMenu();
     }
-    if (![meterLabel.text isEqualToString:display]) meterLabel.text = display;
+    [dashboard update:MeterSnapshot(snapshot, clock) game:game visible:meterVisible];
 }
 
 static void QueueMeterRefresh(void) {
@@ -249,16 +196,23 @@ static void Write(NSDictionary *record) {
 static void ResetMeter(NSString *reason, BOOL resume) {
     os_unfair_lock_lock(&meterLock);
     double time = Now();
+    DamageMeter previous = meter;
+    double previousClock = gameClock;
     MeterReset(&meter, time);
     if (resume) meter.frozen = false;
     os_unfair_lock_unlock(&meterLock);
-    dispatch_async(dispatch_get_main_queue(), ^{ [avatarNames removeAllObjects]; });
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (dashboard && previous.total > 0) {
+            [dashboard saveSnapshot:MeterSnapshot(previous, previousClock)]; [dashboard apply];
+        }
+        [avatarNames removeAllObjects];
+    });
     dispatch_async(writer, ^{ Write(@{@"type": @"meter_reset", @"reason": reason, @"time": @(time)}); });
 }
 
 static void ToggleMeter(void) {
     meterVisible = !meterVisible;
-    meterWindow.hidden = !meterVisible;
+    [NSUserDefaults.standardUserDefaults setBool:!meterVisible forKey:@"ZZZDamage.Hidden"];
     RefreshMeter();
 }
 
@@ -514,14 +468,16 @@ static void StartProbe(void) {
             [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(__unused NSTimer *timer) {
                 RefreshMeter();
             }];
+            meterVisible = ![NSUserDefaults.standardUserDefaults boolForKey:@"ZZZDamage.Hidden"];
             keyboardMonitor = [NSClassFromString(@"NSEvent") addLocalMonitorForEventsMatchingMask:1UL << 10
                 handler:^id(id event) {
                     id<ProbeKeyEvent> keyEvent = event;
                     NSUInteger modifiers = [keyEvent modifierFlags];
                     unsigned short key = [keyEvent keyCode];
-                    if (ProbeMeterShortcut(modifiers) && (key == 2 || key == 15)) {
+                    if (ProbeMeterShortcut(modifiers) && (key == 2 || key == 15 || key == 14)) {
                         if ([keyEvent isARepeat]) return nil;
                         if (key == 2) ToggleMeter();
+                        else if (key == 14) { RefreshMeter(); [dashboard toggleEditing]; }
                         else ResetMeterManually();
                         return nil;
                     }

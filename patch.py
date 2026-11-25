@@ -268,8 +268,8 @@ def restore_files(app, profile, local):
         else:
             replace_signature(BACKUP / FRAMEWORK / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
             replace_signature(BACKUP / '_CodeSignature', staged / '_CodeSignature')
-        if not restore_exact:
-            run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
+        # Plugin files may have been added or removed since the backup was signed.
+        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
         run('/usr/bin/codesign', '--verify', '--strict', str(staged))
         bridge_registry.begin(registry, owners, staged)
         replace_file(staged / BINARY, app / BINARY)

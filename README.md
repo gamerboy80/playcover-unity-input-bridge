@@ -123,8 +123,11 @@ changed by signing, and verifies the reconstructed original SHA-256 before use.
 Existing full framework backups remain readable and are converted when applying
 or updating a patch. Preserve this directory and the installed game for restoration.
 Update applies the same profile to the same exact binary; it does not port patches to a newer
-game release. Restore before updating the game. The installer rejects files that
-changed after installation rather than overwriting them.
+game release. Restore before updating the game. The installer rejects changed
+game code rather than overwriting it. PlayCover custom plugins can be added or
+removed between patch operations: verified re-signing of the unchanged executable
+is accepted, plugin files are preserved, and restore rebuilds the app's resource
+signature for the current plugin set.
 
 The desktop-input patch and the separate ZZMI Metal bridge can be installed in
 either order. Each installer manages only its own load command and bridge file.
