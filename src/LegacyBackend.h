@@ -66,11 +66,14 @@ static void legacyPosition(float *result) {
     if (!legacyHasPosition && legacyPositionOriginal) { legacyPositionOriginal(result); return; }
     result[0]=mouseState.x; result[1]=mouseState.y; result[2]=0;
 }
+static inline BOOL legacyCallerMatches(uintptr_t caller, uintptr_t offset) {
+    return offset!=0 && caller==slide+offset;
+}
 static void legacyScrollForCaller(float *result, uintptr_t caller) {
     legacyScrollReads++;
     legacyPoll();
     // UI expects notches; InControl gameplay expects its profile's wheel units.
-    float divisor=caller==slide+GameUIScrollReturn ? GameLegacyScrollUnitsPerStep : 1;
+    float divisor=legacyCallerMatches(caller,GameUIScrollReturn) ? GameLegacyScrollUnitsPerStep : 1;
     result[0]=frameScrollX/divisor; result[1]=frameScrollY/divisor;
     if (frameScrollX!=0 || frameScrollY!=0) legacyPositiveScrolls++;
 }
@@ -79,10 +82,10 @@ static void legacyScrollForCaller(float *result, uintptr_t caller) {
 __attribute__((noinline)) static void legacyScroll(float *result) {
     uintptr_t caller=(uintptr_t)__builtin_return_address(0);
     // This exact wrapper saves x29/x30; its parent identifies UI versus gameplay.
-    if (caller==slide+GameScrollWrapperReturn)
+    if (legacyCallerMatches(caller,GameScrollWrapperReturn))
         caller=(uintptr_t)__builtin_return_address(1);
     static BOOL reportedUI;
-    if (!reportedUI && caller==slide+GameUIScrollReturn) {
+    if (!reportedUI && legacyCallerMatches(caller,GameUIScrollReturn)) {
         reportedUI=YES;
         if (output) { fprintf(output,"UI scroll caller verified; normalizing wheel units to notches\n"); fflush(output); }
     }

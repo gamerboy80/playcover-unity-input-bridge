@@ -3,6 +3,7 @@
 #include <stdio.h>
 static FILE *output;
 #include "../src/InputState.h"
+#include "../src/KeyMap.h"
 #include "../src/Scroll.h"
 static uintptr_t slide;
 static uint8_t keys[14];
@@ -59,6 +60,19 @@ int main(void) {
     assert(initializeLegacy());
     assert(resolverCalls==22 && legacyPositionOriginal==position);
     assert(legacyKey(37)=='w' && legacyKey(94)==282 && legacyKey(105)==293);
+    assert(unityKey(13)==37 && unityKey(0)==15 && unityKey(122)==94 && unityKey(111)==105 &&
+           unityKey(10)==0 && unityKey(128)==0);
+    uint8_t seenUnity[110]={0}, seenLegacy[512]={0};
+    for (unsigned code=0; code<128; code++) {
+        unsigned key=unityKey(code);
+        if (!key) continue;
+        assert(key>=1 && key<=105 && !seenUnity[key]);
+        seenUnity[key]=1;
+        int legacy=legacyKey((int)key);
+        if (key==59) { assert(legacy==0); continue; }
+        assert(legacy>0 && legacy<512 && !seenLegacy[legacy]);
+        seenLegacy[legacy]=1;
+    }
     keys[37/8]|=1u<<(37%8); legacySendKeyboard();
     assert(legacyKeyHeld('w') && legacyKeyDown('w') && legacyAnyHeld() && legacyAnyDown());
     memset(keys,0,sizeof(keys));legacySendKeyboard();frame++;
@@ -75,6 +89,8 @@ int main(void) {
     legacyScrollForCaller(scroll,GameUIScrollReturn);
     assert(scroll[0]==1 && scroll[1]==-2);
     legacyScrollForCaller(scroll,GameUIScrollReturn+4);
+    assert(scroll[0]==120 && scroll[1]==-240);
+    legacyScrollForCaller(scroll,0);
     assert(scroll[0]==120 && scroll[1]==-240);
     legacyScroll(scroll);assert(scroll[1]==-240); // Polling twice must not consume the frame.
     frame++;legacyScroll(scroll);assert(scroll[1]==0 && !legacyDown(0));

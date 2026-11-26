@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from macho import _commands
 from patch import clone_app, closed, digest, read_app_info, require, run
-from plugins.veritas.stage import address_in_x16, validate_prologue, words
+from plugins.veritas.stage import address_in_x16, apply_detours, build_detour, validate_prologue, words
 from signatures import Image
 from plugins.signature_resolver import resolve_app, save_evidence
 
@@ -26,19 +26,13 @@ CONTRACT = Path(__file__).with_name('signatures.json')
 
 
 def detours(profile=PROFILE):
+    code_padding = int(profile['code_padding'], 16)
+    data_padding = int(profile['data_padding'], 16)
     for index, (name, entry) in enumerate(profile['entries'].items()):
         address = int(entry['address'], 16)
         expected = bytes.fromhex(entry['expected'])
-        validate_prologue(expected)
-        stub = int(profile['code_padding'], 16) + index * 48
-        slot = int(profile['data_padding'], 16) + index * 8
-        require(address % 4 == stub % 4 == slot % 8 == 0 and len(expected) == 12,
-                'Unaligned or unsupported detour')
-        jump = address_in_x16(address, stub) + words(0xd61f0200)
+        jump, stub, slot, _, code = build_detour(address, expected, index, code_padding, data_padding)
         require(jump == bytes.fromhex(entry['replacement']), 'Recorded replacement does not match the detour')
-        # Empty callback slots execute the original instructions without the plugin.
-        code = (address_in_x16(stub, slot) + words(0xc8dffe10, 0xb4000050, 0xd61f0200) +
-                expected + address_in_x16(stub + 32, address + 12) + words(0xd61f0200))
         yield name, address, expected, jump, stub, slot, code
 
 
@@ -78,27 +72,7 @@ def instrument(binary, profile=PROFILE):
             'Unexpected preferred image base')
     uuids = [data[pos + 8:pos + 24].hex() for pos, cmd, _ in _commands(data)[0] if cmd == 0x1b]
     require(uuids == [profile['uuid']], 'Unexpected framework UUID')
-    edits, reserved = [], []
-    for name, entry, expected, jump, stub, slot, code in detours(profile):
-        require(entry in image.function_set and len(image.body(entry)) >= len(expected),
-                f'{name} is not a suitable function entry')
-        require(any(segment == '__DATA' and vm + stored <= slot and slot + 8 <= vm + size
-                    for segment, vm, size, _, stored in image.segments),
-                f'{name} callback is outside zero-filled writable storage')
-        for segment, address, length in [('__TEXT', stub, len(code)), ('__DATA', slot, 8)]:
-            require(all(s != segment or address + length <= start or start + size <= address
-                        for (s, _), (start, size, _) in image.sections.items()),
-                    f'{name} overlaps a game section')
-        for address, length in [(entry, len(jump)), (stub, len(code)), (slot, 8)]:
-            require(all(address + length <= start or start + size <= address for start, size in reserved),
-                    'Overlapping probe edits')
-            reserved.append((address, length))
-        source, target = image.file(entry, 12, '__TEXT'), image.file(stub, len(code), '__TEXT')
-        require(data[source:source + 12] == expected, f'{name} entry changed')
-        require(not any(data[target:target + len(code)]), f'{name} padding is in use')
-        edits.extend([(source, jump), (target, code)])
-    for offset, replacement in edits:
-        data[offset:offset + len(replacement)] = replacement
+    apply_detours(data, image, detours(profile))
     return data
 
 

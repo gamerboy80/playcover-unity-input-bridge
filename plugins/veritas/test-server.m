@@ -1,16 +1,18 @@
 #import "Server.h"
 #include <assert.h>
 
-static NSString *Request(VeritasServer *server, NSString *request) {
+static NSString *RequestData(VeritasServer *server, NSData *data) {
     int pair[2]; assert(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
     int incoming = pair[0];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ [server serve:incoming]; });
-    NSData *data = [request dataUsingEncoding:NSUTF8StringEncoding];
     assert(send(pair[1], data.bytes, data.length, 0) == (ssize_t)data.length);
     NSMutableData *response = [NSMutableData data]; char bytes[4096]; ssize_t count;
     while ((count = recv(pair[1], bytes, sizeof(bytes), 0)) > 0) [response appendBytes:bytes length:(NSUInteger)count];
     close(pair[1]);
     return [[NSString alloc] initWithData:response encoding:NSUTF8StringEncoding];
+}
+static NSString *Request(VeritasServer *server, NSString *request) {
+    return RequestData(server, [request dataUsingEncoding:NSUTF8StringEncoding]);
 }
 static NSData *ReadExact(int socket, NSUInteger length) {
     NSMutableData *data = [NSMutableData dataWithLength:length]; NSUInteger read = 0;
@@ -89,6 +91,15 @@ int main(void) {
         assert([response hasPrefix:@"HTTP/1.1 404"]);
         response = Request(server, @"POST /socket.io/?EIO=4&transport=polling HTTP/1.1\r\nContent-Length: 999999\r\n\r\n");
         assert(response.length == 0);
+        response = Request(server, @"POST /socket.io/?EIO=4&transport=polling HTTP/1.1\r\nContent-Length: 10abc\r\n\r\n");
+        assert([response hasPrefix:@"HTTP/1.1 400"]);
+        response = Request(server, @"POST /socket.io/?EIO=4&transport=polling HTTP/1.1\r\nContent-Length: -5\r\n\r\n");
+        assert([response hasPrefix:@"HTTP/1.1 400"]);
+        NSMutableData *badUTF8 = [[@"POST /socket.io/?EIO=4&transport=polling HTTP/1.1\r\nContent-Length: 2\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
+        const uint8_t invalidBytes[] = {0xff, 0xfe};
+        [badUTF8 appendBytes:invalidBytes length:sizeof(invalidBytes)];
+        response = RequestData(server, badUTF8);
+        assert([response hasPrefix:@"HTTP/1.1 400"]);
         int ws = WebSocket(server, nil, YES);
         NSString *hello = ServerText(ws); assert([hello hasPrefix:@"0"]);
         NSDictionary *wsOpen = [NSJSONSerialization JSONObjectWithData:[[hello substringFromIndex:1] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:NULL];

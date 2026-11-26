@@ -1,11 +1,8 @@
 #import <Foundation/Foundation.h>
+#import "../CSV.h"
 
 static inline NSString *VeritasCSVCell(id value) {
-    NSString *text = value == nil || value == NSNull.null ? @"" : [value description];
-    // Spreadsheet programs interpret formulas even inside quoted CSV cells.
-    if (text.length && [@"=+-@\t\r" rangeOfString:[text substringToIndex:1]].location != NSNotFound &&
-        ![value isKindOfClass:NSNumber.class]) text = [@"'" stringByAppendingString:text];
-    return [NSString stringWithFormat:@"\"%@\"", [text stringByReplacingOccurrencesOfString:@"\"" withString:@"\"\""]];
+    return PluginCSVCell(value);
 }
 
 static inline NSArray *VeritasChartData(NSDictionary *battle) {
@@ -17,7 +14,9 @@ static inline NSArray *VeritasChartData(NSDictionary *battle) {
         NSUInteger turns = 0, first = 0, last = 0, primary = 0;
         NSMutableDictionary *uses = [NSMutableDictionary dictionary];
         for (NSDictionary *skill in battle[@"skills"]) if ([skill[@"owner"] isEqual:key]) {
-            NSString *name = skill[@"skill"]; uses[name] = @([uses[name] unsignedIntegerValue] + 1);
+            NSString *name = skill[@"skill"];
+            if (!name) continue;
+            uses[name] = @([uses[name] unsignedIntegerValue] + 1);
             primary = MAX(primary, [uses[name] unsignedIntegerValue]);
         }
         for (NSDictionary *turn in battle[@"turn_history"]) {
@@ -34,13 +33,13 @@ static inline NSArray *VeritasChartData(NSDictionary *battle) {
     double cumulative = 0; NSUInteger order = 0;
     NSMutableDictionary *characterCumulative = [NSMutableDictionary dictionary];
     for (NSDictionary *skill in battle[@"skills"]) {
-        NSString *key = skill[@"owner"]; double damage = [skill[@"total_damage"] doubleValue];
+        NSString *key = skill[@"owner"] ?: @""; double damage = [skill[@"total_damage"] doubleValue];
         cumulative += damage; characterCumulative[key] = @([characterCumulative[key] doubleValue] + damage);
-        [rows addObject:@{@"data_type": @"skill_detail", @"character_name": names[key] ?: key, @"character_id": @(key.intValue),
-            @"turn_order": @(++order), @"turn_battle_id": skill[@"turn"], @"wave": skill[@"wave"], @"cycle": skill[@"cycle"],
-            @"action_value": skill[@"action_value"], @"skill_name": skill[@"skill"], @"skill_type": skill[@"skill_type"] ?: @"Unknown",
+        [rows addObject:@{@"data_type": @"skill_detail", @"character_name": names[key] ?: key, @"character_id": @([key intValue]),
+            @"turn_order": @(++order), @"turn_battle_id": skill[@"turn"] ?: @0, @"wave": skill[@"wave"] ?: @0, @"cycle": skill[@"cycle"] ?: @0,
+            @"action_value": skill[@"action_value"] ?: @0, @"skill_name": skill[@"skill"] ?: @"", @"skill_type": skill[@"skill_type"] ?: @"Unknown",
             @"skill_type_name": skill[@"skill_type"] ?: @"Unknown", @"skill_damage": @(damage),
-            @"cumulative_damage": @(cumulative), @"cumulative_character_damage": characterCumulative[key],
+            @"cumulative_damage": @(cumulative), @"cumulative_character_damage": characterCumulative[key] ?: @0,
             @"skill_damage_percentage": @(total > 0 ? damage / total * 100 : 0)}];
     }
     return rows;
@@ -60,7 +59,9 @@ static inline NSString *VeritasCSV(NSDictionary *battle) {
 }
 static inline NSArray *VeritasStatsHistory(NSArray *history) {
     NSMutableArray *rows = [NSMutableArray array];
-    for (NSDictionary *record in history) [rows addObject:@{@"stats": record[@"stats"], @"turnBattleId": record[@"turn_battle_id"]}];
+    for (NSDictionary *record in history) {
+        [rows addObject:@{@"stats": record[@"stats"] ?: @{}, @"turnBattleId": record[@"turn_battle_id"] ?: @0}];
+    }
     return rows;
 }
 static inline NSDictionary *VeritasExportData(NSDictionary *snapshot) {
@@ -69,37 +70,39 @@ static inline NSDictionary *VeritasExportData(NSDictionary *snapshot) {
     NSMutableDictionary *avatarDetail = [NSMutableDictionary dictionary], *enemyDetail = [NSMutableDictionary dictionary];
     for (NSDictionary *avatar in snapshot[@"lineup"]) {
         NSNumber *uid = avatar[@"id"];
+        if (!uid) continue;
         NSDictionary *record = entities[[NSString stringWithFormat:@"Player:%@", uid]];
         [lineup addObject:@{@"avatarId": uid, @"isDie": record[@"is_die"] ?: @NO}];
         avatarDetail[uid.stringValue] = @{@"id": uid, @"isDie": record[@"is_die"] ?: @NO,
-            @"killer_uid": [record[@"killer"] isKindOfClass:NSDictionary.class] ? record[@"killer"][@"uid"] : @(-1),
+            @"killer_uid": [record[@"killer"] isKindOfClass:NSDictionary.class] ? (record[@"killer"][@"uid"] ?: @(-1)) : @(-1),
             @"stats": record[@"stats"] ?: @{}, @"statsHistory": VeritasStatsHistory(record[@"stats_history"])};
     }
-    [turns addObject:@{@"avatarId": @(-1), @"actionValue": @0, @"waveIndex": snapshot[@"wave"], @"cycleIndex": snapshot[@"max_cycle"]}];
+    [turns addObject:@{@"avatarId": @(-1), @"actionValue": @0, @"waveIndex": snapshot[@"wave"] ?: @0, @"cycleIndex": snapshot[@"max_cycle"] ?: @0}];
     for (NSDictionary *turn in snapshot[@"entity_turn_history"]) {
         NSDictionary *entity = turn[@"entity"];
-        [turns addObject:@{@"avatarId": entity[@"uid"], @"actionValue": turn[@"action_value"],
-            @"waveIndex": turn[@"wave"], @"cycleIndex": turn[@"cycle"]}];
+        if (![entity isKindOfClass:NSDictionary.class] || !entity[@"uid"]) continue;
+        [turns addObject:@{@"avatarId": entity[@"uid"], @"actionValue": turn[@"action_value"] ?: @0,
+            @"waveIndex": turn[@"wave"] ?: @0, @"cycleIndex": turn[@"cycle"] ?: @0}];
     }
     for (NSDictionary *skill in snapshot[@"skills"]) {
-        [skills addObject:@{@"avatarId": @([skill[@"owner"] intValue]), @"damageDetail": skill[@"damage_detail"],
-            @"totalDamage": skill[@"total_damage"], @"skillType": skill[@"skill_type"] ?: @"Unknown", @"skillName": skill[@"skill"],
-            @"turnBattleId": skill[@"turn"]}];
+        [skills addObject:@{@"avatarId": @([skill[@"owner"] intValue]), @"damageDetail": skill[@"damage_detail"] ?: @[],
+            @"totalDamage": skill[@"total_damage"] ?: @0, @"skillType": skill[@"skill_type"] ?: @"Unknown", @"skillName": skill[@"skill"] ?: @"",
+            @"turnBattleId": skill[@"turn"] ?: @0}];
     }
     NSUInteger index = 0;
     for (NSString *uid in [[snapshot[@"enemies"] allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
         NSDictionary *enemy = snapshot[@"enemies"][uid], *record = entities[[@"Enemy:" stringByAppendingString:uid]];
-        enemyDetail[uid] = @{@"id": enemy[@"id"], @"name": enemy[@"name"], @"stats": record[@"stats"] ?: @{},
+        enemyDetail[uid] = @{@"id": enemy[@"id"] ?: @0, @"name": enemy[@"name"] ?: uid, @"stats": record[@"stats"] ?: @{},
             @"maxHP": enemy[@"base_stats"][@"properties"][@"MaxHP"] ?: @0, @"level": enemy[@"base_stats"][@"properties"][@"Level"] ?: @0,
             @"statsHistory": VeritasStatsHistory(record[@"stats_history"]), @"isDie": record[@"is_die"] ?: @NO,
-            @"killer_uid": [record[@"killer"] isKindOfClass:NSDictionary.class] ? record[@"killer"][@"uid"] : @(-1),
-            @"positionIndex": @(index++), @"waveIndex": snapshot[@"wave"]};
+            @"killer_uid": [record[@"killer"] isKindOfClass:NSDictionary.class] ? (record[@"killer"][@"uid"] ?: @(-1)) : @(-1),
+            @"positionIndex": @(index++), @"waveIndex": snapshot[@"wave"] ?: @0};
     }
     return @{@"lineup": lineup, @"turnHistory": turns, @"skillHistory": skills, @"dataAvatar": @[],
-        @"totalAV": snapshot[@"action_value"], @"totalDamage": snapshot[@"total_damage"],
-        @"damagePerAV": snapshot[@"damage_per_av"], @"cycleIndex": snapshot[@"cycle"],
-        @"waveIndex": snapshot[@"wave"], @"maxWave": snapshot[@"max_wave"], @"maxCycle": snapshot[@"max_cycle"],
-        @"avatarDetail": avatarDetail, @"enemyDetail": enemyDetail, @"version": @"0.2.58", @"_playcover": snapshot};
+        @"totalAV": snapshot[@"action_value"] ?: @0, @"totalDamage": snapshot[@"total_damage"] ?: @0,
+        @"damagePerAV": snapshot[@"damage_per_av"] ?: @0, @"cycleIndex": snapshot[@"cycle"] ?: @0,
+        @"waveIndex": snapshot[@"wave"] ?: @0, @"maxWave": snapshot[@"max_wave"] ?: @0, @"maxCycle": snapshot[@"max_cycle"] ?: @0,
+        @"avatarDetail": avatarDetail, @"enemyDetail": enemyDetail, @"version": @"0.2.58", @"_playcover": snapshot ?: @{}};
 }
 
 static inline NSURL *VeritasExportDirectory(void) {

@@ -10,18 +10,9 @@
 - (NSString *)charactersIgnoringModifiers;
 - (BOOL)isARepeat;
 @end
-@interface VeritasOverlayWindow : UIWindow
-@property(nonatomic) BOOL editing;
+@interface VeritasOverlayWindow : VeritasPassthroughWindow
 @end
 @implementation VeritasOverlayWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hit = [super hitTest:point withEvent:event];
-    if (self.rootViewController.presentedViewController) return hit;
-    for (UIView *view = hit; view; view = view.superview) {
-        if (self.editing ? [view isKindOfClass:VeritasPanel.class] : [view isKindOfClass:UIControl.class]) return hit;
-    }
-    return nil;
-}
 @end
 
 @interface VeritasOverlay : NSObject

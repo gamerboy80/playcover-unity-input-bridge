@@ -32,6 +32,15 @@ def profile_name(profile):
                  if canonical == profile['id']), profile['id'])
 
 
+def read_state(state_path):
+    try:
+        state = json.loads(state_path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"Couldn't read saved patch information at {state_path}: {error}") from error
+    require(isinstance(state, dict), f"Saved patch information at {state_path} has an unexpected format.")
+    return state
+
+
 def local_directory(profile):
     local = ROOT / '.local'
     # Preserve existing backup locations and accept only known aliases of this identity.
@@ -43,7 +52,7 @@ def local_directory(profile):
         state_path = candidate / 'state.json'
         if not state_path.exists():
             continue
-        state = json.loads(state_path.read_text())
+        state = read_state(state_path)
         if state.get('original', {}).get(profile['framework_binary']) == profile['original_sha256']:
             recorded = state.get('profile', profile['id'])
             if candidate == local and PROFILE_ALIASES.get(recorded, recorded) != profile['id']:
@@ -156,10 +165,23 @@ def clone_app(app, destination):
 
 
 def closed(profile):
-    result = subprocess.run(['/usr/bin/pgrep', '-x', profile['executable']], capture_output=True)
+    executable = profile['executable']
+    pattern = executable[:15] if len(executable.encode('utf-8')) > 15 else executable
+    result = subprocess.run(['/usr/bin/pgrep', '-x', pattern], capture_output=True)
     require(result.returncode in (0, 1),
             f'Could not check whether {profile["game"]} is running: ' +
             result.stderr.decode(errors='replace').strip())
+    if result.returncode == 0 and pattern != executable:
+        pids = [pid for pid in result.stdout.decode(errors='replace').split() if pid.isdigit()]
+        if pids:
+            ps = subprocess.run(['/bin/ps', '-p', ','.join(pids), '-o', 'comm='], capture_output=True)
+            require(ps.returncode in (0, 1),
+                    f'Could not check whether {profile["game"]} is running: ' +
+                    ps.stderr.decode(errors='replace').strip())
+            running = any(Path(line.strip()).name == executable
+                          for line in ps.stdout.decode(errors='replace').splitlines() if line.strip())
+            require(not running, f'Quit {profile["game"]} before changing its files.')
+        return
     require(result.returncode == 1, f'Quit {profile["game"]} before changing its files.')
 
 
@@ -320,11 +342,8 @@ def applied_profile(app, info):
         state_path = local / 'state.json'
         if not state_path.exists():
             continue
-        try:
-            state = json.loads(state_path.read_text())
-        except (OSError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"Couldn't read saved patch information at {state_path}: {error}") from error
-        if not isinstance(state, dict) or state.get('app') != str(app):
+        state = read_state(state_path)
+        if state.get('app') != str(app):
             continue
         if state.get('status') in ('prepared', 'restoring'):
             changed.append((profile, state, local, state['status']))
@@ -341,7 +360,7 @@ def applied_profile(app, info):
                     changed.append((profile, state, local, 'changed'))
             else:
                 applied.append((profile, state, local, 'installed'))
-    matches = applied or changed
+    matches = applied + changed
     require(len(matches) <= 1,
             'More than one profile matches the game files. No changes were made; inspect the saved profile folders under .local before continuing.')
     return matches[0] if matches else None
@@ -421,6 +440,44 @@ def stage_framework(directory, app, profile, local):
     return framework
 
 
+def _apply_staged(app, state, profile, local, registry, owners, status_message=None):
+    BINARY, FRAMEWORK, MAIN = app_paths(profile)
+    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
+        staged = Path(tmp) / app.name
+        clone_app(app, staged)
+        framework = stage_framework(Path(tmp), app, profile, local)
+        replace_file(framework / Path(BINARY).name, staged / BINARY)
+        replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
+        staged_main = staged / MAIN
+        staged_main.write_bytes(bridge_registry.compose(registry, owners))
+        shutil.copystat(app / MAIN, staged_main)
+        replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
+        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
+        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
+        planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
+                   LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
+        backups.write_diff(local / 'original' / BINARY, original_framework(app, profile, local),
+                           [app / BINARY, staged / BINARY], profile['original_sha256'])
+        begin_change(state, profile, local, planned)
+        bridge_registry.begin(registry, owners, staged)
+        try:
+            if status_message:
+                print(status_message, flush=True)
+            replace_file(staged / BINARY, app / BINARY)
+            replace_file(staged / MAIN, app / MAIN)
+            replace_file(staged / LIBRARY, app / LIBRARY)
+            replace_all_signatures(staged, app)
+            state['profile'] = profile['id']
+            state['installed'] = {p: digest(app / p) for p in planned}
+            state['status'] = 'installed'
+            state.pop('recovery', None)
+            save_state(state, local)
+            bridge_registry.finish(registry, app)
+        except BaseException:
+            restore(app, state, profile, local)
+            raise
+
+
 def install(app, profile, local):
     BINARY, FRAMEWORK, MAIN = app_paths(profile)
     BACKUP = local / 'original'
@@ -472,11 +529,8 @@ def install(app, profile, local):
     if STATE.exists() or BACKUP.exists():
         require(STATE.is_file() and BACKUP.is_dir(),
                 'The saved backup is incomplete. Keep it and run status --verbose before changing the game.')
-        try:
-            saved = json.loads(STATE.read_text())
-        except (OSError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"Couldn't read saved patch information at {STATE}: {error}") from error
-        require(isinstance(saved, dict) and saved.get('app') == str(app) and
+        saved = read_state(STATE)
+        require(saved.get('app') == str(app) and
                 PROFILE_ALIASES.get(saved.get('profile'), saved.get('profile')) == profile['id'],
                 'The saved backup belongs to a different app or profile.')
         require(saved.get('status') in ('restored', 'installed'),
@@ -554,39 +608,8 @@ def install(app, profile, local):
             saved.rename(local)
     state = {'profile': profile['id'], 'app': str(app), 'original': original, 'installed': {}, 'status': 'restored'}
     save_state(state, local)
-    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
-        staged = Path(tmp) / app.name
-        clone_app(app, staged)
-        framework = stage_framework(Path(tmp), app, profile, local)
-        replace_file(framework / Path(BINARY).name, staged / BINARY)
-        replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
-        main = staged / MAIN
-        main.write_bytes(bridge_registry.compose(registry, owners))
-        shutil.copystat(app / MAIN, main)
-        replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
-        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
-        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
-        planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
-                   LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
-        backups.write_diff(BACKUP / BINARY, original_framework(app, profile, local),
-                           [app / BINARY, staged / BINARY], profile['original_sha256'])
-        begin_change(state, profile, local, planned)
-        bridge_registry.begin(registry, owners, staged)
-        try:
-            print('Installing the bridge and checking the app signature...', flush=True)
-            replace_file(staged / BINARY, app / BINARY)
-            replace_file(staged / MAIN, app / MAIN)
-            replace_file(staged / LIBRARY, app / LIBRARY)
-            replace_all_signatures(staged, app)
-            state['profile'] = profile['id']
-            state['installed'] = {p: digest(app / p) for p in planned}
-            state['status'] = 'installed'
-            state.pop('recovery', None)
-            save_state(state, local)
-            bridge_registry.finish(registry, app)
-        except BaseException:
-            restore(app, state, profile, local)
-            raise
+    _apply_staged(app, state, profile, local, registry, owners,
+                  'Installing the bridge and checking the app signature...')
     print(f'Done. The input bridge is installed for {profile["game"]} {profile["version"]}.')
     print('Native mouse capture is enabled. Option+M remains available as a fallback.')
 
@@ -626,38 +649,7 @@ def update(app, state, profile, local):
     require('native-input' in owners, 'The input bridge load command is missing. Run restore before updating.')
     build(profile)
     print('Updating the bridge and checking the app signature...', flush=True)
-    with tempfile.TemporaryDirectory(dir=app.parent) as tmp:
-        staged = Path(tmp) / app.name
-        clone_app(app, staged)
-        framework = stage_framework(Path(tmp), app, profile, local)
-        replace_file(framework / Path(BINARY).name, staged / BINARY)
-        replace_signature(framework / '_CodeSignature', staged / FRAMEWORK / '_CodeSignature')
-        staged_main = staged / MAIN
-        staged_main.write_bytes(bridge_registry.compose(registry, owners))
-        shutil.copystat(app / MAIN, staged_main)
-        replace_file(ROOT / 'build' / profile['id'] / 'NativeInputBridge.dylib', staged / LIBRARY)
-        run('/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements', str(staged))
-        run('/usr/bin/codesign', '--verify', '--strict', str(staged))
-        planned = {BINARY: digest(staged / BINARY), MAIN: digest(staged / MAIN),
-                   LIBRARY: digest(staged / LIBRARY), **signature_hashes(staged, profile)}
-        backups.write_diff(local / 'original' / BINARY, original_framework(app, profile, local),
-                           [app / BINARY, staged / BINARY], profile['original_sha256'])
-        begin_change(state, profile, local, planned)
-        bridge_registry.begin(registry, owners, staged)
-        try:
-            replace_file(staged / BINARY, app / BINARY)
-            replace_file(staged / MAIN, app / MAIN)
-            replace_file(staged / LIBRARY, app / LIBRARY)
-            replace_all_signatures(staged, app)
-            state['profile'] = profile['id']
-            state['installed'] = {p: digest(app / p) for p in planned}
-            state['status'] = 'installed'
-            state.pop('recovery', None)
-            save_state(state, local)
-            bridge_registry.finish(registry, app)
-        except BaseException:
-            restore(app, state, profile, local)
-            raise
+    _apply_staged(app, state, profile, local, registry, owners)
     print('Done. The input bridge is updated. Your original backup is unchanged.')
 
 
@@ -799,7 +791,7 @@ def main():
                     continue
                 record = local_directory(candidate) / 'state.json'
                 if record.exists():
-                    saved = json.loads(record.read_text())
+                    saved = read_state(record)
                     if saved.get('app') == str(app):
                         expected = saved.get('original', {}).get(profile['executable'])
                         if not expected or digest(app / profile['executable']) != expected:
@@ -836,10 +828,7 @@ def main():
         state_path = local / 'state.json'
         require(state_path.exists(),
                 f'No saved install was found for {profile_name(profile)}. Run status with --app to check which profile is active.')
-        try:
-            state = json.loads(state_path.read_text())
-        except (OSError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"Couldn't read saved patch information at {state_path}: {error}") from error
+        state = read_state(state_path)
         require(state.get('app') == str(app), 'The saved backup belongs to a different game app.')
         if args.command == 'restore':
             restore(app, state, profile, local)

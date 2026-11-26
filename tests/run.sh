@@ -51,3 +51,6 @@ done
 xcrun clang -I build/plugins -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
     -DGameNativeMenuButtons=1 tests/event-handler.m -o build/test-event-handler-native-menu
 build/test-event-handler-native-menu
+xcrun clang -I build/plugins -fobjc-arc -Wall -Wextra -Werror -framework AppKit \
+    -DGameLegacySupplement=1 -DGameNativeMenuButtons=1 tests/event-handler.m -o build/test-event-handler-supplement
+build/test-event-handler-supplement

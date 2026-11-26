@@ -65,7 +65,8 @@ static void BattleEnd(void *mode, void *method) {
         overlay.inBattle = NO;
         [overlay archiveBattle];
         NSDictionary *summary = overlay.battle.snapshot;
-        [overlay.server publish:@"OnBattleEnd" data:@{@"avatars": summary[@"lineup"], @"turn_history": summary[@"turn_history"], @"av_history": summary[@"av_history"], @"turn_count": summary[@"turn_count"], @"total_damage": summary[@"total_damage"], @"action_value": summary[@"action_value"], @"cycle": summary[@"cycle"], @"wave": summary[@"wave"], @"stage_id": summary[@"stage_id"]}];
+        if (!summary) return;
+        [overlay.server publish:@"OnBattleEnd" data:@{@"avatars": summary[@"lineup"] ?: @{}, @"turn_history": summary[@"turn_history"] ?: @[], @"av_history": summary[@"av_history"] ?: @[], @"turn_count": summary[@"turn_count"] ?: @0, @"total_damage": summary[@"total_damage"] ?: @0, @"action_value": summary[@"action_value"] ?: @0, @"cycle": summary[@"cycle"] ?: @0, @"wave": summary[@"wave"] ?: @0, @"stage_id": summary[@"stage_id"] ?: @0}];
         [overlay requestRender];
     });
 }
@@ -334,7 +335,7 @@ static void SetLineup(void *instance, void *configuration, void *lineup, int sta
             if (uid) {
                 [avatars addObject:@{@"id": @(uid), @"name": AvatarName(uid) ?: [@(uid) stringValue]}];
                 NSString *key = [NSString stringWithFormat:@"avatars/%u", uid];
-                NSData *png = VeritasCachedPortrait(key) ? nil : VeritasCaptureAvatar(unity, uid);
+                NSData *png = (!NSThread.isMainThread || VeritasCachedPortrait(key)) ? nil : VeritasCaptureAvatar(unity, uid);
                 if (png) portraits[key] = png;
             }
         }
@@ -344,10 +345,10 @@ static void SetLineup(void *instance, void *configuration, void *lineup, int sta
             if ([[avatars valueForKey:@"id"] containsObject:number]) continue;
             [avatars addObject:@{@"id": number, @"name": AvatarName(uid) ?: number.stringValue}];
             NSString *key = [NSString stringWithFormat:@"avatars/%u", uid];
-            NSData *png = VeritasCachedPortrait(key) ? nil : VeritasCaptureAvatar(unity, uid);
+            NSData *png = (!NSThread.isMainThread || VeritasCachedPortrait(key)) ? nil : VeritasCaptureAvatar(unity, uid);
             if (png) portraits[key] = png;
         }
-        NSData *hp = VeritasCachedPortrait(@"properties/BaseHP") ? nil : VeritasCapturePropertyIcon(unity, @"BaseHP");
+        NSData *hp = (!NSThread.isMainThread || VeritasCachedPortrait(@"properties/BaseHP")) ? nil : VeritasCapturePropertyIcon(unity, @"BaseHP");
         if (hp) portraits[@"properties/BaseHP"] = hp;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!extra) [overlay log:@"ExtraTeam reflection unavailable; additional characters will appear when initialized"];
@@ -418,7 +419,7 @@ static void EnemyInitialize(void *component, void *ability, void *method) {
         NSMutableDictionary *stats = [ReadStats(ability) mutableCopy]; stats[@"Level"] = @(levelFor(row));
         int64_t maxHP; memcpy(&maxHP, (const char *)component + VeritasEnemyDefaultHP, sizeof(maxHP));
         stats[@"MaxHP"] = @(VeritasFixPoint(maxHP));
-        NSData *png = VeritasCaptureEnemy(unity, row);
+        NSData *png = NSThread.isMainThread ? VeritasCaptureEnemy(unity, row) : nil;
         NSDictionary *enemy = @{@"id": @(templateID), @"uid": @(uid), @"name": name, @"base_stats": @{@"properties": stats}};
         dispatch_async(dispatch_get_main_queue(), ^{ if (displayedBattle == battle) { [overlay.battle initializeEnemy:enemy]; if (png) VeritasCachePortrait([NSString stringWithFormat:@"enemies/%u", templateID], png); [overlay requestRender]; } });
     }

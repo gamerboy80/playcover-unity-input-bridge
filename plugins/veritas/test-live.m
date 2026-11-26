@@ -83,5 +83,13 @@ int main(void) {
         [prefs setVolatileDomain:@{} forName:NSArgumentDomain];
         [battle reset]; assert(battle.total == 0 && [battle.series[@"skills"] count] == 0);
         assert([saved[@"total_damage"] isEqual:@100]);
+        NSDictionary *partial = @{@"avatars": @{@"99": @40}, @"names": @{},
+            @"skills": @[@{@"total_damage": @15}],
+            @"lineup": @[@{@"id": @99}],
+            @"entities": @{@"Player:99": @{@"stats_history": @[@{}]}},
+            @"enemies": @{@"7": @{@"id": @10}}};
+        assert([VeritasChartData(partial) count] == 2);
+        assert([VeritasCSV(partial) containsString:@"\"0\",\"\""]);
+        assert([NSJSONSerialization isValidJSONObject:VeritasExportData(partial)]);
     }
 }

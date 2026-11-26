@@ -108,3 +108,18 @@
     if (self.updatePanels) self.updatePanels(self.view.safeAreaLayoutGuide.layoutFrame);
 }
 @end
+
+@interface VeritasPassthroughWindow : UIWindow
+@property(nonatomic) BOOL editing;
+@end
+
+@implementation VeritasPassthroughWindow
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = [super hitTest:point withEvent:event];
+    if (self.rootViewController.presentedViewController) return hit;
+    for (UIView *view = hit; view; view = view.superview) {
+        if (self.editing ? [view isKindOfClass:VeritasPanel.class] : [view isKindOfClass:UIControl.class]) return hit;
+    }
+    return nil;
+}
+@end

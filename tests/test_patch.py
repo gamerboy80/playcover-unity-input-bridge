@@ -361,6 +361,56 @@ class PatchTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'arm64'):
             module.link_library(source)
 
+    def test_corrupt_state_raises_readable_error(self):
+        profile = load_profile()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(module, 'ROOT', Path(tmp)):
+            state_dir = Path(tmp) / '.local' / profile['id']
+            state_dir.mkdir(parents=True)
+            state_path = state_dir / 'state.json'
+            state_path.write_text('{not valid json')
+            with self.assertRaisesRegex(RuntimeError, "Couldn't read saved patch information"):
+                module.local_directory(profile)
+            state_path.write_text('[]')
+            with self.assertRaisesRegex(RuntimeError, 'unexpected format'):
+                module.local_directory(profile)
+
+    def test_applied_profile_rejects_installed_plus_changed_conflict(self):
+        primary = load_profile('zzz')
+        secondary = load_profile('zzz-test')
+        with tempfile.TemporaryDirectory() as tmp, patch.object(module, 'ROOT', Path(tmp)), \
+                patch.object(module, 'profile_paths', return_value=[
+                    ROOT / 'profiles' / f"{primary['id']}.json",
+                    ROOT / 'profiles' / f"{secondary['id']}.json",
+                ]):
+            app, _ = self.fake_app(Path(tmp), primary)
+            _, _, main = module.app_paths(primary)
+            (app / main).write_bytes(module.link_library(bytearray((app / main).read_bytes())))
+            (app / module.LIBRARY).write_bytes(b'input bridge')
+            module.bridge_registry.load(app, primary['bundle_id'], primary['version'], main)
+            primary_dir = Path(tmp) / '.local' / primary['id']
+            primary_dir.mkdir(parents=True)
+            primary_state = {
+                'profile': primary['id'],
+                'app': str(app),
+                'status': 'installed',
+                'installed': {**module.signature_hashes(app, primary),
+                              main: module.digest(app / main),
+                              module.LIBRARY: module.digest(app / module.LIBRARY)},
+                'original': {primary['framework_binary']: primary['original_sha256']},
+            }
+            (primary_dir / 'state.json').write_text(json.dumps(primary_state))
+            secondary_dir = Path(tmp) / '.local' / secondary['id']
+            secondary_dir.mkdir(parents=True)
+            (secondary_dir / 'state.json').write_text(json.dumps({
+                'profile': secondary['id'],
+                'app': str(app),
+                'status': 'prepared',
+                'original': {secondary['framework_binary']: secondary['original_sha256']},
+            }))
+            info = plistlib.loads((app / 'Info.plist').read_bytes())
+            with self.assertRaisesRegex(RuntimeError, 'More than one profile matches'):
+                module.applied_profile(app, info)
+
 
 if __name__ == '__main__':
     unittest.main()

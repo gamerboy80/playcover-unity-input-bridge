@@ -83,17 +83,9 @@ static UIColor *ZZZChartColor(NSUInteger index) {
 }
 @end
 
-@interface ZZZDashboardWindow : UIWindow
-@property(nonatomic) BOOL editing;
+@interface ZZZDashboardWindow : VeritasPassthroughWindow
 @end
 @implementation ZZZDashboardWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hit = [super hitTest:point withEvent:event];
-    if (self.rootViewController.presentedViewController) return hit;
-    for (UIView *view = hit; view; view = view.superview)
-        if (self.editing ? [view isKindOfClass:VeritasPanel.class] : [view isKindOfClass:UIControl.class]) return hit;
-    return nil;
-}
 @end
 
 @interface ZZZDashboard : NSObject
@@ -143,9 +135,14 @@ static UIColor *ZZZChartColor(NSUInteger index) {
 }
 - (void)share:(BOOL)csv {
     NSDictionary *snapshot = self.selected ?: self.live;
-    if (!snapshot) return;
+    if (!snapshot || self.window.rootViewController.presentedViewController) return;
     NSError *error = nil;
     NSURL *file = ZZZWriteSummary(snapshot, csv, &error);
+    if (!self.editing) {
+        if (file) NSLog(@"[ZZZDamage] Exported summary: %@", file.path);
+        else NSLog(@"[ZZZDamage] Export failed: %@", error);
+        return;
+    }
     UIViewController *controller;
     if (file) {
         controller = [[UIActivityViewController alloc] initWithActivityItems:@[file] applicationActivities:nil];

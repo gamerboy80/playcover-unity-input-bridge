@@ -109,8 +109,11 @@ static id handleEvent(ZZZHostEvent *event) {
     float scaleX=width/bounds.size.width, scaleY=height/bounds.size.height;
     // Precise gesture events can carry a stale location; use the actual window cursor.
     CGPoint point=type==22 ? [window mouseLocationOutsideOfEventStream] : event.locationInWindow;
-    mouseState.x=captured ? width*.5f : point.x*scaleX;
-    mouseState.y=captured ? height*.5f : point.y*scaleY;
+    if ([view respondsToSelector:@selector(convertPoint:fromView:)]) {
+        point=[view convertPoint:point fromView:nil];
+    }
+    mouseState.x=captured ? width*.5f : (float)((point.x-bounds.origin.x)*scaleX);
+    mouseState.y=captured ? height*.5f : (float)((point.y-bounds.origin.y)*scaleY);
     if (motion) {
         // Focus/cursor repositioning can be included in the first relative delta.
         if (captured && !captureMotionReady(&discardFirstMotion,
@@ -147,7 +150,12 @@ static id handleEvent(ZZZHostEvent *event) {
         if (button>=0 && button<5) {
             BOOL down=(type==1 || type==3 || type==25);
             mouseState.buttons=(uint16_t)((mouseState.buttons&~(1u<<button)) | (down<<button));
-            mouseState.clicks=down ? 1 : 0;
+            if (down) {
+                NSInteger clicks=[event respondsToSelector:@selector(clickCount)] ? [event clickCount] : 1;
+                mouseState.clicks=(uint16_t)(clicks>0 ? (clicks>UINT16_MAX ? UINT16_MAX : clicks) : 1);
+            } else {
+                mouseState.clicks=0;
+            }
         }
     }
     sendMouse();

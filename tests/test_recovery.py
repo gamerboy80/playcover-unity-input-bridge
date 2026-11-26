@@ -501,3 +501,22 @@ class ProcessCheckTests(unittest.TestCase):
                 module.closed(load_profile())
             run.return_value = subprocess.CompletedProcess([], 1, b'', b'')
             module.closed(load_profile())
+
+    def test_long_executable_name_matches_basename(self):
+        profile = dict(load_profile(), executable='ZenlessZoneZeroBeta')
+        with patch.object(module.subprocess, 'run') as run:
+            run.side_effect = [
+                subprocess.CompletedProcess([], 0, b'101 102\n', b''),
+                subprocess.CompletedProcess([], 0, b'/Applications/Other.app/ZenlessZoneZeroOther\n', b''),
+            ]
+            module.closed(profile)
+            self.assertEqual(run.call_args_list[0].args[0], ['/usr/bin/pgrep', '-x', 'ZenlessZoneZero'])
+            self.assertEqual(run.call_args_list[1].args[0], ['/bin/ps', '-p', '101,102', '-o', 'comm='])
+
+            run.reset_mock()
+            run.side_effect = [
+                subprocess.CompletedProcess([], 0, b'205\n', b''),
+                subprocess.CompletedProcess([], 0, b'/Applications/ZZZ.app/ZenlessZoneZeroBeta\n', b''),
+            ]
+            with self.assertRaisesRegex(RuntimeError, 'Quit'):
+                module.closed(profile)

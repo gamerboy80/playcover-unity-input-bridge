@@ -14,6 +14,7 @@
 #include "Capture.h"
 #include "EventRouting.h"
 #include "TextInput.h"
+#include "KeyMap.h"
 #include "PointerLock.h"
 #include "Profile.h"
 
@@ -25,6 +26,7 @@
 @property(readonly) NSUInteger modifierFlags;
 @property(readonly) BOOL isARepeat;
 @property(readonly) NSInteger buttonNumber;
+@property(readonly) NSInteger clickCount;
 @property(readonly) double deltaX;
 @property(readonly) double deltaY;
 @property(readonly) double scrollingDeltaX;
@@ -47,6 +49,7 @@
 - (CGPoint)convertPointToScreen:(CGPoint)point;
 @property(readonly) id keyWindow;
 @property(readonly) id mainWindow;
+@property(readonly, copy) NSArray *windows;
 @property(readonly) BOOL isActive;
 + (id)sharedApplication;
 + (void)hide;
@@ -138,6 +141,8 @@ static void traceScroll(void) {
 
 #endif
 
+enum { BridgeCGWindowUnderPointer = 91, BridgeCGWindowUnderPointerTarget = 92 };
+
 static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     if (!event.hasPreciseScrollingDeltas) return bindNativeWheelToWindow(event, window);
     if (!createCGWheel || !setCGInteger || !getCGLocation || !setCGLocation || !event.CGEvent) return event;
@@ -145,8 +150,8 @@ static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     if (!copy) return event;
     setCGLocation(copy, getCGLocation(event.CGEvent));
     if (window) {
-        setCGInteger(copy, 91, [window windowNumber]);
-        setCGInteger(copy, 92, [window windowNumber]);
+        setCGInteger(copy, BridgeCGWindowUnderPointer, [window windowNumber]);
+        setCGInteger(copy, BridgeCGWindowUnderPointerTarget, [window windowNumber]);
     }
     id wheel=[(id)NSClassFromString(@"NSEvent") eventWithCGEvent:copy];
     CFRelease(copy);
@@ -154,28 +159,6 @@ static id nativeWheelEvent(ZZZHostEvent *event, id window, float x, float y) {
     wheel=bindNativeWheelToWindow(wheel, window);
     if (wheel && !sawNativeWheel) { sawNativeWheel=YES; note("Trackpad threshold emitted a native wheel event"); }
     return wheel ?: event;
-}
-
-// macOS virtual keycodes -> the unity-input-system-v1 backend's Unity Key enum.
-static unsigned unityKey(unsigned code) {
-    static const uint8_t map[128] = {
-        [0]=15,[1]=33,[2]=18,[3]=20,[4]=22,[5]=21,[6]=40,[7]=38,
-        [8]=17,[9]=36,[11]=16,[12]=31,[13]=37,[14]=19,[15]=32,
-        [16]=39,[17]=34,[18]=41,[19]=42,[20]=43,[21]=44,[22]=46,
-        [23]=45,[24]=14,[25]=49,[26]=47,[27]=13,[28]=48,[29]=50,
-        [30]=12,[31]=29,[32]=35,[33]=11,[34]=23,[35]=30,[36]=2,
-        [37]=26,[38]=24,[39]=5,[40]=25,[41]=6,[42]=10,[43]=7,
-        [44]=9,[45]=28,[46]=27,[47]=8,[48]=3,[49]=1,[50]=4,[51]=65,
-        [53]=60,[55]=57,[54]=58,[56]=51,[60]=52,[58]=53,[61]=54,
-        [59]=55,[62]=56,[57]=72,[65]=82,[67]=79,[69]=80,[71]=73,
-        [75]=78,[76]=77,[78]=81,[81]=83,[82]=84,[83]=85,[84]=86,
-        [85]=87,[86]=88,[87]=89,[88]=90,[89]=91,[91]=92,[92]=93,
-        [122]=94,[120]=95,[99]=96,[118]=97,[96]=98,[97]=99,
-        [98]=100,[100]=101,[101]=102,[109]=103,[103]=104,[111]=105,
-        [115]=68,[119]=69,[116]=67,[121]=66,[117]=71,[114]=70,
-        [123]=61,[124]=62,[125]=64,[126]=63
-    };
-    return code < sizeof(map) ? map[code] : 0;
 }
 
 #if GameLegacyBackend || GameLegacySupplement
@@ -274,13 +257,11 @@ static void setCapture(BOOL value) {
     }
     if (!value && associateCursor) associateCursor(1);
     captured = value;
-#if GameNativeMenuButtons
     if (!captured && mouseState.buttons) {
         mouseState.buttons=0;
         mouseState.clicks=0;
         sendMouse();
     }
-#endif
     if (value) {
         ignoreMotionUntil=NSProcessInfo.processInfo.systemUptime+.1;
         discardFirstMotion=YES;
@@ -318,16 +299,32 @@ static void traceLegacy(void) {
 }
 #endif
 
+static id findGameWindow(id hostApp) {
+    Class uinsWindow = NSClassFromString(@"UINSWindow");
+    id candidate = [hostApp mainWindow] ?: [hostApp keyWindow];
+    if (uinsWindow && candidate && [candidate isKindOfClass:uinsWindow]) return candidate;
+    if (uinsWindow) {
+        for (id window in [hostApp windows]) {
+            if ([window isKindOfClass:uinsWindow]) return window;
+        }
+    }
+    return candidate;
+}
+
 static void initializeDevices(void) {
     static BOOL pointerLockChecked;
-    Class controller=NSClassFromString(@"IOSViewController");
-    if (!pointerLockChecked && controller) {
-        pointerLockChecked=YES;
-        if (restoreNativePointerLock(controller)) note("Restored native pointer lock around the PlayTools override");
-        else note("Native pointer lock: no recognized PlayTools override to restore");
+    static Class appClass;
+    if (!pointerLockChecked) {
+        Class controller=NSClassFromString(@"IOSViewController");
+        if (controller) {
+            pointerLockChecked=YES;
+            if (restoreNativePointerLock(controller)) note("Restored native pointer lock around the PlayTools override");
+            else note("Native pointer lock: no recognized PlayTools override to restore");
+        }
     }
-    id hostApp=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-    if (!gameWindow) gameWindow=[hostApp mainWindow];
+    if (!appClass) appClass=NSClassFromString(@"NSApplication");
+    id hostApp=[appClass sharedApplication];
+    if (!gameWindow) gameWindow=findGameWindow(hostApp);
     if (!slide) {
         for (uint32_t i=0;i<_dyld_image_count();i++) {
             const char *name=_dyld_get_image_name(i);
@@ -418,8 +415,7 @@ static void initializeDevices(void) {
 #if GameLegacyBackend || GameLegacySupplement
     traceLegacy();
 #endif
-    id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-    BOOL active=[app isActive] && [app keyWindow]==gameWindow &&
+    BOOL active=[hostApp isActive] && [hostApp keyWindow]==gameWindow &&
         routeGameEvent(gameWindow,gameWindow) && !editingGameText();
     if (!active && (wasActive || captured || forcedCapture)) releaseInput();
     double now=NSProcessInfo.processInfo.systemUptime;

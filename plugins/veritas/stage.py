@@ -42,21 +42,52 @@ def validate_prologue(expected):
         require(pair_store_sp or subtract_sp or frame_pointer, 'Detour prologue is not relocatable stack setup')
 
 
+def build_detour(entry, expected, index, code, slots):
+    require(entry % 4 == 0 and code % 4 == 0 and slots % 8 == 0 and len(expected) == 12,
+            'Unaligned or unsupported detour')
+    validate_prologue(expected)
+    stub, slot = code + index * 48, slots + index * 8
+    original = stub + 20
+    entry_jump = address_in_x16(entry, stub) + words(0xd61f0200)
+    # LDAR pairs with the plugin's release store. A missing plugin runs the original.
+    stub_code = (address_in_x16(stub, slot) +
+                 words(0xc8dffe10, 0xb4000050, 0xd61f0200) +
+                 expected + address_in_x16(original + len(expected), entry + len(expected)) +
+                 words(0xd61f0200))
+    return entry_jump, stub, slot, original, stub_code
+
+
+def apply_detours(data, image, entries):
+    reserved, edits = [], []
+    for name, entry, expected, jump, stub, slot, stub_code in entries:
+        require(entry in image.function_set and len(image.body(entry)) >= len(expected),
+                f'{name} is no longer a function entry')
+        for address, length in ((entry, len(jump)), (stub, len(stub_code)), (slot, 8)):
+            require(all(address + length <= start or start + size <= address for start, size in reserved),
+                    'Overlapping detours')
+            reserved.append((address, length))
+        require(any(segment == '__DATA' and vm + stored <= slot and slot + 8 <= vm + size
+                    for segment, vm, size, _, stored in image.segments),
+                f'{name} callback is outside zero-filled writable storage')
+        for segment, address, length in (('__TEXT', stub, len(stub_code)), ('__DATA', slot, 8)):
+            require(all(s != segment or address + length <= start or start + size <= address
+                        for (s, _), (start, size, _) in image.sections.items()),
+                    f'{name} detour overlaps a game section')
+        source = image.file(entry, len(expected), '__TEXT')
+        target = image.file(stub, len(stub_code), '__TEXT')
+        require(data[source:source + len(expected)] == expected, f'{name} entry changed')
+        require(not any(data[target:target + len(stub_code)]), f'{name} stub padding is in use')
+        edits.extend(((source, jump), (target, stub_code)))
+    for offset, replacement in edits:
+        data[offset:offset + len(replacement)] = replacement
+
+
 def detours(profile=PROFILE):
     code = int(profile['code_padding'], 16)
     slots = int(profile['data_padding'], 16)
     for index, (name, (entry, expected)) in enumerate(profile['entries'].items()):
         entry, expected = int(entry, 16), bytes.fromhex(expected)
-        require(entry % 4 == 0 and code % 4 == 0 and slots % 8 == 0 and len(expected) == 12, "Unaligned or unsupported detour")
-        validate_prologue(expected)
-        stub, slot = code + index * 48, slots + index * 8
-        original = stub + 20
-        entry_jump = address_in_x16(entry, stub) + words(0xd61f0200)
-        # LDAR pairs with the plugin's release store. A missing plugin runs the original.
-        stub_code = (address_in_x16(stub, slot) +
-                     words(0xc8dffe10, 0xb4000050, 0xd61f0200) +
-                     expected + address_in_x16(original + len(expected), entry + len(expected)) +
-                     words(0xd61f0200))
+        entry_jump, stub, slot, original, stub_code = build_detour(entry, expected, index, code, slots)
         yield name, entry, expected, entry_jump, stub, slot, original, stub_code
 
 
@@ -96,26 +127,10 @@ def instrument(binary, profile=PROFILE):
     data = bytearray(binary)
     image = Image(data)
     require(next(vm for name, vm, _, _, _ in image.segments if name == "__TEXT") == 0, "Unexpected preferred image base")
-    reserved, edits = [], []
-    for name, entry, expected, jump, stub, slot, _, stub_code in detours(profile):
-        require(entry in image.function_set and len(image.body(entry)) >= len(expected), f'{name} is no longer a function entry')
-        for address, length in [(entry, len(jump)), (stub, len(stub_code)), (slot, 8)]:
-            require(all(address + length <= start or start + size <= address for start, size in reserved), 'Overlapping detours')
-            reserved.append((address, length))
-        require(any(segment == '__DATA' and vm + stored <= slot and slot + 8 <= vm + size
-                    for segment, vm, size, _, stored in image.segments),
-                f'{name} callback is outside zero-filled writable storage')
-        for segment, address, length in (('__TEXT', stub, len(stub_code)), ('__DATA', slot, 8)):
-            require(all(s != segment or address + length <= start or start + size <= address
-                        for (s, _), (start, size, _) in image.sections.items()),
-                    f'{name} detour overlaps a game section')
-        source = image.file(entry, len(expected), '__TEXT')
-        target = image.file(stub, len(stub_code), '__TEXT')
-        require(data[source:source + len(expected)] == expected, f'{name} entry changed')
-        require(not any(data[target:target + len(stub_code)]), f'{name} stub padding is in use')
-        edits.extend([(source, jump), (target, stub_code)])
-    for offset, replacement in edits:
-        data[offset:offset + len(replacement)] = replacement
+    apply_detours(data, image, (
+        (name, entry, expected, jump, stub, slot, stub_code)
+        for name, entry, expected, jump, stub, slot, _, stub_code in detours(profile)
+    ))
     return data
 
 

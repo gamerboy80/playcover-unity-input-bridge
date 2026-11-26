@@ -11,13 +11,17 @@
 @property NSUInteger type, modifierFlags, phase, momentumPhase;
 @property unsigned short keyCode;
 @property BOOL isARepeat, hasPreciseScrollingDeltas;
-@property NSInteger buttonNumber;
+@property NSInteger buttonNumber, clickCount;
 @property double deltaX, deltaY, scrollingDeltaX, scrollingDeltaY;
-@property CGPoint locationInWindow, mouseLocationOutsideOfEventStream;
+@property CGPoint locationInWindow, mouseLocationOutsideOfEventStream, convertOffset;
 @property CGRect bounds;
 @property id window, contentView, firstResponder;
 @end
 @implementation ZZZHostEvent
+- (CGPoint)convertPoint:(CGPoint)point fromView:(id)view {
+    (void)view;
+    return CGPointMake(point.x - self.convertOffset.x, point.y - self.convertOffset.y);
+}
 @end
 
 static BOOL ready=YES, captured, forcedCapture, editing;
@@ -212,6 +216,22 @@ int main(void) {
             assert(handleEvent(key)==nil && (keys[37/8]&(1u<<(37%8))));
             key.type=11;
             assert(handleEvent(key)==nil && keys[37/8]==0);
+
+            // Sub-view bounds origin and clickCount must be preserved across coordinate mapping and button transitions.
+            view.bounds=CGRectMake(5,10,400,300);
+            view.convertOffset=CGPointMake(10,20);
+            ZZZHostEvent *move=[ZZZHostEvent new];
+            move.window=window; move.type=5; move.locationInWindow=CGPointMake(215,180);
+            assert(handleEvent(move)==move && mouseState.x==400 && mouseState.y==300);
+            captured=YES;
+            ZZZHostEvent *click=[ZZZHostEvent new];
+            click.window=window; click.type=1; click.buttonNumber=0; click.clickCount=2;
+            assert(handleEvent(click)==nil && mouseState.buttons==1 && mouseState.clicks==2);
+            click.type=2; click.clickCount=1;
+            assert(handleEvent(click)==nil && mouseState.buttons==0 && mouseState.clicks==0);
+            captured=forcedCapture=NO;
+            view.bounds=CGRectMake(0,0,400,300);
+            view.convertOffset=CGPointZero;
 
             puts("Event handler checks passed");
             exit(0);

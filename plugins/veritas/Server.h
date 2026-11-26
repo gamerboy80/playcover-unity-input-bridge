@@ -218,7 +218,13 @@ static inline NSString *VeritasJSON(id object) {
             if (colon.location != NSNotFound) headers[[[line substringToIndex:colon.location] lowercaseString]] =
                 [[line substringFromIndex:colon.location + 1] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
         }
-        NSInteger length = [headers[@"content-length"] integerValue];
+        NSString *lengthHeader = headers[@"content-length"];
+        NSCharacterSet *nonDigits = [NSCharacterSet characterSetWithCharactersInString:@"0123456789"].invertedSet;
+        if (lengthHeader && (!lengthHeader.length || [lengthHeader rangeOfCharacterFromSet:nonDigits].location != NSNotFound)) {
+            VeritasSendBytes(socket, [@"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+            close(socket); return;
+        }
+        NSInteger length = lengthHeader ? [lengthHeader integerValue] : 0;
         if (length < 0 || length > 65536) { close(socket); return; }
         NSUInteger bodyStart = NSMaxRange(separator);
         while (request.length < bodyStart + (NSUInteger)length) {
@@ -226,7 +232,11 @@ static inline NSString *VeritasJSON(id object) {
             if (count <= 0) { close(socket); return; }
             [request appendBytes:buffer length:(NSUInteger)count];
         }
-        NSString *body = [[NSString alloc] initWithData:[request subdataWithRange:NSMakeRange(bodyStart, (NSUInteger)length)] encoding:NSUTF8StringEncoding];
+        NSString *body = length ? [[NSString alloc] initWithData:[request subdataWithRange:NSMakeRange(bodyStart, (NSUInteger)length)] encoding:NSUTF8StringEncoding] : @"";
+        if (!body) {
+            VeritasSendBytes(socket, [@"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+            close(socket); return;
+        }
         NSURLComponents *url = [NSURLComponents componentsWithString:[@"http://localhost" stringByAppendingString:first[1]]];
         NSMutableDictionary *query = [NSMutableDictionary dictionary];
         for (NSURLQueryItem *item in url.queryItems) if (item.value) query[item.name] = item.value;

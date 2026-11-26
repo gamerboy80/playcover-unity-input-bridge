@@ -12,4 +12,7 @@ int main(void) { @autoreleasepool {
     NSMutableDictionary *zero = [data mutableCopy]; zero[@"seconds"] = @0; zero[@"total"] = @0;
     NSString *zeroCSV = ZZZSummaryCSV(zero);
     assert(![zeroCSV containsString:@"nan"] && ![zeroCSV containsString:@"inf"]);
+    assert([ZZZCSVCell(nil) isEqual:@"\"\""] && [ZZZCSVCell(NSNull.null) isEqual:@"\"\""]);
+    NSString *partialCSV = ZZZSummaryCSV(@{@"sources": @[@{@"damage": @12}]});
+    assert([partialCSV containsString:@"\"0\",\"0\",\"\",\"12\",\"0\",\"0\",\"0\",\"0\""]);
 } return 0; }
