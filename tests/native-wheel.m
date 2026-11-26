@@ -13,6 +13,28 @@
 @end
 @implementation RoutingWindow
 @end
+
+@interface ClientTextView : NSView <NSTextInputClient>
+@end
+@implementation ClientTextView
+- (void)insertText:(id)string replacementRange:(NSRange)replacementRange { (void)string; (void)replacementRange; }
+- (void)doCommandBySelector:(SEL)selector { (void)selector; }
+- (void)setMarkedText:(id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
+    (void)string; (void)selectedRange; (void)replacementRange;
+}
+- (void)unmarkText {}
+- (NSRange)selectedRange { return NSMakeRange(NSNotFound, 0); }
+- (NSRange)markedRange { return NSMakeRange(NSNotFound, 0); }
+- (BOOL)hasMarkedText { return NO; }
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range actualRange:(NSRangePointer)actualRange {
+    (void)range; (void)actualRange; return nil;
+}
+- (NSArray<NSAttributedStringKey> *)validAttributesForMarkedText { return @[]; }
+- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(NSRangePointer)actualRange {
+    (void)range; (void)actualRange; return NSZeroRect;
+}
+- (NSUInteger)characterIndexForPoint:(NSPoint)point { (void)point; return 0; }
+@end
 @implementation WheelTestView
 - (void)scrollWheel:(NSEvent *)event {
     assert(!event.hasPreciseScrollingDeltas);
@@ -32,6 +54,20 @@ int main(void) {
         assert(!routeGameEvent(panel,game));
         assert(!routeGameEvent(game,nil));
         game.firstResponder=[NSTextField new];
+        assert(!routeGameEvent(game,game));
+        game.firstResponder=[NSTextField labelWithString:@"label"];
+        assert(routeGameEvent(game,game));
+        NSTextField *disabled=[NSTextField new]; disabled.enabled=NO;
+        game.firstResponder=disabled;
+        assert(routeGameEvent(game,game));
+        game.firstResponder=[NSSearchField new];
+        assert(!routeGameEvent(game,game));
+        NSTextView *textView=[NSTextView new];
+        game.firstResponder=textView;
+        assert(!routeGameEvent(game,game));
+        textView.editable=NO;
+        assert(routeGameEvent(game,game));
+        game.firstResponder=[ClientTextView new];
         assert(!routeGameEvent(game,game));
         unsigned owned=0;
         balanceCursorHide(&owned,true,true,testHide,testUnhide);

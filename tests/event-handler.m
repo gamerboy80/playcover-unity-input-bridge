@@ -165,6 +165,54 @@ int main(void) {
         dispatch_async(dispatch_get_main_queue(), ^{
             assert(mouseWrites==before+1 && deliveredScroll==120);
             assert(queuedScrolls==1 && wheelEvents==1 && nativeDispatches==1);
+
+            // Editing text must pass scroll, mouse clicks/motion and orphaned keyUp cleanly.
+            unsigned kbBefore=keyboardWrites, mouseBefore=mouseWrites;
+            unsigned wheelBefore=wheelEvents, preciseBefore=preciseEvents;
+            unsigned stepsBefore=emittedSteps, queuedBefore=queuedScrolls;
+            editing=YES; captured=forcedCapture=YES;
+            mouseState.buttons=1; mouseState.clicks=1;
+            scrollRemainderX=scrollRemainderY=6;
+            scroll.phase=0; scroll.momentumPhase=1; scroll.scrollingDeltaY=32;
+            assert(handleEvent(scroll)==scroll);
+            assert(!captured && !forcedCapture && mouseState.buttons==0 && mouseState.clicks==0);
+            assert(scrollRemainderX==0 && scrollRemainderY==0);
+            assert(mouseWrites==mouseBefore+1);
+            scroll.momentumPhase=0; scroll.scrollingDeltaY=8;
+            assert(handleEvent(scroll)==scroll);
+            scroll.hasPreciseScrollingDeltas=NO; scroll.scrollingDeltaY=2;
+            assert(handleEvent(scroll)==scroll);
+            assert(wheelEvents==wheelBefore && preciseEvents==preciseBefore);
+            assert(emittedSteps==stepsBefore && queuedScrolls==queuedBefore);
+            assert(mouseWrites==mouseBefore+1);
+
+            ZZZHostEvent *drag=[ZZZHostEvent new];
+            drag.window=window; drag.type=1;
+            captured=YES;
+            assert(handleEvent(drag)==drag && !captured && mouseWrites==mouseBefore+1);
+            drag.type=5; drag.deltaX=12;
+            assert(handleEvent(drag)==drag && mouseWrites==mouseBefore+1);
+            drag.type=2;
+            assert(handleEvent(drag)==drag && mouseWrites==mouseBefore+1);
+
+            // Submitting or closing a text box on keyDown must not swallow its matching keyUp.
+            kbBefore=keyboardWrites;
+            key.modifierFlags=0; key.keyCode=13; key.type=10;
+            assert(handleEvent(key)==key && keys[37/8]==0);
+            editing=NO;
+            key.type=11;
+            assert(handleEvent(key)==key && keys[37/8]==0 && keyboardWrites==kbBefore);
+            // Releasing Command before releasing the modified key must also deliver keyUp.
+            key.type=10; key.modifierFlags=1u<<20;
+            assert(handleEvent(key)==key && keys[37/8]==0);
+            key.type=11; key.modifierFlags=0;
+            assert(handleEvent(key)==key && keys[37/8]==0 && keyboardWrites==kbBefore);
+            // Normal gameplay resumes on the next keyDown.
+            key.type=10;
+            assert(handleEvent(key)==nil && (keys[37/8]&(1u<<(37%8))));
+            key.type=11;
+            assert(handleEvent(key)==nil && keys[37/8]==0);
+
             puts("Event handler checks passed");
             exit(0);
         });

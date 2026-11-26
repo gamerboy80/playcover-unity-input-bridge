@@ -44,11 +44,17 @@ the event handler releases held game input and forwards native key events.
 A Catalyst regression test reproduces the old miss with a nested custom text
 responder and checks empty fields, focus loss, ordinary game views and standard
 text controls. Event-handler tests cover key down/up/modifier forwarding and
-resuming gameplay. Static Objective-C metadata in the reviewed 3.3.1 framework
-shows neither `UnityView` nor its `UnityRenderingView` superclass adopts a
-text-input protocol. No game addresses or byte patches change. The reported
-login verification screen and bottom black bar still need a physical retest;
-the tests do not establish the bar's origin or live login behavior.
+resuming gameplay. Follow-up checks also pass scroll, mouse clicks and drags
+through while editing UIKit text, preserve matching `keyUp` delivery when
+closing a text box or releasing Command, ignore read-only text views/labels,
+disabled controls and hidden/inactive scenes, inspect visible non-key overlay
+windows and non-view `UIResponder`s, and recognize non-Catalyst AppKit
+`NSTextInputClient`/`NSTextInput` responders. Static Objective-C metadata in the
+reviewed 3.3.1 framework shows neither `UnityView` nor its `UnityRenderingView`
+superclass adopts a text-input protocol. No game addresses or byte patches
+change. The reported login verification screen and bottom black bar still need a
+physical retest; the tests do not establish the bar's origin or live login
+behavior.
 
 ### Keyboard binding settings
 

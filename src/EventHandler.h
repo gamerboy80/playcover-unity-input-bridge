@@ -1,13 +1,44 @@
 // Shared event handling; included after the host and backend callbacks.
 #pragma once
 
+static uint8_t nativeKeys[32];
+
+static void setNativeKey(unsigned code, BOOL down) {
+    if (code >= sizeof(nativeKeys) * 8) return;
+    nativeKeys[code / 8] = (uint8_t)((nativeKeys[code / 8] & ~(1u << (code % 8))) | (down << (code % 8)));
+}
+
+static BOOL takeNativeKey(unsigned code) {
+    if (code >= sizeof(nativeKeys) * 8) return NO;
+    uint8_t mask = (uint8_t)(1u << (code % 8));
+    if (!(nativeKeys[code / 8] & mask)) return NO;
+    nativeKeys[code / 8] &= (uint8_t)~mask;
+    return YES;
+}
+
 static void releaseInput(void) {
+    BOOL hadKeys = NO;
+    for (size_t i = 0; i < sizeof(keys); i++) {
+        if (keys[i]) { hadKeys = YES; break; }
+    }
+    BOOL hadMouse = mouseState.buttons != 0 || mouseState.clicks != 0 ||
+        mouseState.dx != 0 || mouseState.dy != 0 || mouseState.sx != 0 || mouseState.sy != 0;
     memset(keys, 0, sizeof(keys));
     mouseState.buttons = 0;
+    mouseState.clicks = 0;
+    mouseState.dx = mouseState.dy = mouseState.sx = mouseState.sy = 0;
     scrollRemainderX = scrollRemainderY = 0;
-    sendKeyboard(); sendMouse();
+    if (hadKeys) sendKeyboard();
+    if (hadMouse) sendMouse();
     forcedCapture = NO;
     setCapture(NO);
+}
+
+static id forwardNativeEvent(ZZZHostEvent *event, NSUInteger type) {
+    releaseInput();
+    if (type == 10) setNativeKey(event.keyCode, YES);
+    else if (type == 11) setNativeKey(event.keyCode, NO);
+    return event;
 }
 
 static void updateModifiers(NSUInteger flags) {
@@ -25,6 +56,14 @@ static id handleEvent(ZZZHostEvent *event) {
     NSUInteger type=event.type, flags=event.modifierFlags;
     BOOL motion=type==5 || type==6 || type==7 || type==27;
     id window=event.window;
+    if (!window && (type==22 || (captured && motion))) {
+        id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
+        if ([app isActive]) window=[app keyWindow];
+    }
+    if (!window) return event;
+    if (!routeGameEvent(window,gameWindow) || editingGameText()) {
+        return forwardNativeEvent(event, type);
+    }
     if (type==22) {
         if (event.hasPreciseScrollingDeltas) preciseEvents++; else wheelEvents++;
 #if !GameLegacyBackend
@@ -34,22 +73,17 @@ static id handleEvent(ZZZHostEvent *event) {
             sawPreciseScroll=YES; note("Precise trackpad scroll event received");
         }
     }
-    if (!window && (type==22 || (captured && motion))) {
-        id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
-        if ([app isActive]) window=[app keyWindow];
-    }
-    if (!window) return event;
-    if (!routeGameEvent(window,gameWindow)) { releaseInput(); return event; }
     if (type==22 && event.momentumPhase!=0) {
         scrollRemainderX=scrollRemainderY=0;
         return nil;
     }
     id wheelEvent=nil;
     if (type==10 || type==11 || type==12) {
-        if (editingGameText()) { releaseInput(); return event; }
         unsigned code=event.keyCode, key=unityKey(code);
         // Keep macOS Command shortcuts available; clear held game keys first.
-        if (flags & (1u<<20)) { releaseInput(); return event; }
+        if (flags & (1u<<20)) return forwardNativeEvent(event, type);
+        if (type==11 && takeNativeKey(code)) return event;
+        if (type==10) setNativeKey(code, NO);
         if (type==10 && code==46 && (flags&(1u<<19))) {
             if (!event.isARepeat) { forcedCapture=!forcedCapture; setCapture(forcedCapture); }
             return nil;

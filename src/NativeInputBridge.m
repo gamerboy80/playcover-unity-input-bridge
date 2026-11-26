@@ -290,12 +290,7 @@ static void setCapture(BOOL value) {
 }
 
 static BOOL editingGameText(void) {
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:UIWindowScene.class]) continue;
-        for (UIWindow *window in ((UIWindowScene *)scene).windows)
-            if (window.isKeyWindow && editingUIKitText(window)) return YES;
-    }
-    return NO;
+    return editingUIKitScenes(UIApplication.sharedApplication.connectedScenes, gameWindow);
 }
 
 #include "EventHandler.h"
@@ -392,8 +387,8 @@ static void initializeDevices(void) {
             fflush(output);
         }
 #endif
-        [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationDidResignActiveNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
-        [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationWillTerminateNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; releaseInput(); }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationDidResignActiveNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; memset(nativeKeys, 0, sizeof(nativeKeys)); releaseInput(); }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:@"NSApplicationWillTerminateNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; memset(nativeKeys, 0, sizeof(nativeKeys)); releaseInput(); }];
 #if !GameLegacyBackend
         ((void (*)(uintptr_t))(slide+GameMouseMakeCurrent))(mouse);
         if (GameEnableMouseProcessing) {
@@ -426,7 +421,7 @@ static void initializeDevices(void) {
     id app=[(id)NSClassFromString(@"NSApplication") sharedApplication];
     BOOL active=[app isActive] && [app keyWindow]==gameWindow &&
         routeGameEvent(gameWindow,gameWindow) && !editingGameText();
-    if (!active && wasActive) releaseInput();
+    if (!active && (wasActive || captured || forcedCapture)) releaseInput();
     double now=NSProcessInfo.processInfo.systemUptime;
     if (active && !wasActive) {
         captureNotBefore=now+.15;
